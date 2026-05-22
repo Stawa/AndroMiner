@@ -1,0 +1,42 @@
+{
+  "name": "androminer-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "typecheck": "vue-tsc --noEmit",
+    "build": "npm run typecheck && vite build",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "preview": "vite preview --host 0.0.0.0",
+    "android:sync": "npm run build && npx cap sync android",
+    "android:open": "npx cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.4.4",
+    "@capacitor/clipboard": "^7.0.4",
+    "@capacitor/core": "^7.4.4",
+    "@capacitor/device": "^7.0.5",
+    "@capacitor/filesystem": "^7.1.8",
+    "@capacitor/preferences": "^7.0.4",
+    "@capacitor/share": "^7.0.4",
+    "chart.js": "^4.5.0",
+    "material-symbols": "^0.44.8",
+    "pinia": "^2.3.0",
+    "vue": "^3.5.13",
+    "vue-chartjs": "^5.3.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.4.4",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "autoprefixer": "^10.4.20",
+    "playwright-core": "^1.60.0",
+    "postcss": "^8.4.49",
+    "prettier": "^3.8.3",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3",
+    "vue-tsc": "^2.1.10"
+  }
+}

@@ -1,0 +1,63 @@
+# Dependencies
+node_modules/
+
+# Build and generated output
+dist/
+build/
+/types/
+coverage/
+.sourcemaps/
+*.map
+*.tsbuildinfo
+
+# Capacitor / Android generated files
+android/.gradle/
+android/**/build/
+android/capacitor-cordova-android-plugins/
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+android/app/src/main/res/xml/config.xml
+
+# Android local config and signing material
+local.properties
+android/local.properties
+key.properties
+android/key.properties
+*.jks
+*.keystore
+*.p12
+*.pfx
+
+# Environment files
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Logs and local diagnostics
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+capacitor-build.log
+artifacts/
+
+# IDE, OS, and editor files
+.idea/
+.vscode/
+.settings/
+.project
+*.iml
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.*.sw*
+xcuserdata/
+
+# iOS / native package manager output
+Pods/
+Carthage/
+*.xcframework.zip

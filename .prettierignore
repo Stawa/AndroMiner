@@ -1,0 +1,15 @@
+node_modules
+dist
+artifacts
+
+android/.gradle
+android/build
+android/app/build
+android/capacitor-cordova-android-plugins
+android/app/src/main/assets/public
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+android/app/src/main/assets/cordova_plugins.js
+
+*.log
+*.tsbuildinfo

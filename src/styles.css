@@ -1,0 +1,278 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    background: #101513;
+  }
+
+  body {
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    overflow-x: hidden;
+    background: #101513;
+    color: white;
+    font-family: Inter, Roboto, ui-sans-serif, system-ui, sans-serif;
+    overscroll-behavior-y: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  button,
+  input,
+  select {
+    font: inherit;
+  }
+
+  button {
+    min-height: 48px;
+    touch-action: manipulation;
+  }
+}
+
+@layer components {
+  .material-symbols-rounded {
+    font-variation-settings:
+      'FILL' 0,
+      'wght' 400,
+      'GRAD' 0,
+      'opsz' 24;
+  }
+
+  .icon-filled {
+    font-variation-settings:
+      'FILL' 1,
+      'wght' 500,
+      'GRAD' 0,
+      'opsz' 24;
+  }
+
+  .phone-page {
+    @apply mx-auto w-full max-w-[420px] space-y-3 px-4 pb-[calc(5.75rem+env(safe-area-inset-bottom))] pt-1;
+  }
+
+  .session-page {
+    @apply mx-auto flex min-h-screen w-full max-w-[420px] flex-col px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))];
+  }
+
+  .app-card {
+    @apply rounded-[20px] border border-app-line bg-app-card text-white shadow-none;
+  }
+
+  .ripple {
+    @apply relative overflow-hidden;
+  }
+
+  .ripple::after {
+    content: '';
+    @apply pointer-events-none absolute inset-0 bg-white opacity-0 transition-opacity duration-150;
+  }
+
+  .ripple:active::after {
+    @apply opacity-10;
+  }
+
+  .top-icon-button {
+    @apply ripple grid h-12 w-12 shrink-0 place-items-center rounded-full text-white transition-colors duration-150 active:bg-white/10;
+  }
+
+  .app-bottom-nav {
+    @apply fixed inset-x-0 bottom-0 z-40 border-t border-app-line bg-app-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur;
+  }
+
+  .bottom-nav-button {
+    @apply ripple flex min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-1 text-[11px] font-medium leading-4 text-app-muted transition-colors duration-150;
+  }
+
+  .bottom-nav-button-active {
+    @apply text-app-green;
+  }
+
+  .bottom-nav-icon {
+    @apply grid h-8 min-w-12 place-items-center rounded-full transition-colors duration-150;
+  }
+
+  .bottom-nav-button-active .bottom-nav-icon {
+    @apply bg-app-green-dim;
+  }
+
+  .setting-row {
+    @apply flex min-h-[64px] w-full items-center gap-3 border-t border-app-line px-4 py-3 first:border-t-0;
+  }
+
+  .setting-icon {
+    @apply shrink-0 text-app-muted;
+  }
+
+  .settings-heading {
+    @apply flex min-h-14 items-center gap-3 px-4 text-[14px] font-semibold leading-5 text-app-muted;
+  }
+
+  .md-switch {
+    @apply relative h-8 w-[52px] shrink-0 rounded-full border-2 border-app-muted/[0.7] bg-white/[0.14] transition-colors duration-200;
+  }
+
+  .md-switch-thumb {
+    @apply absolute left-[3px] top-1/2 h-6 w-6 -translate-y-1/2 rounded-full bg-app-muted transition-all duration-200;
+  }
+
+  .peer:checked + .md-switch {
+    @apply border-app-green bg-app-green/[0.8];
+  }
+
+  .peer:checked + .md-switch .md-switch-thumb {
+    @apply left-[22px] bg-white;
+  }
+
+  .peer:focus-visible + .md-switch {
+    @apply outline outline-2 outline-offset-2 outline-app-green;
+  }
+
+  .peer:disabled + .md-switch {
+    @apply opacity-45;
+  }
+
+  .profile-chip {
+    @apply min-h-[56px] rounded-xl bg-app-elevated px-3 py-2 text-center text-app-muted transition-colors duration-150 active:bg-white/10;
+  }
+
+  .profile-chip-selected {
+    @apply bg-app-green-dim text-app-green;
+  }
+
+  .stat-card {
+    @apply min-w-0 rounded-2xl border border-app-line bg-app-card p-3;
+  }
+
+  .session-action {
+    @apply flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-1 rounded-xl border border-app-line bg-app-card px-2 text-[13px] font-medium leading-5 text-white active:bg-white/10;
+  }
+
+  .config-field {
+    @apply block min-w-0 space-y-2;
+  }
+
+  .config-label {
+    @apply block text-[12px] font-medium leading-4 text-app-muted;
+  }
+
+  .config-input,
+  .config-select {
+    @apply h-14 w-full min-w-0 rounded-xl border border-transparent bg-app-elevated px-4 text-[16px] leading-6 text-white outline-none transition-colors duration-150 placeholder:text-app-muted focus:border-app-green;
+  }
+
+  .config-select {
+    @apply appearance-none pr-10;
+  }
+
+  .android-slider {
+    @apply h-10 w-full cursor-pointer appearance-none bg-transparent accent-app-green;
+  }
+
+  .android-slider::-webkit-slider-runnable-track {
+    @apply h-1 rounded-full bg-white/[0.18];
+  }
+
+  .android-slider::-webkit-slider-thumb {
+    @apply -mt-3 h-7 w-7 appearance-none rounded-full border-2 border-white bg-white;
+  }
+
+  .chart-card {
+    @apply app-card p-4;
+  }
+
+  .drawer-row {
+    @apply flex min-h-12 w-full items-center gap-4 rounded-xl px-3 text-left text-[15px] text-white active:bg-white/10;
+  }
+
+  .drawer-backdrop {
+    @apply pointer-events-none fixed inset-0 z-50 bg-black/[0.55];
+    opacity: var(--drawer-backdrop-opacity, 0);
+    transition: opacity 220ms ease;
+    transition-delay: var(--drawer-backdrop-delay, 0s, 220ms);
+  }
+
+  .drawer-backdrop.drawer-backdrop-open {
+    @apply pointer-events-auto;
+  }
+
+  .app-drawer {
+    @apply fixed inset-y-0 left-0 z-50 w-[min(84vw,304px)] bg-app-card px-4 pb-6 pt-[max(2.25rem,env(safe-area-inset-top))] shadow-xl shadow-black/40;
+    opacity: var(--drawer-opacity, 0.64);
+    transform: translate3d(var(--drawer-x, -104%), 0, 0);
+    transition:
+      opacity 260ms cubic-bezier(0.2, 0, 0, 1),
+      transform 260ms cubic-bezier(0.2, 0, 0, 1);
+    transition-delay: var(--drawer-delay, 0s, 0s);
+    will-change: opacity, transform;
+  }
+
+  .app-drawer.app-drawer-open {
+    --drawer-opacity: 1;
+    --drawer-x: 0%;
+  }
+
+  .fade-enter-active,
+  .fade-leave-active {
+    transition: opacity 180ms ease;
+  }
+
+  .fade-enter-from,
+  .fade-leave-to {
+    opacity: 0;
+  }
+
+  .drawer-enter-active,
+  .drawer-leave-active {
+    transition:
+      opacity 240ms cubic-bezier(0.2, 0, 0, 1),
+      transform 240ms cubic-bezier(0.2, 0, 0, 1);
+    will-change: opacity, transform;
+  }
+
+  .drawer-enter-from,
+  .drawer-leave-to {
+    opacity: 0.5;
+    transform: translate3d(-104%, 0, 0);
+  }
+
+  .sheet-enter-active,
+  .sheet-leave-active {
+    transition: transform 220ms ease;
+  }
+
+  .sheet-enter-from,
+  .sheet-leave-to {
+    transform: translateY(100%);
+  }
+
+  .motion-reduced *,
+  .motion-reduced *::before,
+  .motion-reduced *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+  }
+
+  @keyframes ringPulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.72;
+    }
+  }
+
+  .animate-ringPulse {
+    animation: ringPulse 1.8s ease-in-out infinite;
+  }
+}
