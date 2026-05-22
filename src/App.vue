@@ -265,6 +265,8 @@ watch(
       :stats="miner.stats"
       :connected="miner.connected.value"
       :uptime="miner.uptimeLabel.value"
+      :backend-message="miner.backendMessage.value"
+      :logs="miner.minerLogs.value"
       @pause="miner.pauseMining"
       @stop="miner.stopMining"
       @profile="miner.updateProfile"

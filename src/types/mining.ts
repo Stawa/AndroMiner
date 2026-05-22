@@ -109,6 +109,7 @@ export interface MiningTelemetry {
   stats: MiningStats;
   hashrateHistory: HistoryPoint[];
   temperatureHistory: HistoryPoint[];
+  logs: string[];
   isLoading: boolean;
 }
 

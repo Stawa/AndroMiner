@@ -86,10 +86,10 @@ export const useProfilesStore = defineStore('profiles', {
             : index === 1
               ? ('battery_saver' as const)
               : ('performance' as const),
-        threadCount: Math.min(config.totalDetectedThreads, index === 0 ? 4 : index === 1 ? 2 : 7),
+        threadCount: Math.min(config.totalDetectedThreads, index === 0 ? 2 : index === 1 ? 1 : 4),
         customThreadCount: Math.min(
           config.totalDetectedThreads,
-          index === 0 ? 4 : index === 1 ? 2 : 7
+          index === 0 ? 2 : index === 1 ? 1 : 4
         )
       }));
 

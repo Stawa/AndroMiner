@@ -15,6 +15,8 @@ interface MiningSessionViewProps {
   stats: MiningStats;
   connected: boolean;
   uptime: string;
+  backendMessage: string;
+  logs: string[];
 }
 
 const props = defineProps<MiningSessionViewProps>();
@@ -60,6 +62,8 @@ const batterySafetyLimit = 20;
 const profileLabel = computed(
   () => profilePresets.find((preset) => preset.id === props.config.profile)?.label || 'Profile'
 );
+const latestLogs = computed(() => props.logs.slice(-8).reverse());
+const detailLogs = computed(() => props.logs.slice(-30).reverse());
 
 const toggleDetails = (): void => {
   detailsOpen.value = !detailsOpen.value;
@@ -270,6 +274,35 @@ const trendLabel = computed(() => {
           :tone="stats.batteryLevel <= batterySafetyLimit ? 'warning' : 'normal'"
         />
       </section>
+
+      <section class="rounded-2xl border border-app-line bg-black/25 p-3">
+        <div class="mb-2 flex items-center justify-between gap-3">
+          <div class="flex min-w-0 items-center gap-2">
+            <MaterialIcon name="terminal" :size="18" class="shrink-0 text-app-green" />
+            <p class="truncate text-[13px] font-semibold text-white">Miner logs</p>
+          </div>
+          <span
+            class="shrink-0 rounded-full bg-white/5 px-2 py-1 text-[10px] uppercase text-app-muted"
+          >
+            latest
+          </span>
+        </div>
+
+        <div
+          class="max-h-36 overflow-y-auto rounded-xl bg-black/30 px-3 py-2 font-mono text-[11px] leading-4"
+        >
+          <p v-if="latestLogs.length === 0" class="break-words text-app-muted">
+            {{ backendMessage || 'Waiting for miner output...' }}
+          </p>
+          <p
+            v-for="(line, index) in latestLogs"
+            :key="`latest-${index}-${line}`"
+            class="break-words border-b border-white/5 py-1 text-app-muted last:border-b-0"
+          >
+            {{ line }}
+          </p>
+        </div>
+      </section>
     </main>
 
     <SessionControls
@@ -362,6 +395,26 @@ const trendLabel = computed(() => {
             ><strong class="font-medium text-white">{{
               config.backgroundMining ? 'Enabled' : 'Disabled'
             }}</strong>
+          </div>
+          <div class="py-3 text-[14px]">
+            <div class="mb-2 flex items-center justify-between gap-3">
+              <span class="text-app-muted">Miner logs</span>
+              <strong class="font-medium text-white">{{ logs.length }} lines</strong>
+            </div>
+            <div
+              class="max-h-52 overflow-y-auto rounded-xl bg-black/30 px-3 py-2 font-mono text-[11px] leading-4"
+            >
+              <p v-if="detailLogs.length === 0" class="break-words text-app-muted">
+                {{ backendMessage || 'Waiting for miner output...' }}
+              </p>
+              <p
+                v-for="(line, index) in detailLogs"
+                :key="`detail-${index}-${line}`"
+                class="break-words border-b border-white/5 py-1 text-app-muted last:border-b-0"
+              >
+                {{ line }}
+              </p>
+            </div>
           </div>
         </div>
       </section>

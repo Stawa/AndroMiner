@@ -26,6 +26,7 @@ interface NativeMinerStatus {
   running: boolean;
   message?: string;
   stats?: NativeMinerStats;
+  logs?: string[];
 }
 
 interface NativeMinerPlugin {
@@ -53,8 +54,8 @@ const initialConfig: MiningConfig = {
   walletAddress: 'YOUR_XMR_WALLET_ADDRESS',
   workerName: 'android-phone',
   password: 'x',
-  threadCount: 4,
-  customThreadCount: 4,
+  threadCount: 2,
+  customThreadCount: 2,
   totalDetectedThreads: 8,
   affinity: 'auto',
   priority: 'normal',
@@ -86,7 +87,7 @@ export const profilePresets: ProfilePreset[] = [
     id: 'battery_saver',
     label: 'Battery Saver',
     description: 'Cooler CPU use for longer unplugged sessions',
-    threads: 2,
+    threads: 1,
     thermalLimit: 62,
     priority: 'low'
   },
@@ -94,25 +95,25 @@ export const profilePresets: ProfilePreset[] = [
     id: 'balanced',
     label: 'Balanced',
     description: 'Recommended for everyday Android mining',
-    threads: 4,
+    threads: 2,
     thermalLimit: 72,
-    priority: 'normal'
+    priority: 'low'
   },
   {
     id: 'performance',
     label: 'Performance',
     description: 'Higher output with tighter thermal monitoring',
-    threads: 7,
+    threads: 4,
     thermalLimit: 78,
-    priority: 'high'
+    priority: 'normal'
   },
   {
     id: 'custom',
     label: 'Custom',
     description: 'Manual CPU and safety configuration',
-    threads: 4,
+    threads: 2,
     thermalLimit: 72,
-    priority: 'normal'
+    priority: 'low'
   }
 ];
 
@@ -173,12 +174,14 @@ export const useMiningController = () => {
   const connected = ref(false);
   const backendState = ref<MinerBackendState>('checking');
   const backendMessage = ref('Checking native miner backend...');
+  const minerLogs = ref<string[]>([]);
   const config = reactive<MiningConfig>(cloneConfig(initialConfig));
   const stats = reactive<MiningStats>({ ...initialStats });
   const hashrateHistory = ref<HistoryPoint[]>(createEmptyHistory());
   const temperatureHistory = ref<HistoryPoint[]>(createEmptyHistory());
   const sessionHistory = ref<MiningSessionHistoryItem[]>(readSessionHistory());
   let pollHandle = 0;
+  let uiTickHandle = 0;
   let sessionStartedAt = 0;
   let sessionStartingAcceptedShares = 0;
   let sessionStartingRejectedShares = 0;
@@ -195,6 +198,7 @@ export const useMiningController = () => {
     stats,
     hashrateHistory: hashrateHistory.value,
     temperatureHistory: temperatureHistory.value,
+    logs: minerLogs.value,
     isLoading: isLoading.value
   }));
 
@@ -227,6 +231,7 @@ export const useMiningController = () => {
       (status.available
         ? 'Native miner backend is ready.'
         : 'Native miner backend is missing an Android XMRig binary.');
+    minerLogs.value = Array.isArray(status.logs) ? status.logs : minerLogs.value;
 
     if (status.running) {
       state.value = state.value === 'paused' ? 'paused' : 'mining';
@@ -244,7 +249,15 @@ export const useMiningController = () => {
     stats.acceptedShares = Number(nativeStats.acceptedShares ?? stats.acceptedShares);
     stats.rejectedShares = Number(nativeStats.rejectedShares ?? stats.rejectedShares);
     stats.activeThreads = Number(nativeStats.activeThreads ?? stats.activeThreads);
-    stats.uptimeSeconds = Number(nativeStats.uptimeSeconds ?? stats.uptimeSeconds);
+    const nativeUptimeSeconds = Number(nativeStats.uptimeSeconds ?? stats.uptimeSeconds);
+    if ((state.value === 'mining' || state.value === 'starting') && nativeUptimeSeconds > 0) {
+      if (sessionStartedAt <= 0) {
+        sessionStartedAt = Date.now() - nativeUptimeSeconds * 1000;
+      }
+      stats.uptimeSeconds = Math.max(stats.uptimeSeconds, nativeUptimeSeconds);
+    } else {
+      stats.uptimeSeconds = nativeUptimeSeconds;
+    }
     stats.cpuUsage =
       state.value === 'mining'
         ? bounded(config.threadCount * 11 + 18, 0, 100)
@@ -255,6 +268,17 @@ export const useMiningController = () => {
       sessionHashrateTotal += stats.hashrate;
       sessionHashrateSamples += 1;
     }
+  };
+
+  const refreshLocalUptime = (): void => {
+    if ((state.value !== 'mining' && state.value !== 'starting') || sessionStartedAt <= 0) {
+      return;
+    }
+
+    stats.uptimeSeconds = Math.max(
+      stats.uptimeSeconds,
+      Math.floor((Date.now() - sessionStartedAt) / 1000)
+    );
   };
 
   const refreshStatus = async (): Promise<void> => {
@@ -305,6 +329,7 @@ export const useMiningController = () => {
     stats.uptimeSeconds = 0;
     stats.hashrate = 0;
     stats.activeThreads = 0;
+    minerLogs.value = [];
     sessionStartedAt = Date.now();
     sessionStartingAcceptedShares = stats.acceptedShares;
     sessionStartingRejectedShares = stats.rejectedShares;
@@ -313,7 +338,15 @@ export const useMiningController = () => {
     state.value = 'starting';
 
     try {
-      const status = await NativeMiner.start({ config: cloneConfig(config) });
+      const nativeConfig = cloneConfig(config);
+      nativeConfig.threadCount = bounded(
+        nativeConfig.threadCount,
+        1,
+        nativeConfig.totalDetectedThreads
+      );
+      nativeConfig.customThreadCount = nativeConfig.threadCount;
+
+      const status = await NativeMiner.start({ config: nativeConfig });
       setBackendStatus(status);
       applyNativeStats(status.stats);
       state.value = status.running ? 'mining' : 'idle';
@@ -476,8 +509,12 @@ export const useMiningController = () => {
 
     pollHandle = window.setInterval(() => {
       void refreshStatus();
-      tickTelemetry();
     }, 2000);
+
+    uiTickHandle = window.setInterval(() => {
+      refreshLocalUptime();
+      tickTelemetry();
+    }, 1000);
   });
 
   watch(state, (nextState) => {
@@ -501,6 +538,7 @@ export const useMiningController = () => {
 
   onUnmounted(() => {
     window.clearInterval(pollHandle);
+    window.clearInterval(uiTickHandle);
   });
 
   return {
@@ -510,6 +548,7 @@ export const useMiningController = () => {
     connected,
     backendState,
     backendMessage,
+    minerLogs,
     config,
     stats,
     hashrateHistory,
