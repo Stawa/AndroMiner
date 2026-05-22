@@ -3,24 +3,44 @@ import { computed, onMounted, ref, watch } from 'vue';
 type ThemeMode = 'light' | 'dark';
 
 const storageKey = 'androminer-theme';
-const theme = ref<ThemeMode>('dark');
 
 const applyTheme = (mode: ThemeMode): void => {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
   document.documentElement.classList.toggle('dark', mode === 'dark');
   document.documentElement.style.colorScheme = mode;
 };
 
+const getInitialTheme = (): ThemeMode => {
+  if (typeof window === 'undefined') {
+    return 'dark';
+  }
+
+  const stored = localStorage.getItem(storageKey);
+  if (stored === 'light' || stored === 'dark') {
+    return stored;
+  }
+
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+};
+
+const theme = ref<ThemeMode>(getInitialTheme());
+applyTheme(theme.value);
+
 export const useTheme = () => {
   const isDark = computed(() => theme.value === 'dark');
 
+  const setTheme = (mode: ThemeMode): void => {
+    theme.value = mode;
+  };
+
   const toggleTheme = (): void => {
-    theme.value = isDark.value ? 'light' : 'dark';
+    setTheme(isDark.value ? 'light' : 'dark');
   };
 
   onMounted(() => {
-    const stored = localStorage.getItem(storageKey);
-    const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    theme.value = stored === 'light' || stored === 'dark' ? stored : systemDark ? 'dark' : 'light';
     applyTheme(theme.value);
   });
 
@@ -36,6 +56,7 @@ export const useTheme = () => {
   return {
     theme,
     isDark,
+    setTheme,
     toggleTheme
   };
 };

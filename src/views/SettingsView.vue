@@ -1,12 +1,20 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import MaterialIcon from '../components/MaterialIcon.vue';
 import SettingGroup from '../components/SettingGroup.vue';
 import ToggleRow from '../components/ToggleRow.vue';
+import { useTheme } from '../composables/useTheme';
 import { useSettingsStore } from '../stores/settings';
 
 const settings = useSettingsStore();
+const { theme, setTheme } = useTheme();
 const aboutOpen = ref(false);
+const lightThemeEnabled = computed({
+  get: () => theme.value === 'light',
+  set: (enabled: boolean) => {
+    setTheme(enabled ? 'light' : 'dark');
+  }
+});
 
 const emit = defineEmits<{
   exportConfig: [];
@@ -24,6 +32,14 @@ const closeAbout = (): void => {
 
 <template>
   <div class="phone-page">
+    <SettingGroup title="Appearance" icon="palette">
+      <ToggleRow
+        v-model="lightThemeEnabled"
+        label="Light theme"
+        supporting-text="Use a brighter interface for daytime mining"
+      />
+    </SettingGroup>
+
     <SettingGroup title="Notifications" icon="notifications">
       <ToggleRow
         v-model="settings.notifications.miningStatus"

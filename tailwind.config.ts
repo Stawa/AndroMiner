@@ -10,14 +10,15 @@ export default {
       },
       colors: {
         app: {
-          bg: '#111615',
-          card: '#1a211f',
-          elevated: '#222a27',
-          line: '#2d3834',
-          muted: '#aeb8b3',
-          green: '#5ad989',
-          'green-dim': '#174d34',
-          yellow: '#f8c338'
+          bg: 'rgb(var(--color-app-bg) / <alpha-value>)',
+          card: 'rgb(var(--color-app-card) / <alpha-value>)',
+          elevated: 'rgb(var(--color-app-elevated) / <alpha-value>)',
+          line: 'rgb(var(--color-app-line) / <alpha-value>)',
+          muted: 'rgb(var(--color-app-muted) / <alpha-value>)',
+          on: 'rgb(var(--color-app-on) / <alpha-value>)',
+          green: 'rgb(var(--color-app-green) / <alpha-value>)',
+          'green-dim': 'rgb(var(--color-app-green-dim) / <alpha-value>)',
+          yellow: 'rgb(var(--color-app-yellow) / <alpha-value>)'
         },
         surface: {
           bg: '#f8faf7',

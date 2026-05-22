@@ -8,6 +8,7 @@ import AppHeader from './components/AppHeader.vue';
 import BottomNav, { type AppTab } from './components/BottomNav.vue';
 import { useDeviceTelemetry } from './composables/useDeviceTelemetry';
 import { useMiningController } from './composables/useMiningController';
+import { useTheme } from './composables/useTheme';
 import { useProfilesStore } from './stores/profiles';
 import { useSettingsStore, type SettingsState } from './stores/settings';
 import DashboardView from './views/DashboardView.vue';
@@ -30,6 +31,7 @@ const miner = useMiningController();
 const settings = useSettingsStore();
 const profiles = useProfilesStore();
 const { device } = useDeviceTelemetry();
+useTheme();
 const sessionActive = computed(() => miner.state.value !== 'idle');
 
 interface MiningNotificationPlugin {
@@ -240,7 +242,7 @@ watch(
 
 <template>
   <div
-    class="min-h-screen bg-app-bg text-white"
+    class="min-h-screen bg-app-bg text-app-on"
     :class="{ 'motion-reduced': !settings.performance.animationsEnabled }"
   >
     <SystemCheckView

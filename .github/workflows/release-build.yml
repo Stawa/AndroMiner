@@ -1,0 +1,88 @@
+name: Android (CI / Release)
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+run-name: ${{ github.event_name == 'workflow_dispatch' && 'Android Manual Tests' || format('Android Release Build {0}', github.event.release.tag_name) }}
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    name: ${{ github.event_name == 'workflow_dispatch' && 'Android Manual Tests' || 'Android Release Build' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check formatting
+        if: github.event_name == 'workflow_dispatch'
+        run: npm run format:check
+
+      - name: Build web app
+        if: github.event_name == 'workflow_dispatch'
+        run: npm run build
+
+      - name: Sync Android project
+        if: github.event_name == 'workflow_dispatch'
+        run: npx cap sync android
+
+      - name: Run Android unit tests
+        if: github.event_name == 'workflow_dispatch'
+        working-directory: android
+        run: |
+          chmod +x ./gradlew
+          ./gradlew testDebugUnitTest --stacktrace
+
+      - name: Build web app and sync Android project
+        if: github.event_name == 'release'
+        run: npm run android:sync
+
+      - name: Build Android APK and bundle
+        if: github.event_name == 'release'
+        working-directory: android
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleRelease bundleRelease --stacktrace
+
+      - name: Collect release outputs
+        if: github.event_name == 'release'
+        run: |
+          mkdir -p release-assets
+          find android/app/build/outputs -type f \( -name "*.apk" -o -name "*.aab" \) -print -exec cp {} release-assets/ \;
+          test -n "$(find release-assets -type f -print -quit)"
+
+      - name: Upload workflow artifacts
+        if: github.event_name == 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: androminer-${{ github.event.release.tag_name }}-android
+          path: release-assets/*
+          if-no-files-found: error
+
+      - name: Attach assets to GitHub Release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$RELEASE_TAG" release-assets/* --clobber

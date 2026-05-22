@@ -40,14 +40,15 @@ AndroMiner is an Android-focused cryptocurrency mining app built with Vue 3, Typ
 
 This repository now includes a working build path for Android ARM64 XMRig through [`miner-builder/`](miner-builder/). The current local miner build is:
 
-| Component | Version / source                                     |
-| --------- | ---------------------------------------------------- |
-| XMRig     | `v6.26.0` from `xmrig/xmrig`                         |
-| Commit    | `b2ca72480c58d197e18c885d9fc1a0c8d517e60a`           |
-| libuv     | `v1.48.0`                                            |
-| ABI       | `arm64-v8a`                                          |
-| Output    | `android/app/src/main/jniLibs/arm64-v8a/libxmrig.so` |
-| TLS       | Disabled in the first working build                  |
+| Component               | Version / source                                     |
+| ----------------------- | ---------------------------------------------------- |
+| XMRig                   | `v6.26.0` from `xmrig/xmrig`                         |
+| Commit                  | `b2ca72480c58d197e18c885d9fc1a0c8d517e60a`           |
+| libuv                   | `v1.48.0`                                            |
+| OpenSSL builder target  | `openssl-3.3.2`                                      |
+| ABI                     | `arm64-v8a`                                          |
+| Output                  | `android/app/src/main/jniLibs/arm64-v8a/libxmrig.so` |
+| Current packaged binary | OpenSSL/TLS-enabled ARM64 XMRig                      |
 
 The Android app registers a native `NativeMiner` Capacitor plugin that:
 
@@ -122,7 +123,7 @@ AndroMiner uses standard XMRig-style pool settings: pool URL, port, wallet/user,
 | Nanopool          | XMR       | `xmr-eu1.nanopool.org`    | `14444`      | `stratum+tcp` | Centralized XMR pool; verify regional endpoint.                      |
 
 > [!IMPORTANT]
-> The current bundled ARM64 miner is a no-TLS build. Use plain TCP pool ports such as SupportXMR `3333` until the builder is extended with OpenSSL/TLS support.
+> The current bundled ARM64 miner is OpenSSL/TLS-enabled. Rebuilding this binary requires MSYS2 Perl or WSL/Ubuntu Perl; Strawberry Perl and Git for Windows Perl are not suitable for the OpenSSL Android build.
 
 Useful references:
 
@@ -140,9 +141,12 @@ Useful references:
 - [x] Support for Android debug APK builds
 - [x] Native Android process bridge for XMRig-compatible miners
 - [x] ARM64 Android XMRig builder and packaged debug binary path
+- [x] OpenSSL/TLS-enabled XMRig builder support
 - [x] Live miner logs in the active session screen
-- [ ] Light theme support
-- [ ] OpenSSL/TLS-enabled XMRig Android build
+- [x] Foreground mining status notifications on Android
+- [x] Configuration import and export
+- [x] Packaged OpenSSL/TLS-enabled XMRig Android binary
+- [x] Light theme support
 - [ ] Additional Android ABIs beyond ARM64
 - [ ] Full XMRig JSON/API telemetry support
 - [ ] Signing production builds and packaging releases
