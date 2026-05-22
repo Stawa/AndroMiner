@@ -6,7 +6,7 @@ import MiningMetric from '../components/MiningMetric.vue';
 import SessionControls from '../components/SessionControls.vue';
 import StatusIndicator from '../components/StatusIndicator.vue';
 import WarningBottomSheet, { type WarningType } from '../components/WarningBottomSheet.vue';
-import { profilePresets } from '../composables/useMiningMock';
+import { profilePresets } from '../composables/useMiningController';
 import type { MiningConfig, MiningProfile, MiningState, MiningStats } from '../types/mining';
 
 interface MiningSessionViewProps {

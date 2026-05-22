@@ -6,7 +6,8 @@ import ExpandableCard from '../components/ExpandableCard.vue';
 import MaterialIcon from '../components/MaterialIcon.vue';
 import ProfileChip from '../components/ProfileChip.vue';
 import ToggleRow from '../components/ToggleRow.vue';
-import { cryptocurrencies, profilePresets } from '../composables/useMiningMock';
+import { profilePresets, type MinerBackendState } from '../composables/useMiningController';
+import { cryptocurrencies } from '../data/miningCatalog';
 import { useProfilesStore } from '../stores/profiles';
 import type {
   CpuAffinity,
@@ -19,6 +20,8 @@ import type {
 
 interface MiningConfigViewProps {
   config: MiningConfig;
+  backendState: MinerBackendState;
+  backendMessage: string;
 }
 
 interface ConfigSelectOption {
@@ -127,6 +130,22 @@ const activeSavedProfile = computed(() => savedProfiles.activeProfile);
 
 const profileSummary = (profile: SavedMiningProfile): string =>
   `${profile.config.coin.symbol} · ${profile.config.threadCount} threads · ${profile.config.poolUrl}:${profile.config.poolPort}`;
+
+const backendStatus = computed(() => {
+  const labels: Record<MinerBackendState, { label: string; icon: string; tone: string }> = {
+    checking: { label: 'Checking backend', icon: 'sync', tone: 'text-app-muted' },
+    ready: { label: 'Native miner ready', icon: 'check_circle', tone: 'text-app-green' },
+    missing: { label: 'Miner binary missing', icon: 'warning', tone: 'text-app-yellow' },
+    'web-unavailable': {
+      label: 'Android app required',
+      icon: 'phone_android',
+      tone: 'text-app-yellow'
+    },
+    error: { label: 'Backend error', icon: 'error', tone: 'text-red-300' }
+  };
+
+  return labels[props.backendState];
+});
 
 const addSavedProfile = (): void => {
   const profile = savedProfiles.saveFromConfig(
@@ -239,6 +258,21 @@ watch(
         :supporting-text="`Current algorithm: ${config.algorithm}`"
         @update:model-value="handleCoinChange"
       />
+    </section>
+
+    <section class="app-card p-4">
+      <div class="flex items-start gap-3">
+        <div
+          class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-app-elevated"
+          :class="backendStatus.tone"
+        >
+          <MaterialIcon :name="backendStatus.icon" :size="22" />
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-[15px] font-semibold leading-5 text-white">{{ backendStatus.label }}</p>
+          <p class="mt-1 text-[12px] leading-[18px] text-app-muted">{{ backendMessage }}</p>
+        </div>
+      </div>
     </section>
 
     <section class="app-card overflow-hidden">

@@ -11,7 +11,7 @@ interface ProfilesState {
 
 const cloneConfig = (config: MiningConfig): MiningConfig => ({
   ...config,
-  coin: { ...config.coin }
+  coin: { ...config.coin, poolExamples: [...(config.coin.poolExamples || [])] }
 });
 
 const readProfiles = (): SavedMiningProfile[] => {

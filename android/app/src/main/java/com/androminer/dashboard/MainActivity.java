@@ -24,6 +24,7 @@ public class MainActivity extends BridgeActivity {
   protected void onCreate(Bundle savedInstanceState) {
     registerPlugin(DeviceStatusPlugin.class);
     registerPlugin(MiningNotificationPlugin.class);
+    registerPlugin(NativeMinerPlugin.class);
     super.onCreate(savedInstanceState);
     requestNotificationPermission();
     requestBatteryOptimizationExemptionOnce();

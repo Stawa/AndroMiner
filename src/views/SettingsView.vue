@@ -190,8 +190,8 @@ const closeAbout = (): void => {
         </div>
       </div>
       <p class="mt-4 text-[13px] leading-5 text-app-muted">
-        Android-native mock interface prepared for a future mining service, foreground notification,
-        and device safety integration.
+        Android-native interface for launching an XMRig-compatible miner binary, tracking real pool
+        shares, and mirroring device safety telemetry.
       </p>
       <button
         class="ripple mt-5 h-12 w-full rounded-full bg-app-green-dim text-[15px] font-semibold text-app-green"

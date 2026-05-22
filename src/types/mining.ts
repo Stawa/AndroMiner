@@ -28,7 +28,19 @@ export interface Cryptocurrency {
   name: string;
   symbol: string;
   algorithm: string;
+  xmrigAlgo: string;
+  miner: 'xmrig';
   defaultPort: number;
+  defaultPoolUrl: string;
+  defaultProtocol: MiningProtocol;
+  walletAddressPattern: string;
+  poolExamples: Array<{
+    name: string;
+    host: string;
+    port: number;
+    protocol: MiningProtocol;
+    notes: string;
+  }>;
   logoText: string;
   logoClass: string;
 }
@@ -131,4 +143,5 @@ export interface DeviceTelemetry {
   temperatureC: number | null;
   thermalStatus: 'unknown' | 'cool' | 'normal' | 'warm' | 'hot' | 'unavailable';
   thermalSource: 'native' | 'battery' | 'estimated' | 'unavailable';
+  thermalSensorName: string | null;
 }

@@ -61,7 +61,11 @@ defineProps<AboutViewProps>();
         </div>
         <div class="flex min-h-12 items-center justify-between gap-3 px-4 py-2 text-[14px]">
           <span class="text-app-muted">Thermal source</span
-          ><strong class="text-right font-medium text-white">{{ device.thermalSource }}</strong>
+          ><strong class="text-right font-medium text-white">{{
+            device.thermalSensorName
+              ? `${device.thermalSource} · ${device.thermalSensorName}`
+              : device.thermalSource
+          }}</strong>
         </div>
       </div>
     </SettingGroup>
@@ -73,8 +77,8 @@ defineProps<AboutViewProps>();
           battery optimization request, and network-state awareness.
         </p>
         <p>
-          CPU thermal sensors need a native Android bridge for device-specific APIs; the UI now
-          exposes a typed integration point.
+          Actual mining requires an XMRig-compatible Android binary packaged as libxmrig.so or
+          installed into the app files miners directory.
         </p>
       </div>
     </SettingGroup>

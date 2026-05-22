@@ -9,11 +9,15 @@ import type {
   MiningStats,
   SavedMiningProfile
 } from '../types/mining';
+import type { MinerBackendState } from '../composables/useMiningController';
 
 interface DashboardViewProps {
   config: MiningConfig;
   stats: MiningStats;
   device: DeviceTelemetry;
+  connected: boolean;
+  backendState: MinerBackendState;
+  backendMessage: string;
   sessionHistory: MiningSessionHistoryItem[];
   activeProfile?: SavedMiningProfile;
 }
@@ -38,6 +42,7 @@ const walletPreview = computed(() =>
     : props.config.walletAddress
 );
 const profileName = computed(() => props.activeProfile?.name || 'Unsaved setup');
+const canStart = computed(() => props.backendState === 'ready');
 const formatDuration = (seconds: number): string => {
   if (seconds < 60) {
     return `${Math.max(1, seconds)}s`;
@@ -173,7 +178,7 @@ const deleteSelectedSession = (id: string): void => {
             {{ config.coin.symbol }} mining
           </h2>
         </div>
-        <StatusIndicator connected />
+        <StatusIndicator :connected="connected" />
       </div>
 
       <div class="space-y-2 rounded-2xl bg-app-elevated p-3 text-[14px] leading-5">
@@ -197,10 +202,18 @@ const deleteSelectedSession = (id: string): void => {
         </div>
       </div>
 
+      <div
+        v-if="backendState !== 'ready'"
+        class="mt-3 rounded-xl border border-app-line bg-app-elevated/70 p-3 text-[12px] leading-[18px] text-app-muted"
+      >
+        {{ backendMessage }}
+      </div>
+
       <div class="mt-4 grid grid-cols-3 gap-2">
         <button
-          class="ripple col-span-2 flex h-14 items-center justify-center gap-2 rounded-xl bg-app-green-dim text-[16px] font-semibold text-app-green"
+          class="ripple col-span-2 flex h-14 items-center justify-center gap-2 rounded-xl bg-app-green-dim text-[16px] font-semibold text-app-green disabled:opacity-45"
           type="button"
+          :disabled="!canStart"
           @click="emit('start')"
         >
           <MaterialIcon name="play_arrow" :size="24" filled />

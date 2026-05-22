@@ -16,7 +16,11 @@ import SettingGroup from '../components/SettingGroup.vue';
           configuration.
         </p>
         <p>
-          <strong class="text-white">4.</strong> Start mining from Dashboard or Save & Start Mining.
+          <strong class="text-white">4.</strong> Package an Android XMRig-compatible binary before
+          starting a real session.
+        </p>
+        <p>
+          <strong class="text-white">5.</strong> Start mining from Dashboard or Save & Start Mining.
         </p>
       </div>
     </SettingGroup>
@@ -27,10 +31,7 @@ import SettingGroup from '../components/SettingGroup.vue';
         <p>
           CPU threads use native web runtime detection and are mirrored into the mining profile.
         </p>
-        <p>
-          Thermal status is estimated in the web layer until a native Android thermal plugin is
-          connected.
-        </p>
+        <p>Thermal status is read through the native Android bridge when sensors are available.</p>
       </div>
     </SettingGroup>
 

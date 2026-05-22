@@ -18,6 +18,7 @@ interface NativeDeviceStatus {
   cpuThreads: number;
   temperatureC?: number;
   temperatureSource?: DeviceTelemetry['thermalSource'];
+  temperatureSensor?: string;
   thermalStatus: DeviceTelemetry['thermalStatus'];
 }
 
@@ -89,7 +90,8 @@ export const useDeviceTelemetry = () => {
     deviceMemoryGb: getDeviceMemory(),
     temperatureC: null,
     thermalStatus: 'unknown',
-    thermalSource: 'estimated'
+    thermalSource: 'estimated',
+    thermalSensorName: null
   });
 
   const refresh = async (): Promise<void> => {
@@ -125,18 +127,22 @@ export const useDeviceTelemetry = () => {
       device.temperatureC =
         typeof nativeStatus?.temperatureC === 'number'
           ? Number(nativeStatus.temperatureC.toFixed(1))
-          : device.temperatureC;
+          : nativeStatus
+            ? null
+            : device.temperatureC;
       device.thermalStatus =
         nativeStatus?.thermalStatus ||
         estimateThermalStatus(device.batteryLevel, device.isCharging);
       device.thermalSource =
         nativeStatus?.temperatureSource || (nativeStatus ? 'native' : 'estimated');
+      device.thermalSensorName = nativeStatus?.temperatureSensor || null;
     } catch {
       device.cpuThreads = getHardwareConcurrency();
       device.deviceMemoryGb = getDeviceMemory();
       device.temperatureC = null;
       device.thermalStatus = 'unavailable';
       device.thermalSource = 'unavailable';
+      device.thermalSensorName = null;
     }
   };
 

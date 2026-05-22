@@ -7,7 +7,7 @@ import AppDrawer from './components/AppDrawer.vue';
 import AppHeader from './components/AppHeader.vue';
 import BottomNav, { type AppTab } from './components/BottomNav.vue';
 import { useDeviceTelemetry } from './composables/useDeviceTelemetry';
-import { useMiningMock } from './composables/useMiningMock';
+import { useMiningController } from './composables/useMiningController';
 import { useProfilesStore } from './stores/profiles';
 import { useSettingsStore, type SettingsState } from './stores/settings';
 import DashboardView from './views/DashboardView.vue';
@@ -26,7 +26,7 @@ const activeTab = ref<AppTab>('dashboard');
 const drawerOpen = ref(false);
 const importInput = ref<HTMLInputElement | null>(null);
 const systemCheckComplete = ref(false);
-const miner = useMiningMock();
+const miner = useMiningController();
 const settings = useSettingsStore();
 const profiles = useProfilesStore();
 const { device } = useDeviceTelemetry();
@@ -63,7 +63,7 @@ const applyProfile = (profile: SavedMiningProfile): void => {
 
 const saveAndStartMining = (): void => {
   profiles.saveActiveConfig(miner.config);
-  miner.startMining();
+  void miner.startMining();
 };
 
 const navigateToSetup = (): void => {
@@ -277,6 +277,9 @@ watch(
         :config="miner.config"
         :stats="miner.stats"
         :device="device"
+        :connected="miner.connected.value"
+        :backend-state="miner.backendState.value"
+        :backend-message="miner.backendMessage.value"
         :session-history="miner.sessionHistory.value"
         :active-profile="profiles.activeProfile"
         @start="miner.startMining"
@@ -289,6 +292,8 @@ watch(
       <MiningConfigView
         v-else-if="activeTab === 'mining'"
         :config="miner.config"
+        :backend-state="miner.backendState.value"
+        :backend-message="miner.backendMessage.value"
         @profile="updateProfile"
         @coin="miner.updateCoin"
         @apply-profile="applyProfile"
