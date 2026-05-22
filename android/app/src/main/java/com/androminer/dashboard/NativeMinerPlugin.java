@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
@@ -47,6 +48,9 @@ public class NativeMinerPlugin extends Plugin {
   private int rejectedShares;
   private int activeThreads;
   private String lastMessage = "Native miner has not started.";
+  private String lastFailureReason = "";
+  private int lastExitCode = Integer.MIN_VALUE;
+  private boolean stopRequested;
 
   @PluginMethod
   public void status(PluginCall call) {
@@ -88,6 +92,9 @@ public class NativeMinerPlugin extends Plugin {
       rejectedShares = 0;
       activeThreads = config.getInteger("threadCount", Runtime.getRuntime().availableProcessors());
       lastMessage = "Native miner process started.";
+      lastFailureReason = "";
+      lastExitCode = Integer.MIN_VALUE;
+      stopRequested = false;
       clearLogs();
       appendLog(lastMessage);
       appendLog("Pool endpoint: " + poolEndpoint);
@@ -152,8 +159,17 @@ public class NativeMinerPlugin extends Plugin {
     command.add("--no-color");
     command.add("--print-time=2");
 
-    if (protocol.toLowerCase(Locale.US).contains("ssl")
-        || protocol.toLowerCase(Locale.US).contains("tls")) {
+    String normalizedProtocol = normalizeProtocol(protocol);
+
+    if (usesDaemonMode(normalizedProtocol)) {
+      command.add("--daemon");
+    }
+
+    if ("nicehash".equals(normalizedProtocol)) {
+      command.add("--nicehash");
+    }
+
+    if (usesTls(normalizedProtocol)) {
       command.add("--tls");
     }
 
@@ -173,7 +189,7 @@ public class NativeMinerPlugin extends Plugin {
   }
 
   private String buildPoolEndpoint(String protocol, String host, int port) {
-    String normalizedProtocol = protocol == null ? "" : protocol.trim();
+    String normalizedProtocol = normalizeProtocol(protocol);
     String normalizedHost = host == null ? "" : host.trim();
 
     if (normalizedHost.contains("://")) {
@@ -186,7 +202,27 @@ public class NativeMinerPlugin extends Plugin {
       return normalizedHost + ":" + port;
     }
 
-    return normalizedProtocol + "://" + normalizedHost + ":" + port;
+    if (normalizedProtocol.equals("http") || normalizedProtocol.equals("https")) {
+      return normalizedProtocol + "://" + normalizedHost + ":" + port;
+    }
+
+    return normalizedHost + ":" + port;
+  }
+
+  private String normalizeProtocol(String protocol) {
+    return protocol == null ? "" : protocol.trim().toLowerCase(Locale.US);
+  }
+
+  private boolean usesTls(String protocol) {
+    return protocol.contains("ssl") || protocol.contains("tls") || protocol.equals("https");
+  }
+
+  private boolean usesDaemonMode(String protocol) {
+    return protocol.equals("daemon")
+        || protocol.equals("daemon+ssl")
+        || protocol.equals("solo")
+        || protocol.equals("http")
+        || protocol.equals("https");
   }
 
   private boolean hasExplicitPort(String endpoint) {
@@ -215,6 +251,9 @@ public class NativeMinerPlugin extends Plugin {
     stats.put("activeThreads", isRunning() ? activeThreads : 0);
     stats.put("uptimeSeconds", isRunning() ? (System.currentTimeMillis() - startedAtMs) / 1000 : 0);
     result.put("stats", stats);
+    result.put("exitCode", lastExitCode == Integer.MIN_VALUE ? null : lastExitCode);
+    result.put("failureReason", lastFailureReason);
+    result.put("unexpectedExit", lastExitCode != Integer.MIN_VALUE && !stopRequested);
 
     JSArray logs = new JSArray();
     for (String logLine : recentLogs) {
@@ -248,10 +287,32 @@ public class NativeMinerPlugin extends Plugin {
     } finally {
       synchronized (this) {
         if (minerProcess == process) {
+          int exitCode = Integer.MIN_VALUE;
+          try {
+            exitCode = process.waitFor();
+          } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+          }
+
           minerProcess = null;
           hashrate = 0;
           activeThreads = 0;
-          appendLog("Native miner process exited.");
+          lastExitCode = exitCode;
+
+          if (stopRequested) {
+            lastMessage = "Native miner stopped.";
+          } else {
+            String codeLabel = exitCode == Integer.MIN_VALUE ? "unknown" : String.valueOf(exitCode);
+            String reason =
+                lastFailureReason.isBlank()
+                    ? lastMessage
+                    : lastFailureReason;
+            lastMessage =
+                "Native miner exited unexpectedly with code "
+                    + codeLabel
+                    + (reason == null || reason.isBlank() ? "." : ". Last output: " + reason);
+            appendLog(lastMessage);
+          }
         }
       }
     }
@@ -277,6 +338,24 @@ public class NativeMinerPlugin extends Plugin {
     if (normalized.contains("rejected")) {
       rejectedShares += 1;
     }
+    if (looksLikeFailure(normalized)) {
+      lastFailureReason = line;
+    }
+  }
+
+  private boolean looksLikeFailure(String normalizedLine) {
+    return normalizedLine.contains("error")
+        || normalizedLine.contains("failed")
+        || normalizedLine.contains("failure")
+        || normalizedLine.contains("invalid")
+        || normalizedLine.contains("unauthorized")
+        || normalizedLine.contains("connection refused")
+        || normalizedLine.contains("connect error")
+        || normalizedLine.contains("dns error")
+        || normalizedLine.contains("tls error")
+        || normalizedLine.contains("ssl error")
+        || normalizedLine.contains("socket")
+        || normalizedLine.contains("closed");
   }
 
   private synchronized void clearLogs() {
@@ -303,14 +382,28 @@ public class NativeMinerPlugin extends Plugin {
       return;
     }
 
+    stopRequested = true;
     minerProcess.destroy();
     try {
-      minerProcess.waitFor();
+      if (!minerProcess.waitFor(3, TimeUnit.SECONDS)) {
+        appendLog("Native miner did not stop in time; forcing shutdown.");
+        minerProcess.destroyForcibly();
+        minerProcess.waitFor(2, TimeUnit.SECONDS);
+      }
     } catch (InterruptedException exception) {
       Thread.currentThread().interrupt();
       minerProcess.destroyForcibly();
     } finally {
+      lastExitCode = getExitCode(minerProcess);
       minerProcess = null;
+    }
+  }
+
+  private int getExitCode(Process process) {
+    try {
+      return process.exitValue();
+    } catch (IllegalThreadStateException exception) {
+      return Integer.MIN_VALUE;
     }
   }
 

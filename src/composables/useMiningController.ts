@@ -25,6 +25,9 @@ interface NativeMinerStatus {
   available: boolean;
   running: boolean;
   message?: string;
+  exitCode?: number | null;
+  failureReason?: string;
+  unexpectedExit?: boolean;
   stats?: NativeMinerStats;
   logs?: string[];
 }
@@ -215,6 +218,17 @@ export const useMiningController = () => {
 
   const uptimeLabel = computed(() => formatUptime(stats.uptimeSeconds));
 
+  const resetActiveSession = (): void => {
+    state.value = 'idle';
+    connected.value = false;
+    stats.uptimeSeconds = 0;
+    stats.hashrate = 0;
+    stats.activeThreads = 0;
+    sessionStartedAt = 0;
+    sessionHashrateTotal = 0;
+    sessionHashrateSamples = 0;
+  };
+
   const pushHistory = (series: HistoryPoint[], value: number): HistoryPoint[] => [
     ...series.slice(-(maxHistoryPoints - 1)),
     {
@@ -224,14 +238,26 @@ export const useMiningController = () => {
   ];
 
   const setBackendStatus = (status: NativeMinerStatus): void => {
+    const wasActive = state.value === 'mining' || state.value === 'starting';
+    const stoppedUnexpectedly = status.available && !status.running && wasActive;
+
     connected.value = status.available && status.running;
-    backendState.value = status.available ? 'ready' : 'missing';
+    backendState.value = status.available ? (stoppedUnexpectedly ? 'error' : 'ready') : 'missing';
     backendMessage.value =
       status.message ||
       (status.available
         ? 'Native miner backend is ready.'
         : 'Native miner backend is missing an Android XMRig binary.');
     minerLogs.value = Array.isArray(status.logs) ? status.logs : minerLogs.value;
+
+    if (stoppedUnexpectedly) {
+      const exitCode = typeof status.exitCode === 'number' ? ` Exit code: ${status.exitCode}.` : '';
+      const reason = status.failureReason || status.message || 'No miner error was reported.';
+      backendMessage.value = `Native miner stopped unexpectedly.${exitCode} ${reason}`;
+      recordSession();
+      resetActiveSession();
+      return;
+    }
 
     if (status.running) {
       state.value = state.value === 'paused' ? 'paused' : 'mining';
@@ -404,14 +430,7 @@ export const useMiningController = () => {
     }
 
     recordSession();
-    state.value = 'idle';
-    connected.value = false;
-    stats.uptimeSeconds = 0;
-    stats.hashrate = 0;
-    stats.activeThreads = 0;
-    sessionStartedAt = 0;
-    sessionHashrateTotal = 0;
-    sessionHashrateSamples = 0;
+    resetActiveSession();
   };
 
   const pauseMining = async (): Promise<void> => {

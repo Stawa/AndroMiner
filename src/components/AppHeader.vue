@@ -1,10 +1,13 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import MaterialIcon from './MaterialIcon.vue';
 import type { AppTab } from './BottomNav.vue';
+import type { MinerBackendState } from '../composables/useMiningController';
 
 interface AppHeaderProps {
   connected: boolean;
   activeTab: AppTab;
+  backendState: MinerBackendState;
 }
 
 const props = defineProps<AppHeaderProps>();
@@ -30,6 +33,26 @@ const showBack = (): boolean =>
   props.activeTab === 'profiles' ||
   props.activeTab === 'help' ||
   props.activeTab === 'about';
+
+const dashboardStatus = computed(() => {
+  if (props.connected) {
+    return { label: 'Pool connected', dot: 'bg-app-green', text: 'text-app-muted' };
+  }
+
+  const labels: Record<MinerBackendState, { label: string; dot: string; text: string }> = {
+    checking: { label: 'Checking backend', dot: 'bg-app-yellow', text: 'text-app-muted' },
+    ready: { label: 'Miner ready', dot: 'bg-app-green', text: 'text-app-muted' },
+    missing: { label: 'Miner binary missing', dot: 'bg-app-yellow', text: 'text-app-muted' },
+    'web-unavailable': {
+      label: 'Android app required',
+      dot: 'bg-app-yellow',
+      text: 'text-app-muted'
+    },
+    error: { label: 'Miner stopped', dot: 'bg-red-300', text: 'text-red-300' }
+  };
+
+  return labels[props.backendState];
+});
 </script>
 
 <template>
@@ -55,11 +78,8 @@ const showBack = (): boolean =>
             v-if="props.activeTab === 'dashboard'"
             class="mt-0.5 flex items-center gap-1.5 text-[12px] leading-4 text-app-muted"
           >
-            <span
-              class="h-2 w-2 rounded-full"
-              :class="connected ? 'bg-app-green' : 'bg-app-yellow'"
-            />
-            {{ connected ? 'Pool connected' : 'Reconnecting' }}
+            <span class="h-2 w-2 rounded-full" :class="dashboardStatus.dot" />
+            <span :class="dashboardStatus.text">{{ dashboardStatus.label }}</span>
           </p>
         </div>
 

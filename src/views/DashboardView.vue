@@ -43,6 +43,24 @@ const walletPreview = computed(() =>
 );
 const profileName = computed(() => props.activeProfile?.name || 'Unsaved setup');
 const canStart = computed(() => props.backendState === 'ready');
+const connectionStatus = computed(() => {
+  if (props.connected) {
+    return { label: 'Pool connected', tone: 'good' as const };
+  }
+
+  const labels: Record<
+    MinerBackendState,
+    { label: string; tone: 'good' | 'warning' | 'danger' | 'muted' }
+  > = {
+    checking: { label: 'Checking backend', tone: 'warning' },
+    ready: { label: 'Miner ready', tone: 'good' },
+    missing: { label: 'Miner missing', tone: 'warning' },
+    'web-unavailable': { label: 'Android required', tone: 'warning' },
+    error: { label: 'Miner stopped', tone: 'danger' }
+  };
+
+  return labels[props.backendState];
+});
 const formatDuration = (seconds: number): string => {
   if (seconds < 60) {
     return `${Math.max(1, seconds)}s`;
@@ -178,7 +196,11 @@ const deleteSelectedSession = (id: string): void => {
             {{ config.coin.symbol }} mining
           </h2>
         </div>
-        <StatusIndicator :connected="connected" />
+        <StatusIndicator
+          :connected="connected"
+          :label="connectionStatus.label"
+          :tone="connectionStatus.tone"
+        />
       </div>
 
       <div class="space-y-2 rounded-2xl bg-app-elevated p-3 text-[14px] leading-5">

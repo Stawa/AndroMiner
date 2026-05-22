@@ -254,6 +254,7 @@ watch(
     <AppHeader
       v-if="systemCheckComplete && !sessionActive"
       :connected="miner.connected.value"
+      :backend-state="miner.backendState.value"
       :active-tab="activeTab"
       @open-drawer="drawerOpen = true"
       @back="activeTab = 'dashboard'"
@@ -269,6 +270,7 @@ watch(
       :uptime="miner.uptimeLabel.value"
       :backend-message="miner.backendMessage.value"
       :logs="miner.minerLogs.value"
+      :hashrate-history="miner.hashrateHistory.value"
       @pause="miner.pauseMining"
       @stop="miner.stopMining"
       @profile="miner.updateProfile"

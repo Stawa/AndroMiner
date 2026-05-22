@@ -7,7 +7,13 @@ import SessionControls from '../components/SessionControls.vue';
 import StatusIndicator from '../components/StatusIndicator.vue';
 import WarningBottomSheet, { type WarningType } from '../components/WarningBottomSheet.vue';
 import { profilePresets } from '../composables/useMiningController';
-import type { MiningConfig, MiningProfile, MiningState, MiningStats } from '../types/mining';
+import type {
+  HistoryPoint,
+  MiningConfig,
+  MiningProfile,
+  MiningState,
+  MiningStats
+} from '../types/mining';
 
 interface MiningSessionViewProps {
   state: MiningState;
@@ -17,6 +23,7 @@ interface MiningSessionViewProps {
   uptime: string;
   backendMessage: string;
   logs: string[];
+  hashrateHistory: HistoryPoint[];
 }
 
 const props = defineProps<MiningSessionViewProps>();
@@ -34,9 +41,27 @@ const warningType = ref<WarningType | null>(null);
 const detailsDragStartY = ref<number | null>(null);
 const detailsDragY = ref(0);
 
-const averageHashrate = computed(() =>
-  Math.max(props.stats.hashrate * 0.94, props.stats.hashrate - 1.8)
+const recentHashrates = computed(() =>
+  props.hashrateHistory
+    .map((point) => point.value)
+    .filter((value) => Number.isFinite(value) && value > 0)
 );
+const baselineHashrates = computed(() => {
+  if (recentHashrates.value.length <= 1) {
+    return recentHashrates.value;
+  }
+
+  return recentHashrates.value.slice(0, -1);
+});
+const averageHashrate = computed(() => {
+  const samples = baselineHashrates.value;
+
+  if (samples.length === 0) {
+    return Math.max(0, props.stats.hashrate);
+  }
+
+  return samples.reduce((total, value) => total + value, 0) / samples.length;
+});
 const poolAddress = computed(() => `${props.config.poolUrl}:${props.config.poolPort}`);
 const totalHashesLabel = computed(() => {
   const totalHashes = Math.max(0, props.stats.hashrate * props.stats.uptimeSeconds);
@@ -170,8 +195,39 @@ const trendLabel = computed(() => {
   const average = averageHashrate.value;
 
   if (current <= 0) return 'Idle';
+  if (baselineHashrates.value.length < 3) return 'Warming up';
+  if (average <= 0) return 'Mining';
 
-  return current >= average ? 'Above average' : 'Below average';
+  const tolerance = Math.max(1, average * 0.08);
+
+  if (current > average + tolerance) return 'Above average';
+  if (current < average - tolerance) return 'Below average';
+
+  return 'Near average';
+});
+
+const trendTone = computed(() => {
+  if (props.stats.hashrate <= 0 || baselineHashrates.value.length < 3) {
+    return 'text-app-muted';
+  }
+
+  return trendLabel.value === 'Above average'
+    ? 'text-app-green'
+    : trendLabel.value === 'Below average'
+      ? 'text-yellow-400'
+      : 'text-app-muted';
+});
+
+const trendIcon = computed(() => {
+  if (props.stats.hashrate <= 0 || baselineHashrates.value.length < 3) {
+    return '•';
+  }
+
+  return trendLabel.value === 'Above average'
+    ? '↗'
+    : trendLabel.value === 'Below average'
+      ? '↘'
+      : '•';
 });
 </script>
 
@@ -222,18 +278,9 @@ const trendLabel = computed(() => {
           class="mx-auto mt-4 flex w-fit items-center rounded-full border border-app-line bg-app-elevated/60 px-2 py-2 backdrop-blur"
         >
           <!-- trend -->
-          <div
-            class="flex items-center gap-1 rounded-full px-3 py-1"
-            :class="
-              stats.hashrate >= averageHashrate
-                ? 'text-app-green'
-                : stats.hashrate > 0
-                  ? 'text-yellow-400'
-                  : 'text-app-muted'
-            "
-          >
+          <div class="flex items-center gap-1 rounded-full px-3 py-1" :class="trendTone">
             <span class="text-sm">
-              {{ stats.hashrate <= 0 ? '•' : stats.hashrate >= averageHashrate ? '↗' : '↘' }}
+              {{ trendIcon }}
             </span>
 
             <span class="text-[12px] font-medium">
