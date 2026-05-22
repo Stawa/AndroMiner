@@ -33,7 +33,14 @@ jobs:
           cache: gradle
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --include=optional
+
+      - name: Repair Rollup native dependency
+        run: |
+          if ! node -e "require.resolve('@rollup/rollup-linux-x64-gnu')" >/dev/null 2>&1; then
+            rollup_version="$(node -p "require('./node_modules/rollup/package.json').version")"
+            npm install --no-save --package-lock=false "@rollup/rollup-linux-x64-gnu@$rollup_version"
+          fi
 
       - name: Install native build tools
         if: github.event_name == 'release'
