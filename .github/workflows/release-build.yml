@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -55,6 +55,54 @@ jobs:
           yes | "$SDKMANAGER" --licenses
           "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018"
 
+      - name: Prepare APK signing key
+        if: github.event_name == 'release'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD_SECRET: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS_SECRET: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD_SECRET: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          keystore_file="$RUNNER_TEMP/androminer-release.jks"
+
+          if [ -n "${ANDROID_KEYSTORE_BASE64:-}" ]; then
+            if [ -z "${ANDROID_KEYSTORE_PASSWORD_SECRET:-}" ] || [ -z "${ANDROID_KEY_ALIAS_SECRET:-}" ]; then
+              echo "::error::ANDROID_KEYSTORE_PASSWORD and ANDROID_KEY_ALIAS secrets are required when ANDROID_KEYSTORE_BASE64 is set."
+              exit 1
+            fi
+
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore_file"
+            store_password="$ANDROID_KEYSTORE_PASSWORD_SECRET"
+            key_alias="$ANDROID_KEY_ALIAS_SECRET"
+            key_password="${ANDROID_KEY_PASSWORD_SECRET:-$ANDROID_KEYSTORE_PASSWORD_SECRET}"
+          else
+            store_password="$(openssl rand -base64 32)"
+            key_alias="androminer-release"
+            key_password="$store_password"
+
+            keytool -genkeypair \
+              -v \
+              -keystore "$keystore_file" \
+              -storepass "$store_password" \
+              -keypass "$key_password" \
+              -alias "$key_alias" \
+              -keyalg RSA \
+              -keysize 4096 \
+              -validity 10000 \
+              -dname "CN=AndroMiner, OU=Release, O=AndroMiner, L=Unknown, ST=Unknown, C=US"
+
+            echo "::warning::ANDROID_KEYSTORE_BASE64 is not configured. Generated a temporary signing key; users may need to uninstall older builds before installing future releases."
+          fi
+
+          {
+            echo "ANDROID_KEYSTORE_FILE=$keystore_file"
+            echo "ANDROID_KEYSTORE_PASSWORD=$store_password"
+            echo "ANDROID_KEY_ALIAS=$key_alias"
+            echo "ANDROID_KEY_PASSWORD=$key_password"
+          } >> "$GITHUB_ENV"
+
       - name: Check formatting
         if: github.event_name == 'workflow_dispatch'
         run: npm run format:check
@@ -84,8 +132,9 @@ jobs:
           chmod +x android/gradlew
           mkdir -p release-assets
           (cd android && ./gradlew clean assembleRelease -PtargetSdkVersionOverride=28 --stacktrace)
-          apk="$(find android/app/build/outputs/apk/release -type f -name "*.apk" | head -n 1)"
+          apk="$(find android/app/build/outputs/apk/release -type f -name "*.apk" ! -name "*unsigned*.apk" | head -n 1)"
           test -n "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$apk"
           cp "$apk" "release-assets/androminer-download-${{ github.event.release.tag_name }}.apk"
 
       - name: Build TLS miner
@@ -102,8 +151,9 @@ jobs:
         if: github.event_name == 'release'
         run: |
           (cd android && ./gradlew clean assembleRelease -PbundleMiner=true --stacktrace)
-          apk="$(find android/app/build/outputs/apk/release -type f -name "*.apk" | head -n 1)"
+          apk="$(find android/app/build/outputs/apk/release -type f -name "*.apk" ! -name "*unsigned*.apk" | head -n 1)"
           test -n "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$apk"
           cp "$apk" "release-assets/androminer-tls-${{ github.event.release.tag_name }}.apk"
 
       - name: Build no-TLS miner
@@ -120,8 +170,9 @@ jobs:
         if: github.event_name == 'release'
         run: |
           (cd android && ./gradlew clean assembleRelease -PbundleMiner=true --stacktrace)
-          apk="$(find android/app/build/outputs/apk/release -type f -name "*.apk" | head -n 1)"
+          apk="$(find android/app/build/outputs/apk/release -type f -name "*.apk" ! -name "*unsigned*.apk" | head -n 1)"
           test -n "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$apk"
           cp "$apk" "release-assets/androminer-notls-${{ github.event.release.tag_name }}.apk"
 
       - name: Collect release outputs
