@@ -78,27 +78,7 @@ export const useProfilesStore = defineStore('profiles', {
       return profile;
     },
     createDefaults(config: MiningConfig): void {
-      const defaults = ['Profile 1', 'Profile 2', 'Profile 3'].map((_, index) => ({
-        ...cloneConfig(config),
-        profile:
-          index === 0
-            ? config.profile
-            : index === 1
-              ? ('battery_saver' as const)
-              : ('performance' as const),
-        threadCount: Math.min(config.totalDetectedThreads, index === 0 ? 2 : index === 1 ? 1 : 4),
-        customThreadCount: Math.min(
-          config.totalDetectedThreads,
-          index === 0 ? 2 : index === 1 ? 1 : 4
-        )
-      }));
-
-      defaults.forEach((defaultConfig, index) => {
-        this.saveFromConfig(`Profile ${index + 1}`, defaultConfig);
-      });
-
-      this.activeProfileId = this.profiles[this.profiles.length - 1]?.id || this.activeProfileId;
-      this.persist();
+      this.saveFromConfig('Profile 1', config);
     },
     renameProfile(id: string, name: string): void {
       const profile = this.profiles.find((item) => item.id === id);

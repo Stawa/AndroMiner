@@ -45,6 +45,17 @@ const applyProfile = (profile: SavedMiningProfile): void => {
   profiles.setActive(profile.id);
   emit('apply', profile);
 };
+
+const deleteProfile = (profile: SavedMiningProfile): void => {
+  const confirmed = window.confirm(
+    `Delete "${profile.name}"? This saved mining profile cannot be restored.`
+  );
+  if (!confirmed) {
+    return;
+  }
+
+  profiles.deleteProfile(profile.id);
+};
 </script>
 
 <template>
@@ -132,7 +143,7 @@ const applyProfile = (profile: SavedMiningProfile): void => {
             <button
               class="ripple min-h-12 rounded-xl bg-app-elevated text-[13px] font-medium text-red-300"
               type="button"
-              @click="profiles.deleteProfile(profile.id)"
+              @click="deleteProfile(profile)"
             >
               Delete
             </button>

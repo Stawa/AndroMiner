@@ -155,10 +155,24 @@ const closeSessionReview = (): void => {
 };
 
 const deleteSelectedSession = (id: string): void => {
+  const confirmed = window.confirm('Delete this completed mining session from history?');
+  if (!confirmed) {
+    return;
+  }
+
   emit('deleteSession', id);
   if (selectedSessionId.value === id) {
     closeSessionReview();
   }
+};
+
+const clearSessionHistory = (): void => {
+  const confirmed = window.confirm('Clear all completed mining sessions from history?');
+  if (!confirmed) {
+    return;
+  }
+
+  emit('clearSessions');
 };
 </script>
 
@@ -283,7 +297,7 @@ const deleteSelectedSession = (id: string): void => {
             class="ripple grid h-12 w-12 place-items-center rounded-full text-app-muted active:bg-white/10"
             type="button"
             aria-label="Clear session history"
-            @click="emit('clearSessions')"
+            @click="clearSessionHistory"
           >
             <MaterialIcon name="delete_sweep" :size="22" />
           </button>

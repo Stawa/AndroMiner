@@ -196,6 +196,13 @@ const deleteActiveProfile = (): void => {
     return;
   }
 
+  const confirmed = window.confirm(
+    `Delete "${activeSavedProfile.value.name}"? This saved mining profile cannot be restored.`
+  );
+  if (!confirmed) {
+    return;
+  }
+
   savedProfiles.deleteProfile(activeSavedProfile.value.id);
 
   if (savedProfiles.activeProfile) {
@@ -228,27 +235,8 @@ const adjustThreads = (delta: number): void => {
     props.config.totalDetectedThreads,
     Math.max(1, props.config.threadCount + delta)
   );
+  props.config.customThreadCount = props.config.threadCount;
 };
-
-watch(
-  () => props.config.threadCount,
-  (value) => {
-    props.config.customThreadCount = Math.min(
-      props.config.totalDetectedThreads,
-      Math.max(1, Number(value) || 1)
-    );
-  }
-);
-
-watch(
-  () => props.config.customThreadCount,
-  (value) => {
-    props.config.threadCount = Math.min(
-      props.config.totalDetectedThreads,
-      Math.max(1, Number(value) || 1)
-    );
-  }
-);
 
 watch(
   () => props.config.donateLevel,
@@ -453,30 +441,6 @@ watch(
             config.totalDetectedThreads
           }}</strong>
         </div>
-        <div class="rounded-xl bg-app-elevated p-3">
-          <div class="mb-2 flex items-center justify-between gap-3">
-            <span class="text-[14px] leading-5 text-app-muted">Threads to use</span>
-            <strong class="text-[15px] text-white">{{ config.threadCount }} threads</strong>
-          </div>
-          <input
-            v-model.number="config.threadCount"
-            class="android-slider"
-            type="range"
-            min="1"
-            :max="config.totalDetectedThreads"
-            step="1"
-          />
-          <div class="flex justify-between text-[11px] leading-4 text-app-muted">
-            <span>1</span>
-            <span>{{ config.totalDetectedThreads }}</span>
-          </div>
-        </div>
-        <ConfigInput
-          v-model="config.customThreadCount"
-          label="Custom thread count"
-          type="number"
-          inputmode="numeric"
-        />
         <div
           class="grid grid-cols-[48px_1fr_48px] items-center gap-2 rounded-xl bg-app-elevated p-2"
         >

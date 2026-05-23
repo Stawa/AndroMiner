@@ -829,16 +829,17 @@ public class NativeMinerPlugin extends Plugin {
 
   private File findMinerBinary() {
     Context context = getContext();
+    ApplicationInfo info = context.getApplicationInfo();
+
     for (String candidate : BINARY_CANDIDATES) {
-      File file = new File(context.getFilesDir(), candidate);
+      File file = new File(info.nativeLibraryDir, candidate);
       if (file.exists()) {
         return file;
       }
     }
 
-    ApplicationInfo info = context.getApplicationInfo();
     for (String candidate : BINARY_CANDIDATES) {
-      File file = new File(info.nativeLibraryDir, candidate);
+      File file = new File(context.getFilesDir(), candidate);
       if (file.exists()) {
         return file;
       }

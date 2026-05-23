@@ -245,6 +245,9 @@ perl -0pi -e 's/NOT CMAKE_GENERATOR STREQUAL Xcode\)/NOT CMAKE_GENERATOR STREQUA
 if [[ -f "$SRC_DIR/xmrig/src/base/net/tls/TlsGen.cpp" ]]; then
   perl -0pi -e 's/auto name = X509_get_subject_name\(m_x509\);/auto name = const_cast<X509_NAME *>(X509_get_subject_name(m_x509));/g' "$SRC_DIR/xmrig/src/base/net/tls/TlsGen.cpp"
 fi
+if [[ -f "$SRC_DIR/xmrig/src/donate.h" ]]; then
+  perl -0pi -e 's/constexpr const int kDefaultDonateLevel = 1;/constexpr const int kDefaultDonateLevel = 0;/g; s/constexpr const int kMinimumDonateLevel = 1;/constexpr const int kMinimumDonateLevel = 0;/g' "$SRC_DIR/xmrig/src/donate.h"
+fi
 
 echo "==> Building XMRig (TLS=$WITH_TLS, HTTP API enabled, hwloc disabled)"
 rm -rf "$BUILD_DIR/xmrig-$ABI"

@@ -522,6 +522,18 @@ if (Test-Path $XmrigTlsGen) {
   )
   $XmrigTlsGenText | Set-Content -NoNewline $XmrigTlsGen
 }
+$XmrigDonateHeader = Join-Path $XmrigSrc "src\donate.h"
+if (Test-Path $XmrigDonateHeader) {
+  $XmrigDonateText = Get-Content -Raw $XmrigDonateHeader
+  $XmrigDonateText = $XmrigDonateText.Replace(
+    "constexpr const int kDefaultDonateLevel = 1;",
+    "constexpr const int kDefaultDonateLevel = 0;"
+  ).Replace(
+    "constexpr const int kMinimumDonateLevel = 1;",
+    "constexpr const int kMinimumDonateLevel = 0;"
+  )
+  $XmrigDonateText | Set-Content -NoNewline $XmrigDonateHeader
+}
 
 $TlsValue = if ($NoTls) { "OFF" } else { "ON" }
 Write-Host "==> Building XMRig (TLS=$TlsValue, HTTP API enabled, hwloc disabled)"

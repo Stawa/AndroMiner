@@ -8,6 +8,52 @@ interface AboutViewProps {
 }
 
 defineProps<AboutViewProps>();
+
+const androidPermissions = [
+  {
+    name: 'INTERNET',
+    detail: 'Connects to mining pools and downloads the optional miner binary.'
+  },
+  {
+    name: 'ACCESS_NETWORK_STATE',
+    detail: 'Checks whether network connectivity is available before mining.'
+  },
+  {
+    name: 'WAKE_LOCK',
+    detail: 'Keeps the device awake during active mining sessions.'
+  },
+  {
+    name: 'POST_NOTIFICATIONS',
+    detail: 'Shows mining status notifications on supported Android versions.'
+  },
+  {
+    name: 'FOREGROUND_SERVICE',
+    detail: 'Allows long-running mining work to continue as a foreground task.'
+  },
+  {
+    name: 'FOREGROUND_SERVICE_DATA_SYNC',
+    detail: 'Declares the foreground service type used by the Android build.'
+  },
+  {
+    name: 'REQUEST_IGNORE_BATTERY_OPTIMIZATIONS',
+    detail: 'Lets the app ask Android to reduce battery restrictions.'
+  },
+  {
+    name: 'VIBRATE',
+    detail: 'Supports notification or warning feedback.'
+  }
+];
+
+const minerDetails = [
+  { label: 'Miner', value: 'XMRig v6.26.0, built from source for Android ARM64' },
+  { label: 'Binary name', value: 'libxmrig.so' },
+  { label: 'ABI', value: 'arm64-v8a' },
+  { label: 'Algorithm focus', value: 'RandomX / rx/0 for Monero CPU mining' },
+  { label: 'Native stack', value: 'libuv v1.48.0, OpenSSL openssl-4.0.0, hwloc disabled' },
+  { label: 'Variants', value: 'TLS and no-TLS builds are available' },
+  { label: 'Download source', value: 'GitHub miner-builder branch after user approval' },
+  { label: 'Bundled APKs', value: 'Include the miner directly inside the APK native library path' }
+];
 </script>
 
 <template>
@@ -71,15 +117,30 @@ defineProps<AboutViewProps>();
     </SettingGroup>
 
     <SettingGroup title="Android permissions" icon="admin_panel_settings">
-      <div class="space-y-3 border-t border-app-line p-4 text-[13px] leading-5 text-app-muted">
-        <p>
-          Configured for internet/pool access, wake lock, foreground-service mining, notifications,
-          battery optimization request, and network-state awareness.
-        </p>
-        <p>
-          Actual mining requires the app to download the ARM64 XMRig binary into its private miners
-          directory after user approval.
-        </p>
+      <div class="divide-y divide-app-line border-t border-app-line">
+        <div
+          v-for="permission in androidPermissions"
+          :key="permission.name"
+          class="px-4 py-3 text-[13px] leading-5"
+        >
+          <p class="font-semibold text-white">{{ permission.name }}</p>
+          <p class="mt-1 text-app-muted">{{ permission.detail }}</p>
+        </div>
+      </div>
+    </SettingGroup>
+
+    <SettingGroup title="Miner binary" icon="memory">
+      <div class="divide-y divide-app-line border-t border-app-line">
+        <div
+          v-for="item in minerDetails"
+          :key="item.label"
+          class="flex min-h-12 items-start justify-between gap-3 px-4 py-3 text-[14px]"
+        >
+          <span class="shrink-0 text-app-muted">{{ item.label }}</span>
+          <strong class="min-w-0 break-words text-right font-medium text-white">{{
+            item.value
+          }}</strong>
+        </div>
       </div>
     </SettingGroup>
   </div>
