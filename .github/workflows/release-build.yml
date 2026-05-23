@@ -42,17 +42,11 @@ jobs:
             npm install --no-save --package-lock=false "@rollup/rollup-linux-x64-gnu@$rollup_version"
           fi
 
-      - name: Install native build tools
-        if: github.event_name == 'release'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential cmake make ninja-build perl
-
       - name: Install Android SDK packages
         if: github.event_name == 'release'
         run: |
           yes | sdkmanager --licenses
-          sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018"
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
       - name: Check formatting
         if: github.event_name == 'workflow_dispatch'
@@ -77,16 +71,7 @@ jobs:
         if: github.event_name == 'release'
         run: npm run android:sync
 
-      - name: Build native miner with TLS
-        if: github.event_name == 'release'
-        env:
-          XMRIG_REF: v6.26.0
-          LIBUV_REF: v1.48.0
-          OPENSSL_REF: openssl-3.3.2
-          WITH_TLS: ON
-        run: ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018" bash miner-builder/build-xmrig-android.sh
-
-      - name: Build TLS APK
+      - name: Build APK
         if: github.event_name == 'release'
         run: |
           chmod +x android/gradlew
@@ -94,32 +79,13 @@ jobs:
           mkdir -p release-assets
           apk="$(find android/app/build/outputs/apk/release -type f -name "*.apk" | head -n 1)"
           test -n "$apk"
-          cp "$apk" "release-assets/androminer-${{ github.event.release.tag_name }}-tls.apk"
-
-      - name: Build native miner without TLS
-        if: github.event_name == 'release'
-        env:
-          XMRIG_REF: v6.26.0
-          LIBUV_REF: v1.48.0
-          OPENSSL_REF: openssl-3.3.2
-          WITH_TLS: OFF
-        run: ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018" bash miner-builder/build-xmrig-android.sh
-
-      - name: Build no-TLS APK
-        if: github.event_name == 'release'
-        run: |
-          chmod +x android/gradlew
-          (cd android && ./gradlew clean assembleRelease --stacktrace)
-          apk="$(find android/app/build/outputs/apk/release -type f -name "*.apk" | head -n 1)"
-          test -n "$apk"
-          cp "$apk" "release-assets/androminer-${{ github.event.release.tag_name }}-notls.apk"
+          cp "$apk" "release-assets/androminer-${{ github.event.release.tag_name }}.apk"
 
       - name: Collect release outputs
         if: github.event_name == 'release'
         run: |
           ls -lh release-assets
-          test -f "release-assets/androminer-${{ github.event.release.tag_name }}-tls.apk"
-          test -f "release-assets/androminer-${{ github.event.release.tag_name }}-notls.apk"
+          test -f "release-assets/androminer-${{ github.event.release.tag_name }}.apk"
 
       - name: Upload workflow artifacts
         if: github.event_name == 'release'
