@@ -14,9 +14,9 @@ AndroMiner is an Android-focused cryptocurrency mining app built with Vue 3, Typ
 
 | Requirement                | Version / Notes                |
 | -------------------------- | ------------------------------ |
-| Node.js                    | 20+                            |
+| Node.js                    | 22+                            |
 | npm                        | 10+                            |
-| JDK                        | 17+                            |
+| JDK                        | 21+                            |
 | Android Studio / SDK tools | Required for Android builds    |
 | Android SDK Platform       | 35                             |
 | Gradle                     | Wrapper included in `android/` |
