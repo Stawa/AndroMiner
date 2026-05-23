@@ -186,7 +186,7 @@ fi
 perl -0pi -e 's/if \(WIN32\)/if (WIN32 AND NOT ANDROID)/g' "$SRC_DIR/xmrig/CMakeLists.txt"
 perl -0pi -e 's/NOT CMAKE_GENERATOR STREQUAL Xcode\)/NOT CMAKE_GENERATOR STREQUAL Xcode AND NOT ANDROID)/g' "$SRC_DIR/xmrig/CMakeLists.txt"
 
-echo "==> Building XMRig (TLS=$WITH_TLS, hwloc disabled)"
+echo "==> Building XMRig (TLS=$WITH_TLS, HTTP API enabled, hwloc disabled)"
 rm -rf "$BUILD_DIR/xmrig-$ABI"
 cmake -G Ninja -S "$SRC_DIR/xmrig" -B "$BUILD_DIR/xmrig-$ABI" \
   -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
@@ -194,7 +194,7 @@ cmake -G Ninja -S "$SRC_DIR/xmrig" -B "$BUILD_DIR/xmrig-$ABI" \
   -DANDROID_PLATFORM="$ANDROID_PLATFORM" \
   -DCMAKE_BUILD_TYPE=Release \
   -DWITH_TLS="$WITH_TLS" \
-  -DWITH_HTTPD=OFF \
+  -DWITH_HTTP=ON \
   -DWITH_HWLOC=OFF \
   -DWITH_OPENCL=OFF \
   -DWITH_CUDA=OFF \

@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.androminer.dashboard',
+  appId: 'com.androminer.app',
   appName: 'AndroMiner',
   webDir: 'dist',
   android: {

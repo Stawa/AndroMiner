@@ -59,6 +59,8 @@ export interface MiningConfig {
   totalDetectedThreads: number;
   affinity: CpuAffinity;
   priority: CpuPriority;
+  donateLevel: number;
+  donateOverProxy: number;
   hugePagesSupported: boolean;
   hugePagesEnabled: boolean;
   batteryAwareMode: boolean;
@@ -80,6 +82,21 @@ export interface MiningStats {
   activeThreads: number;
   estimatedEarnings: number;
   uptimeSeconds: number;
+}
+
+export interface MiningApiTelemetry {
+  available: boolean;
+  source: string;
+  host: string;
+  port: number;
+  lastUpdatedAt: number | null;
+  message: string;
+  summary?: unknown;
+  backends?: unknown;
+  hashrate?: unknown;
+  results?: unknown;
+  connection?: unknown;
+  threadHashrates?: number[];
 }
 
 export interface HistoryPoint {
@@ -110,6 +127,7 @@ export interface MiningTelemetry {
   hashrateHistory: HistoryPoint[];
   temperatureHistory: HistoryPoint[];
   logs: string[];
+  apiTelemetry: MiningApiTelemetry;
   isLoading: boolean;
 }
 

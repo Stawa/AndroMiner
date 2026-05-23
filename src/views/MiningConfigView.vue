@@ -120,6 +120,12 @@ const affinitySelectOptions: ConfigSelectOption[] = affinityOptions.map((option)
           : 'Let Android and miner decide'
 }));
 
+const donateOverProxySelectOptions: ConfigSelectOption[] = [
+  { value: '0', label: 'Off', supportingText: 'Do not donate over proxy' },
+  { value: '1', label: 'Auto', supportingText: 'Use XMRig default proxy donation mode' },
+  { value: '2', label: 'Always', supportingText: 'Always donate over proxy when applicable' }
+];
+
 const protocolSelectOptions: ConfigSelectOption[] = protocolOptions.map((option) => ({
   value: option.value,
   label: option.label,
@@ -212,6 +218,10 @@ const handleAffinityChange = (value: string): void => {
   props.config.affinity = value as CpuAffinity;
 };
 
+const handleDonateOverProxyChange = (value: string): void => {
+  props.config.donateOverProxy = Number(value);
+};
+
 const adjustThreads = (delta: number): void => {
   props.config.threadCount = Math.min(
     props.config.totalDetectedThreads,
@@ -236,6 +246,20 @@ watch(
       props.config.totalDetectedThreads,
       Math.max(1, Number(value) || 1)
     );
+  }
+);
+
+watch(
+  () => props.config.donateLevel,
+  (value) => {
+    props.config.donateLevel = Math.min(99, Math.max(1, Number(value) || 1));
+  }
+);
+
+watch(
+  () => props.config.donateOverProxy,
+  (value) => {
+    props.config.donateOverProxy = Math.min(2, Math.max(0, Number(value) || 0));
   }
 );
 
@@ -483,6 +507,20 @@ watch(
           label="Affinity"
           :options="affinitySelectOptions"
           @update:model-value="handleAffinityChange"
+        />
+        <ConfigInput
+          v-model="config.donateLevel"
+          label="XMRig donate level"
+          type="number"
+          inputmode="numeric"
+          suffix="%"
+          supporting-text="Developer donation percentage passed to XMRig"
+        />
+        <ConfigSelect
+          :model-value="String(config.donateOverProxy)"
+          label="Donate over proxy"
+          :options="donateOverProxySelectOptions"
+          @update:model-value="handleDonateOverProxyChange"
         />
         <ToggleRow
           v-model="config.hugePagesEnabled"

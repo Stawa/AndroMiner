@@ -9,6 +9,7 @@ import WarningBottomSheet, { type WarningType } from '../components/WarningBotto
 import { profilePresets } from '../composables/useMiningController';
 import type {
   HistoryPoint,
+  MiningApiTelemetry,
   MiningConfig,
   MiningProfile,
   MiningState,
@@ -23,6 +24,7 @@ interface MiningSessionViewProps {
   uptime: string;
   backendMessage: string;
   logs: string[];
+  apiTelemetry: MiningApiTelemetry;
   hashrateHistory: HistoryPoint[];
 }
 
@@ -89,6 +91,44 @@ const profileLabel = computed(
 );
 const latestLogs = computed(() => props.logs.slice(-8).reverse());
 const detailLogs = computed(() => props.logs.slice(-30).reverse());
+const telemetrySourceLabel = computed(() =>
+  props.apiTelemetry.available ? 'XMRig HTTP API' : 'Log parser'
+);
+
+const telemetryEndpointLabel = computed(() =>
+  props.apiTelemetry.port > 0 ? `${props.apiTelemetry.host}:${props.apiTelemetry.port}` : 'Inactive'
+);
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
+const readNumber = (record: Record<string, unknown> | null, key: string): number | null => {
+  const value = record?.[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+};
+
+const formatCompactNumber = (value: number | null): string => {
+  if (value === null) {
+    return 'Unknown';
+  }
+
+  return new Intl.NumberFormat('en', {
+    notation: 'compact',
+    maximumFractionDigits: 1
+  }).format(value);
+};
+
+const apiResults = computed(() => asRecord(props.apiTelemetry.results));
+const apiConnection = computed(() => asRecord(props.apiTelemetry.connection));
+const currentDifficultyLabel = computed(() =>
+  formatCompactNumber(readNumber(apiResults.value, 'diff_current'))
+);
+const networkLatencyLabel = computed(() => {
+  const ping = readNumber(apiConnection.value, 'ping');
+  return ping === null ? 'Unknown' : `${Math.round(ping)} ms`;
+});
 
 const toggleDetails = (): void => {
   detailsOpen.value = !detailsOpen.value;
@@ -401,7 +441,7 @@ const trendIcon = computed(() => {
           </div>
           <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
             <span class="text-app-muted">Difficulty</span
-            ><strong class="font-medium text-white">12.1M</strong>
+            ><strong class="font-medium text-white">{{ currentDifficultyLabel }}</strong>
           </div>
           <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
             <span class="text-app-muted">Total hashes</span
@@ -409,7 +449,19 @@ const trendIcon = computed(() => {
           </div>
           <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
             <span class="text-app-muted">Network latency</span
-            ><strong class="font-medium text-app-green">85 ms</strong>
+            ><strong
+              class="font-medium"
+              :class="apiTelemetry.available ? 'text-app-green' : 'text-app-muted'"
+              >{{ networkLatencyLabel }}</strong
+            >
+          </div>
+          <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
+            <span class="text-app-muted">Telemetry</span
+            ><strong
+              class="break-all text-right font-medium"
+              :class="apiTelemetry.available ? 'text-app-green' : 'text-app-muted'"
+              >{{ telemetrySourceLabel }} · {{ telemetryEndpointLabel }}</strong
+            >
           </div>
           <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
             <span class="text-app-muted">Battery</span

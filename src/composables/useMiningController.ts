@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { cryptocurrencies, getCryptocurrencyById } from '../data/miningCatalog';
 import type {
   HistoryPoint,
+  MiningApiTelemetry,
   MiningConfig,
   MiningProfile,
   MiningSessionHistoryItem,
@@ -30,6 +31,7 @@ interface NativeMinerStatus {
   unexpectedExit?: boolean;
   stats?: NativeMinerStats;
   logs?: string[];
+  apiTelemetry?: MiningApiTelemetry;
 }
 
 interface NativeMinerPlugin {
@@ -62,6 +64,8 @@ const initialConfig: MiningConfig = {
   totalDetectedThreads: 8,
   affinity: 'auto',
   priority: 'normal',
+  donateLevel: 1,
+  donateOverProxy: 1,
   hugePagesSupported: false,
   hugePagesEnabled: false,
   batteryAwareMode: true,
@@ -84,6 +88,16 @@ const initialStats: MiningStats = {
   estimatedEarnings: 0,
   uptimeSeconds: 0
 };
+
+const defaultApiTelemetry = (): MiningApiTelemetry => ({
+  available: false,
+  source: 'stdout-fallback',
+  host: '127.0.0.1',
+  port: 0,
+  lastUpdatedAt: null,
+  message: 'XMRig API telemetry has not started.',
+  threadHashrates: []
+});
 
 export const profilePresets: ProfilePreset[] = [
   {
@@ -180,6 +194,7 @@ export const useMiningController = () => {
   const minerLogs = ref<string[]>([]);
   const config = reactive<MiningConfig>(cloneConfig(initialConfig));
   const stats = reactive<MiningStats>({ ...initialStats });
+  const apiTelemetry = ref<MiningApiTelemetry>(defaultApiTelemetry());
   const hashrateHistory = ref<HistoryPoint[]>(createEmptyHistory());
   const temperatureHistory = ref<HistoryPoint[]>(createEmptyHistory());
   const sessionHistory = ref<MiningSessionHistoryItem[]>(readSessionHistory());
@@ -202,6 +217,7 @@ export const useMiningController = () => {
     hashrateHistory: hashrateHistory.value,
     temperatureHistory: temperatureHistory.value,
     logs: minerLogs.value,
+    apiTelemetry: apiTelemetry.value,
     isLoading: isLoading.value
   }));
 
@@ -249,6 +265,14 @@ export const useMiningController = () => {
         ? 'Native miner backend is ready.'
         : 'Native miner backend is missing an Android XMRig binary.');
     minerLogs.value = Array.isArray(status.logs) ? status.logs : minerLogs.value;
+    apiTelemetry.value = status.apiTelemetry || {
+      ...apiTelemetry.value,
+      available: false,
+      source: 'stdout-fallback',
+      message: status.running
+        ? 'Using stdout fallback until XMRig API telemetry responds.'
+        : 'XMRig API telemetry is inactive.'
+    };
 
     if (stoppedUnexpectedly) {
       const exitCode = typeof status.exitCode === 'number' ? ` Exit code: ${status.exitCode}.` : '';
@@ -355,6 +379,7 @@ export const useMiningController = () => {
     stats.uptimeSeconds = 0;
     stats.hashrate = 0;
     stats.activeThreads = 0;
+    apiTelemetry.value = defaultApiTelemetry();
     minerLogs.value = [];
     sessionStartedAt = Date.now();
     sessionStartingAcceptedShares = stats.acceptedShares;
@@ -568,6 +593,7 @@ export const useMiningController = () => {
     backendState,
     backendMessage,
     minerLogs,
+    apiTelemetry,
     config,
     stats,
     hashrateHistory,

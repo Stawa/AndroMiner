@@ -480,7 +480,7 @@ if ($XmrigCmakeText.Contains("NOT CMAKE_GENERATOR STREQUAL Xcode)")) {
 $XmrigCmakeText | Set-Content -NoNewline $XmrigCmake
 
 $TlsValue = if ($NoTls) { "OFF" } else { "ON" }
-Write-Host "==> Building XMRig (TLS=$TlsValue, hwloc disabled)"
+Write-Host "==> Building XMRig (TLS=$TlsValue, HTTP API enabled, hwloc disabled)"
 if (Test-Path (Join-Path $XmrigBuild "CMakeCache.txt")) {
   Remove-Item -Recurse -Force $XmrigBuild
 }
@@ -493,7 +493,7 @@ $XmrigCmakeArgs = @(
   "-DANDROID_PLATFORM=$AndroidPlatform",
   "-DCMAKE_BUILD_TYPE=Release",
   "-DWITH_TLS=$TlsValue",
-  "-DWITH_HTTPD=OFF",
+  "-DWITH_HTTP=ON",
   "-DWITH_HWLOC=OFF",
   "-DWITH_OPENCL=OFF",
   "-DWITH_CUDA=OFF",

@@ -1,14 +1,16 @@
 # AndroMiner
 
-AndroMiner is an Android-focused cryptocurrency mining app built with Vue 3, TypeScript, Vite, Tailwind CSS, Capacitor, and a native Android miner bridge. The app is designed around real pool mining, Android device safety, reusable mining profiles, foreground status notifications, and direct control of an XMRig-compatible native miner process.
+AndroMiner is a crypto mining app dedicated exclusively to Android from scratch, using Vue 3, TypeScript, Vite, Tailwind CSS, and Capacitor + Android (native) miner bridge. Made for real pool mining — full cross-platform frontend integrated with native Android to connect directly to a XMRig-compatible miner process. The features include device capability checking, reusable mining profiles, foreground notifications, live miner telemetry and a bundled native miner backend.
 
 > [!CAUTION]
-> Use this app at your own risk. We are not responsible for any damage, data loss, or device issues caused by installation or use.
-> The project is open source, and risks from modified or third-party builds are outside our responsibility.
-> This app has been tested by the maintainer on personal devices before being published. However, environments and builds may differ, so use discretion when installing or building.
+> Use this project at your own risk. Mining workloads can generate sustained CPU usage, increased power consumption, thermal stress, and accelerated battery wear.
+>
+> The maintainers are not responsible for device damage, data loss, instability, or issues caused by installation, use, modified builds, or third-party distributions.
+>
+> While the application has been tested on the maintainer's personal devices, results may vary across hardware, Android versions, and custom builds.
 
 > [!TIP]
-> For maximum safety, clone the repository and build the app yourself instead of using prebuilt releases.
+> For maximum transparency and safety, clone the repository and build the application yourself rather than relying on prebuilt binaries.
 
 ## Project Requirements
 
@@ -26,19 +28,29 @@ AndroMiner is an Android-focused cryptocurrency mining app built with Vue 3, Typ
 | Requirement     | Minimum           | Recommended          |
 | --------------- | ----------------- | -------------------- |
 | Android version | 6.0+              | 10+                  |
-| Architecture    | -                 | ARM64                |
+| Architecture    | ARM64             | ARM64                |
 | CPU             | 4 threads         | 4+ threads           |
 | RAM             | 2 GB              | 4 GB                 |
 | Power           | Battery supported | Plugged-in preferred |
 | Thermal state   | Safe temperature  | Stable/cool device   |
 | Internet        | Required          | Stable connection    |
 
+AndroMiner currently packages and supports only the `arm64-v8a` Android ABI. 32-bit Android devices are not supported by the app as shipped.
+
 > [!NOTE]
-> Official XMRig releases do not ship Android binaries. Real mining starts only when you build an Android-compatible miner from source and package it with the APK as `libxmrig.so`.
+> Official XMRig releases do not ship Android binaries. AndroMiner handles this by building XMRig from source and packaging it into the APK as `libxmrig.so`; GitHub release builds include this bundled miner automatically.
 
 ## Actual Mining Backend
 
-This repository now includes a working build path for Android ARM64 XMRig through [`miner-builder/`](miner-builder/). The current local miner build is:
+AndroMiner does not simulate mining. The Android app launches a packaged ARM64 XMRig binary through a native Capacitor plugin.
+
+The bundled miner is built from source with [`miner-builder/`](miner-builder/) and packaged as:
+
+```text
+android/app/src/main/jniLibs/arm64-v8a/libxmrig.so
+```
+
+Current bundled miner:
 
 | Component               | Version / source                                     |
 | ----------------------- | ---------------------------------------------------- |
@@ -50,12 +62,18 @@ This repository now includes a working build path for Android ARM64 XMRig throug
 | Output                  | `android/app/src/main/jniLibs/arm64-v8a/libxmrig.so` |
 | Current packaged binary | OpenSSL/TLS-enabled ARM64 XMRig                      |
 
-The Android app registers a native `NativeMiner` Capacitor plugin that:
+For published GitHub releases, the workflow in [`.github/workflows/release-build.yml`](.github/workflows/release-build.yml) builds the native miner first, then packages release APKs with the miner already included. Local builds can use the same helper scripts.
 
-- Finds a packaged XMRig-compatible Android binary from the app native library directory as `libxmrig.so`.
-- Starts the miner with real pool arguments: `--algo`, `--url`, `--user`, `--pass`, `--threads`, `--cpu-priority`, `--tls` when required, and `--print-time=2`.
-- Reads miner stdout and updates real hashrate, accepted shares, rejected shares, active thread count, uptime, and recent miner logs.
-- Refuses to fake a mining session on the web build or when the native binary is missing.
+Runtime flow:
+
+1. The app finds `libxmrig.so` inside the APK's native library directory.
+2. The native `NativeMiner` plugin starts XMRig as a local Android process.
+3. Pool, wallet, CPU, donation, and TLS settings are converted into XMRig command-line flags.
+4. XMRig's loopback HTTP API is enabled for structured JSON telemetry.
+5. The UI displays API telemetry first, with stdout log parsing kept as a fallback.
+6. If the app is running on the web, or if the native binary is missing, the app refuses to fake a mining session.
+
+The app currently reads these real miner values: hashrate, accepted shares, rejected shares, active threads, uptime, pool difficulty, pool latency, per-thread rates, and recent miner logs.
 
 Frontend settings currently wired into the native miner:
 
@@ -66,17 +84,17 @@ Frontend settings currently wired into the native miner:
 | Wallet, worker, password | Passed as `--user` and `--pass`; worker names are appended as `wallet.worker`. |
 | Thread count             | Passed directly as `--threads=N`.                                              |
 | CPU priority             | Passed as `--cpu-priority=0`, `1`, or `2`.                                     |
+| Donate settings          | Passed as `--donate-level=N` and `--donate-over-proxy=N`.                      |
 
-Reserved UI settings that are not fully native yet: CPU affinity, huge pages, and complete XMRig JSON/API telemetry.
+CPU affinity and huge pages are still UI-only/reserved settings.
 
-To package a miner binary, compile XMRig or an XMRig-compatible fork for the target Android ABI with the Android NDK and place the executable here:
+To rebuild the miner binary, compile XMRig or an XMRig-compatible fork for ARM64 Android with the Android NDK and place the executable here:
 
-| Location                                               | Use case                                                                                                 |
-| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| `android/app/src/main/jniLibs/arm64-v8a/libxmrig.so`   | Bundled ARM64 release builds. The Gradle config uses legacy JNI packaging so the binary can be executed. |
-| `android/app/src/main/jniLibs/armeabi-v7a/libxmrig.so` | Optional 32-bit ARM builds if you intentionally support older devices.                                   |
+| Location                                             | Use case                                                                                                 |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `android/app/src/main/jniLibs/arm64-v8a/libxmrig.so` | Bundled ARM64 release builds. The Gradle config uses legacy JNI packaging so the binary can be executed. |
 
-The app cannot safely download and execute a miner binary after install on modern Android. Apps targeting Android 10+ cannot execute files from writable app storage, and official XMRig does not publish Android binaries anyway. If you want a user-installable miner without bundling native code, the realistic route is a separate Termux-based setup rather than this APK launching a downloaded executable.
+The app cannot safely download and execute a miner binary after install on modern Android. Apps targeting Android 10+ cannot execute files from writable app storage, and official XMRig does not publish Android binaries. For a miner that is not bundled into the APK, a Termux-based setup is more realistic than this app downloading an executable at runtime.
 
 The helper scripts in [`miner-builder/`](miner-builder/) compile XMRig from source and install the result into `android/app/src/main/jniLibs/arm64-v8a/libxmrig.so`.
 
@@ -97,19 +115,32 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 ## Compatible Cryptocurrencies
 
-The in-app catalog intentionally ships with only realistic Android CPU mining targets.
+AndroMiner is built for phone CPU mining, so the default catalog is intentionally small.
 
-| Status        | Coin                   | Algorithm        | Miner backend              | Notes                                                                  |
-| ------------- | ---------------------- | ---------------- | -------------------------- | ---------------------------------------------------------------------- |
-| Supported     | Monero (XMR)           | RandomX          | XMRig `rx/0`               | Primary supported coin and default profile.                            |
-| Extendable    | RandomX-family coins   | RandomX variants | XMRig-supported algorithms | Add a catalog entry and make sure the bundled miner supports the algo. |
-| Not supported | Bitcoin (BTC)          | SHA-256          | ASIC only                  | Android CPU mining is not practical.                                   |
-| Not supported | Litecoin (LTC)         | Scrypt           | ASIC only                  | Android CPU mining is not practical.                                   |
-| Not supported | Ethereum (ETH)         | -                | -                          | Ethereum no longer uses proof-of-work mining.                          |
-| Not supported | Ethereum Classic (ETC) | Etchash          | GPU miner                  | Not targeted by the current Android CPU backend.                       |
-| Not supported | Ravencoin (RVN)        | KawPow           | GPU-focused                | Not targeted by the current Android CPU backend.                       |
+### Supported Coins
 
-XMRig documents itself as a RandomX, KawPow, CryptoNight, and GhostRider CPU/GPU miner, but this app only enables coins that make sense for phone CPU mining by default.
+| Coin         | Algorithm | XMRig flag    | Why it is included                                                  |
+| ------------ | --------- | ------------- | ------------------------------------------------------------------- |
+| Monero (XMR) | RandomX   | `--algo=rx/0` | CPU-minable, supported by XMRig, and realistic for Android testing. |
+
+### Possible Coins to Add
+
+| Coin type             | Requirement                                                                  |
+| --------------------- | ---------------------------------------------------------------------------- |
+| RandomX-family coins  | Add the coin to `src/data/miningCatalog.ts` and use an XMRig-supported algo. |
+| Other XMRig CPU algos | Only add them if the bundled Android XMRig binary supports the algorithm.    |
+
+### Incompatible Coins
+
+| Coin                   | Reason                                                                 |
+| ---------------------- | ---------------------------------------------------------------------- |
+| Bitcoin (BTC)          | SHA-256 mining is ASIC-dominated; Android CPU mining is not practical. |
+| Litecoin (LTC)         | Scrypt mining is ASIC-dominated; Android CPU mining is not practical.  |
+| Ethereum (ETH)         | Ethereum no longer uses proof-of-work mining.                          |
+| Ethereum Classic (ETC) | Requires GPU-focused Etchash mining, not this Android CPU backend.     |
+| Ravencoin (RVN)        | Uses KawPow, which is GPU-focused and not targeted by this app.        |
+
+XMRig supports more algorithms than this app exposes. A coin being supported by XMRig does not automatically mean it is a good fit for Android phones, the bundled binary, or this app's UI.
 
 ## Pool Compatibility
 
@@ -135,21 +166,33 @@ Useful references:
 
 ## Project Status
 
-- [x] Frontend Vue + Capacitor
-- [x] System requirements checks and the onboarding procedure
-- [x] UI for mining setup, profiles, statistics, and session history
-- [x] Support for Android debug APK builds
-- [x] Native Android process bridge for XMRig-compatible miners
-- [x] ARM64 Android XMRig builder and packaged debug binary path
-- [x] OpenSSL/TLS-enabled XMRig builder support
-- [x] Live miner logs in the active session screen
-- [x] Foreground mining status notifications on Android
-- [x] Configuration import and export
-- [x] Packaged OpenSSL/TLS-enabled XMRig Android binary
+### Core App
+
+- [x] Vue + Capacitor frontend foundation
+- [x] Device compatibility checks & onboarding flow
+- [x] Mining setup and profile management UI
+- [x] Statistics dashboard & session history
 - [x] Light theme support
-- [ ] Additional Android ABIs beyond ARM64
-- [ ] Full XMRig JSON/API telemetry support
-- [ ] Signing production builds and packaging releases
+- [x] Configuration import/export
+
+### Android Integration
+
+- [x] Android debug APK support
+- [x] Native Android miner process bridge
+- [x] Foreground mining notifications
+- [x] Live mining logs
+
+### Native Miner Support
+
+- [x] ARM64 XMRig build pipeline
+- [x] Embedded XMRig binary packaging
+- [x] OpenSSL/TLS-enabled miner support
+- [x] OpenSSL-enabled Android XMRig builds
+
+### Remaining
+
+- [x] Full XMRig API & telemetry integration
+- [ ] Production signing & release packaging
 
 ## App Overview
 

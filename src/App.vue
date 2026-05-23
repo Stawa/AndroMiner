@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
@@ -33,6 +33,8 @@ const profiles = useProfilesStore();
 const { device } = useDeviceTelemetry();
 useTheme();
 const sessionActive = computed(() => miner.state.value !== 'idle');
+const configAutosaveReady = ref(false);
+let configAutosaveHandle = 0;
 
 interface MiningNotificationPlugin {
   show: (options: { title: string; body: string }) => Promise<void>;
@@ -66,6 +68,28 @@ const applyProfile = (profile: SavedMiningProfile): void => {
 const saveAndStartMining = (): void => {
   profiles.saveActiveConfig(miner.config);
   void miner.startMining();
+};
+
+const autosaveCurrentConfig = (): void => {
+  if (!configAutosaveReady.value) {
+    return;
+  }
+
+  profiles.saveActiveConfig(miner.config);
+};
+
+const scheduleConfigAutosave = (): void => {
+  if (!configAutosaveReady.value) {
+    return;
+  }
+
+  window.clearTimeout(configAutosaveHandle);
+  configAutosaveHandle = window.setTimeout(autosaveCurrentConfig, 300);
+};
+
+const flushConfigAutosave = (): void => {
+  window.clearTimeout(configAutosaveHandle);
+  autosaveCurrentConfig();
 };
 
 const navigateToSetup = (): void => {
@@ -176,6 +200,16 @@ onMounted(() => {
   if (profiles.profiles.length === 0) {
     profiles.createDefaults(miner.config);
   }
+
+  if (profiles.activeProfile) {
+    miner.applySavedProfile(profiles.activeProfile);
+  }
+
+  window.setTimeout(() => {
+    configAutosaveReady.value = true;
+  }, 0);
+  document.addEventListener('visibilitychange', flushConfigAutosave);
+  window.addEventListener('pagehide', flushConfigAutosave);
 });
 
 watch(
@@ -183,6 +217,8 @@ watch(
   () => settings.persist(),
   { deep: true }
 );
+
+watch(() => miner.config, scheduleConfigAutosave, { deep: true });
 
 watch(
   () => device.cpuThreads,
@@ -238,6 +274,12 @@ watch(
   },
   { immediate: true }
 );
+
+onBeforeUnmount(() => {
+  flushConfigAutosave();
+  document.removeEventListener('visibilitychange', flushConfigAutosave);
+  window.removeEventListener('pagehide', flushConfigAutosave);
+});
 </script>
 
 <template>
@@ -270,6 +312,7 @@ watch(
       :uptime="miner.uptimeLabel.value"
       :backend-message="miner.backendMessage.value"
       :logs="miner.minerLogs.value"
+      :api-telemetry="miner.apiTelemetry.value"
       :hashrate-history="miner.hashrateHistory.value"
       @pause="miner.pauseMining"
       @stop="miner.stopMining"
