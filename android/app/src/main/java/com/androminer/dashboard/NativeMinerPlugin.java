@@ -238,7 +238,7 @@ public class NativeMinerPlugin extends Plugin {
     String workerName = config.getString("workerName", "android-phone");
     String password = config.getString("password", "x");
     int threadCount = Math.max(1, config.getInteger("threadCount", 1));
-    int donateLevel = bounded(config.getInteger("donateLevel", 1), 1, 99);
+    int donateLevel = bounded(config.getInteger("donateLevel", 0), 0, 99);
     int donateOverProxy = bounded(config.getInteger("donateOverProxy", 1), 0, 2);
     String priority = config.getString("priority", "low");
     JSObject coin = config.getJSObject("coin");

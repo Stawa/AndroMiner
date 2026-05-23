@@ -84,7 +84,7 @@ const initialConfig: MiningConfig = {
   totalDetectedThreads: 8,
   affinity: 'auto',
   priority: 'normal',
-  donateLevel: 1,
+  donateLevel: 0,
   donateOverProxy: 1,
   hugePagesSupported: false,
   hugePagesEnabled: false,

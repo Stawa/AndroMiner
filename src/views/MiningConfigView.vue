@@ -253,7 +253,7 @@ watch(
 watch(
   () => props.config.donateLevel,
   (value) => {
-    props.config.donateLevel = Math.min(99, Math.max(1, Number(value) || 1));
+    props.config.donateLevel = Math.min(99, Math.max(0, Number(value) || 0));
   }
 );
 

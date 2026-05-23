@@ -29,6 +29,8 @@ android/key.properties
 *.keystore
 *.p12
 *.pfx
+*.jks.base64
+*.keystore.base64
 
 # Environment files
 .env
