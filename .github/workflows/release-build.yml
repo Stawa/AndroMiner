@@ -45,8 +45,9 @@ jobs:
       - name: Install Android SDK packages
         if: github.event_name == 'release'
         run: |
-          yes | sdkmanager --licenses
-          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses
+          "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Check formatting
         if: github.event_name == 'workflow_dispatch'
