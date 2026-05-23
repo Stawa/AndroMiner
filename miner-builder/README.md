@@ -1,12 +1,19 @@
 # AndroMiner XMRig Builder
 
-Simple helper scripts for building XMRig for Android and copying it into the app as:
+Simple helper scripts for building XMRig for Android. Local builds copy the result into:
 
 ```text
 android/app/src/main/jniLibs/arm64-v8a/libxmrig.so
 ```
 
-The `.so` name is intentional. The app launches this packaged file as the native miner process.
+The `.so` name is intentional. Release APKs do not bundle this file; the GitHub binary workflow publishes TLS and no-TLS builds to the `miner-builder` branch as:
+
+```text
+lib/arm64-v8a/tls/libxmrig.so
+lib/arm64-v8a/notls/libxmrig.so
+```
+
+The app lets the user choose one branch payload after a first-run warning, then launches the downloaded file as the native miner process.
 
 ## Current Build
 
@@ -70,18 +77,53 @@ To intentionally build without TLS:
 WITH_TLS=OFF bash miner-builder/build-xmrig-android.sh
 ```
 
-## Verify
+## Build Output
 
-The APK should contain:
+The builders are quiet by default. They print high-level progress and write detailed configure/compiler output to:
 
 ```text
-lib/arm64-v8a/libxmrig.so
+miner-builder/work/logs/
 ```
 
-In the Android app, the Mining setup screen should show `Native miner ready`.
+If a step fails, the script prints the last 120 lines from the relevant log.
+
+To stream all compiler output again on Linux / WSL:
+
+```bash
+QUIET=OFF bash miner-builder/build-xmrig-android.sh
+```
+
+or:
+
+```bash
+VERBOSE=1 bash miner-builder/build-xmrig-android.sh
+```
+
+On Windows PowerShell:
+
+```powershell
+.\miner-builder\build-xmrig-android.ps1 -ShowBuildOutput
+```
+
+or:
+
+```powershell
+$env:QUIET = 'OFF'
+.\miner-builder\build-xmrig-android.ps1
+```
+
+## Verify Locally
+
+The local builder output should exist at:
+
+```text
+android/app/src/main/jniLibs/arm64-v8a/libxmrig.so
+```
+
+Release APK packaging excludes `libxmrig.so`, so the Mining setup screen shows that a miner download is required until the app downloads the published branch payload.
 
 ## Notes
 
 - Official XMRig does not publish Android binaries, so this compiles from source.
 - OpenSSL is statically linked into the miner binary; no separate OpenSSL `.so` file should be required in the APK.
-- XMRig is GPLv3. If you distribute an APK with XMRig bundled, follow GPLv3 license and source availability requirements.
+- XMRig is GPLv3. If you distribute the miner binary, follow GPLv3 license and source availability requirements.

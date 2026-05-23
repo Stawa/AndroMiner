@@ -5,7 +5,8 @@ param(
   [string]$LibuvRef = "v1.48.0",
   [string]$OpenSslRef = "openssl-3.3.2",
   [switch]$NoTls,
-  [int]$Jobs = [Environment]::ProcessorCount
+  [int]$Jobs = [Environment]::ProcessorCount,
+  [switch]$ShowBuildOutput
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,6 +17,8 @@ $WorkDir = Join-Path $BuilderDir "work"
 $SrcDir = Join-Path $WorkDir "src"
 $BuildDir = Join-Path $WorkDir "build"
 $PrefixDir = Join-Path $WorkDir "prefix"
+$LogDir = Join-Path $WorkDir "logs"
+$QuietBuild = -not $ShowBuildOutput -and $env:QUIET -ne "OFF" -and $env:VERBOSE -ne "1"
 
 Write-Host "==> Starting AndroMiner XMRig Android builder"
 
@@ -216,7 +219,37 @@ if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) {
 $InstallDir = Join-Path $RootDir "android\app\src\main\jniLibs\$Abi"
 $OutputBinary = Join-Path $InstallDir "libxmrig.so"
 
-New-Item -ItemType Directory -Force -Path $SrcDir, $BuildDir, $PrefixDir, $InstallDir | Out-Null
+New-Item -ItemType Directory -Force -Path $SrcDir, $BuildDir, $PrefixDir, $InstallDir, $LogDir | Out-Null
+
+function Invoke-NativeLogged {
+  param(
+    [string]$Label,
+    [string]$LogPath,
+    [string]$FilePath,
+    [string[]]$Arguments
+  )
+
+  Write-Host "==> $Label"
+  if ($QuietBuild) {
+    & $FilePath @Arguments *> $LogPath
+    if ($LASTEXITCODE -eq 0) {
+      Write-Host "    log: $LogPath"
+      return
+    }
+
+    Write-Host "Build step failed: $Label" -ForegroundColor Red
+    Write-Host "Last 120 log lines from ${LogPath}:" -ForegroundColor Red
+    if (Test-Path $LogPath) {
+      Get-Content -Path $LogPath -Tail 120
+    }
+    throw "$Label failed."
+  }
+
+  & $FilePath @Arguments
+  if ($LASTEXITCODE -ne 0) {
+    throw "$Label failed."
+  }
+}
 
 function Clone-OrUpdate {
   param(
@@ -307,10 +340,7 @@ function Build-OpenSsl {
       "make install_sw"
     ) -join "; "
 
-    & $MsysBash -lc $BashCommand
-    if ($LASTEXITCODE -ne 0) {
-      throw "OpenSSL build failed."
-    }
+    Invoke-NativeLogged "Building OpenSSL ($Target, API $ApiLevel)" (Join-Path $LogDir "openssl-$Abi.log") $MsysBash @("-lc", $BashCommand)
     return
   }
 
@@ -407,21 +437,20 @@ Write-Host "==> Building libuv"
 if (Test-Path (Join-Path $LibuvBuild "CMakeCache.txt")) {
   Remove-Item -Recurse -Force $LibuvBuild
 }
-cmake -G $CmakeGenerator -S $LibuvSrc -B $LibuvBuild `
-  -DCMAKE_TOOLCHAIN_FILE="$Toolchain" `
-  -DANDROID_ABI="$Abi" `
-  -DANDROID_PLATFORM="$AndroidPlatform" `
-  -DCMAKE_BUILD_TYPE=Release `
-  -DCMAKE_INSTALL_PREFIX="$LibuvPrefix" `
-  -DBUILD_TESTING=OFF `
-  -DLIBUV_BUILD_TESTS=OFF
-if ($LASTEXITCODE -ne 0) {
-  throw "libuv CMake configure failed."
-}
-cmake --build $LibuvBuild --target install --parallel $Jobs
-if ($LASTEXITCODE -ne 0) {
-  throw "libuv build failed."
-}
+$LibuvCmakeArgs = @(
+  "-G", $CmakeGenerator,
+  "-S", $LibuvSrc,
+  "-B", $LibuvBuild,
+  "-DCMAKE_TOOLCHAIN_FILE=$Toolchain",
+  "-DANDROID_ABI=$Abi",
+  "-DANDROID_PLATFORM=$AndroidPlatform",
+  "-DCMAKE_BUILD_TYPE=Release",
+  "-DCMAKE_INSTALL_PREFIX=$LibuvPrefix",
+  "-DBUILD_TESTING=OFF",
+  "-DLIBUV_BUILD_TESTS=OFF"
+)
+Invoke-NativeLogged "Configuring libuv" (Join-Path $LogDir "libuv-configure-$Abi.log") "cmake" $LibuvCmakeArgs
+Invoke-NativeLogged "Building libuv" (Join-Path $LogDir "libuv-build-$Abi.log") "cmake" @("--build", $LibuvBuild, "--target", "install", "--parallel", "$Jobs")
 
 $UvInclude = Join-Path $LibuvPrefix "include"
 $UvLibrary = Get-ChildItem -Path $LibuvPrefix -Recurse -Filter "libuv*.a" |
@@ -501,14 +530,8 @@ $XmrigCmakeArgs = @(
   "-DUV_INCLUDE_DIR=$UvInclude",
   "-DUV_LIBRARY=$UvLibrary"
 ) + $OpenSslCmakeArgs
-cmake @XmrigCmakeArgs
-if ($LASTEXITCODE -ne 0) {
-  throw "XMRig CMake configure failed."
-}
-cmake --build $XmrigBuild --parallel $Jobs
-if ($LASTEXITCODE -ne 0) {
-  throw "XMRig build failed."
-}
+Invoke-NativeLogged "Configuring XMRig" (Join-Path $LogDir "xmrig-configure-$Abi-$TlsValue.log") "cmake" $XmrigCmakeArgs
+Invoke-NativeLogged "Building XMRig" (Join-Path $LogDir "xmrig-build-$Abi-$TlsValue.log") "cmake" @("--build", $XmrigBuild, "--parallel", "$Jobs")
 
 $BuiltXmrig = $null
 foreach ($Name in @("xmrig", "xmrig-notls", "xmrig.exe", "xmrig-notls.exe")) {

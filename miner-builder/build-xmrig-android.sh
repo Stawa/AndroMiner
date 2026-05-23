@@ -7,6 +7,7 @@ WORK_DIR="${WORK_DIR:-$BUILDER_DIR/work}"
 SRC_DIR="$WORK_DIR/src"
 BUILD_DIR="$WORK_DIR/build"
 PREFIX_DIR="$WORK_DIR/prefix"
+LOG_DIR="$WORK_DIR/logs"
 
 ABI="${ABI:-arm64-v8a}"
 ANDROID_PLATFORM="${ANDROID_PLATFORM:-android-29}"
@@ -14,6 +15,7 @@ XMRIG_REF="${XMRIG_REF:-master}"
 LIBUV_REF="${LIBUV_REF:-v1.48.0}"
 OPENSSL_REF="${OPENSSL_REF:-openssl-3.3.2}"
 WITH_TLS="${WITH_TLS:-ON}"
+QUIET="${QUIET:-ON}"
 JOBS="${JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)}"
 
 ANDROID_SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
@@ -43,7 +45,33 @@ command -v git >/dev/null || { echo "git is required." >&2; exit 1; }
 command -v cmake >/dev/null || { echo "cmake is required." >&2; exit 1; }
 command -v ninja >/dev/null || { echo "ninja is required." >&2; exit 1; }
 
-mkdir -p "$SRC_DIR" "$BUILD_DIR" "$PREFIX_DIR" "$INSTALL_DIR"
+mkdir -p "$SRC_DIR" "$BUILD_DIR" "$PREFIX_DIR" "$INSTALL_DIR" "$LOG_DIR"
+
+quiet_enabled() {
+  [[ "${QUIET^^}" != "OFF" && "${VERBOSE:-0}" != "1" ]]
+}
+
+run_logged() {
+  local label="$1"
+  local log_file="$2"
+  shift 2
+
+  if quiet_enabled; then
+    echo "==> $label"
+    if "$@" >"$log_file" 2>&1; then
+      echo "    log: $log_file"
+      return 0
+    fi
+
+    echo "Build step failed: $label" >&2
+    echo "Last 120 log lines from $log_file:" >&2
+    tail -n 120 "$log_file" >&2 || true
+    return 1
+  fi
+
+  echo "==> $label"
+  "$@"
+}
 
 clone_or_update() {
   local repo="$1"
@@ -108,6 +136,36 @@ build_openssl() {
   rm -rf "$prefix"
   mkdir -p "$prefix"
 
+  local log_file="$LOG_DIR/openssl-$ABI.log"
+  echo "==> Building OpenSSL ($target, API $api_level)"
+  if quiet_enabled; then
+    if (
+      cd "$source_dir"
+      export ANDROID_NDK_ROOT="$NDK_DIR"
+      export ANDROID_NDK_HOME="$NDK_DIR"
+      export PATH="$llvm_bin:$PATH"
+
+      if [[ -f Makefile ]]; then
+        make clean || true
+      fi
+
+      perl Configure "$target" no-shared no-tests no-unit-test no-apps \
+        "--prefix=$prefix" \
+        "--openssldir=$prefix/ssl" \
+        "-D__ANDROID_API__=$api_level"
+      make -j "$JOBS"
+      make install_sw
+    ) >"$log_file" 2>&1; then
+      echo "    log: $log_file"
+      return 0
+    fi
+
+    echo "Build step failed: OpenSSL" >&2
+    echo "Last 120 log lines from $log_file:" >&2
+    tail -n 120 "$log_file" >&2 || true
+    return 1
+  fi
+
   (
     cd "$source_dir"
     export ANDROID_NDK_ROOT="$NDK_DIR"
@@ -135,9 +193,8 @@ echo "==> Android platform: $ANDROID_PLATFORM"
 echo "==> Fetching libuv ($LIBUV_REF)"
 clone_or_update "https://github.com/libuv/libuv.git" "$LIBUV_REF" "$SRC_DIR/libuv"
 
-echo "==> Building libuv"
 rm -rf "$BUILD_DIR/libuv-$ABI"
-cmake -G Ninja -S "$SRC_DIR/libuv" -B "$BUILD_DIR/libuv-$ABI" \
+run_logged "Configuring libuv" "$LOG_DIR/libuv-configure-$ABI.log" cmake -G Ninja -S "$SRC_DIR/libuv" -B "$BUILD_DIR/libuv-$ABI" \
   -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
   -DANDROID_ABI="$ABI" \
   -DANDROID_PLATFORM="$ANDROID_PLATFORM" \
@@ -145,7 +202,7 @@ cmake -G Ninja -S "$SRC_DIR/libuv" -B "$BUILD_DIR/libuv-$ABI" \
   -DCMAKE_INSTALL_PREFIX="$PREFIX_DIR/libuv-$ABI" \
   -DBUILD_TESTING=OFF \
   -DLIBUV_BUILD_TESTS=OFF
-cmake --build "$BUILD_DIR/libuv-$ABI" --target install --parallel "$JOBS"
+run_logged "Building libuv" "$LOG_DIR/libuv-build-$ABI.log" cmake --build "$BUILD_DIR/libuv-$ABI" --target install --parallel "$JOBS"
 
 UV_INCLUDE="$PREFIX_DIR/libuv-$ABI/include"
 UV_LIBRARY="$(find "$PREFIX_DIR/libuv-$ABI" -name 'libuv*.a' | head -n 1)"
@@ -162,7 +219,6 @@ if [[ "$WITH_TLS" == "ON" ]]; then
   echo "==> Fetching OpenSSL ($OPENSSL_REF)"
   clone_or_update "https://github.com/openssl/openssl.git" "$OPENSSL_REF" "$SRC_DIR/openssl"
 
-  echo "==> Building OpenSSL ($OPENSSL_TARGET, API $ANDROID_API)"
   build_openssl "$SRC_DIR/openssl" "$PREFIX_DIR/openssl-$ABI" "$OPENSSL_TARGET" "$ANDROID_API"
 
   OPENSSL_CMAKE_ARGS=(
@@ -188,7 +244,7 @@ perl -0pi -e 's/NOT CMAKE_GENERATOR STREQUAL Xcode\)/NOT CMAKE_GENERATOR STREQUA
 
 echo "==> Building XMRig (TLS=$WITH_TLS, HTTP API enabled, hwloc disabled)"
 rm -rf "$BUILD_DIR/xmrig-$ABI"
-cmake -G Ninja -S "$SRC_DIR/xmrig" -B "$BUILD_DIR/xmrig-$ABI" \
+run_logged "Configuring XMRig" "$LOG_DIR/xmrig-configure-$ABI-$WITH_TLS.log" cmake -G Ninja -S "$SRC_DIR/xmrig" -B "$BUILD_DIR/xmrig-$ABI" \
   -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
   -DANDROID_ABI="$ABI" \
   -DANDROID_PLATFORM="$ANDROID_PLATFORM" \
@@ -202,7 +258,7 @@ cmake -G Ninja -S "$SRC_DIR/xmrig" -B "$BUILD_DIR/xmrig-$ABI" \
   -DUV_INCLUDE_DIR="$UV_INCLUDE" \
   -DUV_LIBRARY="$UV_LIBRARY" \
   "${OPENSSL_CMAKE_ARGS[@]}"
-cmake --build "$BUILD_DIR/xmrig-$ABI" --parallel "$JOBS"
+run_logged "Building XMRig" "$LOG_DIR/xmrig-build-$ABI-$WITH_TLS.log" cmake --build "$BUILD_DIR/xmrig-$ABI" --parallel "$JOBS"
 
 BUILT_XMRIG="$(find "$BUILD_DIR/xmrig-$ABI" -type f \( -name xmrig -o -name xmrig-notls \) -perm -111 | head -n 1)"
 if [[ -z "$BUILT_XMRIG" ]]; then

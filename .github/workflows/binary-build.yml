@@ -43,6 +43,7 @@ jobs:
           LIBUV_REF: v1.48.0
           OPENSSL_REF: openssl-3.3.2
           WITH_TLS: ON
+          QUIET: ON
         run: ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018" bash miner-builder/build-xmrig-android.sh
 
       - name: Collect TLS miner
@@ -56,6 +57,7 @@ jobs:
           LIBUV_REF: v1.48.0
           OPENSSL_REF: openssl-3.3.2
           WITH_TLS: OFF
+          QUIET: ON
         run: ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018" bash miner-builder/build-xmrig-android.sh
 
       - name: Collect no-TLS miner
