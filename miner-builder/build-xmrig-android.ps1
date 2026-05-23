@@ -3,9 +3,10 @@ param(
   [string]$AndroidPlatform = "android-29",
   [string]$XmrigRef = "master",
   [string]$LibuvRef = "v1.48.0",
-  [string]$OpenSslRef = "openssl-3.3.2",
+  [string]$OpenSslRef = "openssl-4.0.0",
   [switch]$NoTls,
   [int]$Jobs = [Environment]::ProcessorCount,
+  [switch]$SkipInstall,
   [switch]$ShowBuildOutput
 )
 
@@ -218,8 +219,12 @@ if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) {
 
 $InstallDir = Join-Path $RootDir "android\app\src\main\jniLibs\$Abi"
 $OutputBinary = Join-Path $InstallDir "libxmrig.so"
+$InstallOutput = -not $SkipInstall -and $env:SKIP_INSTALL -ne "1"
 
-New-Item -ItemType Directory -Force -Path $SrcDir, $BuildDir, $PrefixDir, $InstallDir, $LogDir | Out-Null
+New-Item -ItemType Directory -Force -Path $SrcDir, $BuildDir, $PrefixDir, $LogDir | Out-Null
+if ($InstallOutput) {
+  New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+}
 
 function Invoke-NativeLogged {
   param(
@@ -508,6 +513,16 @@ if ($XmrigCmakeText.Contains("NOT CMAKE_GENERATOR STREQUAL Xcode)")) {
 }
 $XmrigCmakeText | Set-Content -NoNewline $XmrigCmake
 
+$XmrigTlsGen = Join-Path $XmrigSrc "src\base\net\tls\TlsGen.cpp"
+if (Test-Path $XmrigTlsGen) {
+  $XmrigTlsGenText = Get-Content -Raw $XmrigTlsGen
+  $XmrigTlsGenText = $XmrigTlsGenText.Replace(
+    "auto name = X509_get_subject_name(m_x509);",
+    "auto name = const_cast<X509_NAME *>(X509_get_subject_name(m_x509));"
+  )
+  $XmrigTlsGenText | Set-Content -NoNewline $XmrigTlsGen
+}
+
 $TlsValue = if ($NoTls) { "OFF" } else { "ON" }
 Write-Host "==> Building XMRig (TLS=$TlsValue, HTTP API enabled, hwloc disabled)"
 if (Test-Path (Join-Path $XmrigBuild "CMakeCache.txt")) {
@@ -550,12 +565,79 @@ if (-not $BuiltXmrig) {
   throw "XMRig build finished, but the xmrig executable was not found."
 }
 
-Copy-Item -Force $BuiltXmrig $OutputBinary
+Write-Host "==> Built Android miner:"
+Write-Host "    $BuiltXmrig"
+$InstallHadError = $false
+if ($InstallOutput) {
+  try {
+    Copy-Item -Force -LiteralPath $BuiltXmrig -Destination $OutputBinary -ErrorAction Stop
+    Write-Host "==> Installed Android miner:"
+    Write-Host "    $OutputBinary"
+  } catch {
+    $InstallHadError = $true
+    $InstallError = $_.Exception.Message
+    Write-Warning "The miner was built, but Windows blocked copying it into the Android project."
+    Write-Host "If you insist on building locally, whitelist the parent project folder in Windows Security, then rerun the builder."
+    Write-Host "You can also download published miner binaries from:"
+    Write-Host "    https://github.com/Stawa/AndroMiner/tree/miner-builder"
+    Write-Host "    Source: $BuiltXmrig"
+    Write-Host "    Target: $OutputBinary"
+    Write-Host "    Error: $InstallError"
+    if ($InstallError -match "virus|potentially unwanted") {
+      Write-Host ""
+      Write-Host "Windows Defender commonly flags miner binaries even when you built them locally."
+      Write-Host "Run with -SkipInstall to build without copying into android/app/src/main/jniLibs:"
+      Write-Host "    .\build-xmrig-android.ps1 -SkipInstall"
+    }
+  }
+} else {
+  Write-Host "==> Skipped Android project install because -SkipInstall or SKIP_INSTALL=1 was set."
+}
 
-Write-Host "==> Installed Android miner:"
-Write-Host "    $OutputBinary"
+if ($InstallHadError) {
+  Write-Host ""
+  Write-Host "Options:"
+  Write-Host "  D. Download published miner binary into the Android project"
+  Write-Host "  E. Exit"
+  Write-Host "  Enter. Continue to next steps"
+  $PostBuildChoice = Read-Host "Choose an option"
+  if ($PostBuildChoice -match "^[Dd]$") {
+    Write-Host ""
+    Write-Host "Miner variant:"
+    Write-Host "  T. TLS"
+    Write-Host "  N. No TLS"
+    Write-Host "  Enter. TLS"
+    $DownloadVariantChoice = Read-Host "Choose a variant"
+    $DownloadVariant = if ($DownloadVariantChoice -match "^[Nn]$") { "notls" } else { "tls" }
+    $DownloadUrl = "https://raw.githubusercontent.com/Stawa/AndroMiner/miner-builder/lib/$Abi/$DownloadVariant/libxmrig.so"
+
+    Write-Host "==> Downloading $DownloadVariant miner:"
+    Write-Host "    $DownloadUrl"
+    try {
+      New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+      Invoke-WebRequest -Uri $DownloadUrl -OutFile $OutputBinary -ErrorAction Stop
+      Write-Host "==> Downloaded Android miner:"
+      Write-Host "    $OutputBinary"
+    } catch {
+      Write-Warning "Download failed or Windows blocked the downloaded miner binary."
+      Write-Host "    Target: $OutputBinary"
+      Write-Host "    Error: $($_.Exception.Message)"
+      Write-Host "If Windows Security blocked the file, whitelist the parent project folder and try again."
+    }
+  } elseif ($PostBuildChoice -match "^[Ee]$") {
+    exit 0
+  }
+}
+
 Write-Host ""
-Write-Host "Next:"
-Write-Host "  npm run android:sync"
-Write-Host "  cd android"
-Write-Host "  .\gradlew.bat assembleDebug"
+Write-Host "Next steps:"
+Write-Host "  1. npm run android:sync"
+Write-Host "  2. cd android"
+Write-Host ""
+Write-Host "Build commands:"
+Write-Host "  Standard build:"
+Write-Host "    .\gradlew.bat assembleDebug"
+Write-Host ""
+Write-Host "  Build with bundled native miner:"
+Write-Host "    .\gradlew.bat assembleDebug -PbundleMiner=true"
+Write-Host ""

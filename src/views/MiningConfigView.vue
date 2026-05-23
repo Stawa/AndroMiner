@@ -141,7 +141,8 @@ const backendStatus = computed(() => {
   const labels: Record<MinerBackendState, { label: string; icon: string; tone: string }> = {
     checking: { label: 'Checking backend', icon: 'sync', tone: 'text-app-muted' },
     ready: { label: 'Native miner ready', icon: 'check_circle', tone: 'text-app-green' },
-    missing: { label: 'Miner binary missing', icon: 'warning', tone: 'text-app-yellow' },
+    missing: { label: 'Miner download required', icon: 'download', tone: 'text-app-yellow' },
+    downloading: { label: 'Downloading miner', icon: 'downloading', tone: 'text-app-yellow' },
     'web-unavailable': {
       label: 'Android app required',
       icon: 'phone_android',
@@ -274,7 +275,7 @@ watch(
 
 <template>
   <div class="phone-page">
-    <section class="app-card p-4">
+    <section class="app-card overflow-hidden p-4">
       <ConfigSelect
         :model-value="config.coin.id"
         label="Selected coin"
@@ -292,9 +293,13 @@ watch(
         >
           <MaterialIcon :name="backendStatus.icon" :size="22" />
         </div>
-        <div class="min-w-0 flex-1">
-          <p class="text-[15px] font-semibold leading-5 text-white">{{ backendStatus.label }}</p>
-          <p class="mt-1 text-[12px] leading-[18px] text-app-muted">{{ backendMessage }}</p>
+        <div class="min-w-0 flex-1 overflow-hidden">
+          <p class="break-words text-[15px] font-semibold leading-5 text-white">
+            {{ backendStatus.label }}
+          </p>
+          <p class="mt-1 break-words text-[12px] leading-[18px] text-app-muted">
+            {{ backendMessage }}
+          </p>
         </div>
       </div>
     </section>

@@ -6,8 +6,9 @@ import { Share } from '@capacitor/share';
 import AppDrawer from './components/AppDrawer.vue';
 import AppHeader from './components/AppHeader.vue';
 import BottomNav, { type AppTab } from './components/BottomNav.vue';
+import MinerDownloadWarningSheet from './components/MinerDownloadWarningSheet.vue';
 import { useDeviceTelemetry } from './composables/useDeviceTelemetry';
-import { useMiningController } from './composables/useMiningController';
+import { useMiningController, type MinerBinaryVariant } from './composables/useMiningController';
 import { useTheme } from './composables/useTheme';
 import { useProfilesStore } from './stores/profiles';
 import { useSettingsStore, type SettingsState } from './stores/settings';
@@ -27,6 +28,7 @@ const activeTab = ref<AppTab>('dashboard');
 const drawerOpen = ref(false);
 const importInput = ref<HTMLInputElement | null>(null);
 const systemCheckComplete = ref(false);
+const minerDownloadWarningOpen = ref(false);
 const miner = useMiningController();
 const settings = useSettingsStore();
 const profiles = useProfilesStore();
@@ -65,9 +67,28 @@ const applyProfile = (profile: SavedMiningProfile): void => {
   activeTab.value = 'mining';
 };
 
+const requestStartMining = (): void => {
+  if (miner.backendState.value === 'missing') {
+    minerDownloadWarningOpen.value = true;
+    return;
+  }
+
+  void miner.startMining();
+};
+
 const saveAndStartMining = (): void => {
   profiles.saveActiveConfig(miner.config);
-  void miner.startMining();
+  requestStartMining();
+};
+
+const confirmMinerDownloadAndStart = async (variant: MinerBinaryVariant): Promise<void> => {
+  const ready = await miner.downloadMiner(variant);
+  if (!ready) {
+    return;
+  }
+
+  minerDownloadWarningOpen.value = false;
+  await miner.startMining();
 };
 
 const autosaveCurrentConfig = (): void => {
@@ -331,7 +352,7 @@ onBeforeUnmount(() => {
         :backend-message="miner.backendMessage.value"
         :session-history="miner.sessionHistory.value"
         :active-profile="profiles.activeProfile"
-        @start="miner.startMining"
+        @start="requestStartMining"
         @configure="navigateToSetup"
         @statistics="navigateToStatistics"
         @profiles="navigateToProfiles"
@@ -372,6 +393,13 @@ onBeforeUnmount(() => {
     </main>
 
     <BottomNav v-if="systemCheckComplete && !sessionActive" v-model="activeTab" />
+    <MinerDownloadWarningSheet
+      :open="minerDownloadWarningOpen"
+      :downloading="miner.backendState.value === 'downloading'"
+      :progress="miner.downloadProgress.value"
+      @confirm="confirmMinerDownloadAndStart"
+      @cancel="minerDownloadWarningOpen = false"
+    />
     <AppDrawer
       v-if="systemCheckComplete && !sessionActive"
       :open="drawerOpen"

@@ -42,7 +42,7 @@ const walletPreview = computed(() =>
     : props.config.walletAddress
 );
 const profileName = computed(() => props.activeProfile?.name || 'Unsaved setup');
-const canStart = computed(() => props.backendState === 'ready');
+const canStart = computed(() => props.backendState === 'ready' || props.backendState === 'missing');
 const connectionStatus = computed(() => {
   if (props.connected) {
     return { label: 'Pool connected', tone: 'good' as const };
@@ -54,7 +54,8 @@ const connectionStatus = computed(() => {
   > = {
     checking: { label: 'Checking backend', tone: 'warning' },
     ready: { label: 'Miner ready', tone: 'good' },
-    missing: { label: 'Miner missing', tone: 'warning' },
+    missing: { label: 'Download required', tone: 'warning' },
+    downloading: { label: 'Downloading miner', tone: 'warning' },
     'web-unavailable': { label: 'Android required', tone: 'warning' },
     error: { label: 'Miner stopped', tone: 'danger' }
   };

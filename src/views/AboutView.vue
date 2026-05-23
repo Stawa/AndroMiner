@@ -77,8 +77,8 @@ defineProps<AboutViewProps>();
           battery optimization request, and network-state awareness.
         </p>
         <p>
-          Actual mining requires an XMRig-compatible Android binary packaged as libxmrig.so or
-          installed into the app files miners directory.
+          Actual mining requires the app to download the ARM64 XMRig binary into its private miners
+          directory after user approval.
         </p>
       </div>
     </SettingGroup>

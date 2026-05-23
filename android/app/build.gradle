@@ -1,12 +1,15 @@
 apply plugin: 'com.android.application'
 
+def bundleMiner = project.findProperty('bundleMiner') == 'true'
+def targetSdkVersionOverride = project.findProperty('targetSdkVersionOverride')
+
 android {
     namespace "com.androminer.dashboard"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.androminer.dashboard"
+        applicationId "com.androminer.app"
         minSdkVersion rootProject.ext.minSdkVersion
-        targetSdkVersion rootProject.ext.targetSdkVersion
+        targetSdkVersion targetSdkVersionOverride ? targetSdkVersionOverride.toInteger() : rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -25,6 +28,9 @@ android {
     packagingOptions {
         jniLibs {
             useLegacyPackaging true
+            if (!bundleMiner) {
+                excludes += ['**/libxmrig.so']
+            }
         }
     }
 }

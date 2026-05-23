@@ -12,7 +12,9 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.InetAddress;
@@ -41,11 +43,19 @@ public class NativeMinerPlugin extends Plugin {
   private static final Pattern HASHRATE_PATTERN =
       Pattern.compile("speed.*?([0-9]+(?:\\.[0-9]+)?)\\s*H/s", Pattern.CASE_INSENSITIVE);
   private static final String[] BINARY_CANDIDATES = {
+    "miners/libxmrig.so",
     "miners/xmrig",
     "miners/xmrig-aarch64",
     "libxmrig.so"
   };
+  private static final String TLS_MINER_DOWNLOAD_URL =
+      "https://raw.githubusercontent.com/Stawa/AndroMiner/miner-builder/lib/arm64-v8a/tls/libxmrig.so";
+  private static final String NOTLS_MINER_DOWNLOAD_URL =
+      "https://raw.githubusercontent.com/Stawa/AndroMiner/miner-builder/lib/arm64-v8a/notls/libxmrig.so";
   private static final String API_HOST = "127.0.0.1";
+  private static final int DOWNLOAD_CONNECT_TIMEOUT_MS = 15000;
+  private static final int DOWNLOAD_READ_TIMEOUT_MS = 45000;
+  private static final long DOWNLOAD_PROGRESS_INTERVAL_MS = 250;
   private static final int API_CONNECT_TIMEOUT_MS = 350;
   private static final int API_READ_TIMEOUT_MS = 650;
   private static final int API_FALLBACK_PORT = 39089;
@@ -92,6 +102,52 @@ public class NativeMinerPlugin extends Plugin {
   }
 
   @PluginMethod
+  public void download(PluginCall call) {
+    String variant = normalizeMinerVariant(call.getString("variant", "tls"));
+
+    if (isRunning()) {
+      call.reject("Stop the active miner before downloading a replacement binary.");
+      return;
+    }
+
+    File existing = findMinerBinary();
+    if (existing != null) {
+      existing.setExecutable(true);
+      synchronized (this) {
+        lastMessage = "Miner binary is already installed.";
+        appendLog(lastMessage);
+      }
+      call.resolve(createStatus());
+      return;
+    }
+
+    outputExecutor.execute(
+        () -> {
+          synchronized (NativeMinerPlugin.this) {
+            lastMessage = "Downloading " + formatMinerVariant(variant) + " Android miner binary.";
+            lastFailureReason = "";
+            appendLog(lastMessage);
+          }
+
+          try {
+            File binary = downloadMinerBinary(variant);
+            synchronized (NativeMinerPlugin.this) {
+              lastMessage = formatMinerVariant(variant) + " miner binary downloaded and ready.";
+              appendLog(lastMessage + " " + binary.getAbsolutePath());
+            }
+            call.resolve(createStatus());
+          } catch (IOException exception) {
+            synchronized (NativeMinerPlugin.this) {
+              lastMessage = "Miner download failed: " + exception.getMessage();
+              lastFailureReason = lastMessage;
+              appendLog(lastMessage);
+            }
+            call.reject(lastMessage);
+          }
+        });
+  }
+
+  @PluginMethod
   public synchronized void start(PluginCall call) {
     if (isRunning()) {
       call.resolve(createStatus());
@@ -100,9 +156,9 @@ public class NativeMinerPlugin extends Plugin {
 
     File binary = findMinerBinary();
     if (binary == null) {
-      appendLog("No packaged Android miner binary found.");
+      appendLog("Android miner binary is not installed.");
       call.reject(
-          "No packaged XMRig-compatible Android binary found. Build it for Android with the NDK and package it as libxmrig.so.");
+          "Miner binary is not installed. Download the Android XMRig binary before starting.");
       return;
     }
 
@@ -312,7 +368,7 @@ public class NativeMinerPlugin extends Plugin {
       running = isRunning();
       message =
           binary == null
-              ? "No packaged Android miner binary found. Official XMRig does not publish Android binaries; build one for Android and package it with the APK."
+              ? "Android miner download is required before the first mining session."
               : lastMessage;
       failureReason = lastFailureReason;
       exitCode = lastExitCode;
@@ -789,5 +845,111 @@ public class NativeMinerPlugin extends Plugin {
     }
 
     return null;
+  }
+
+  private String normalizeMinerVariant(String variant) {
+    if (variant == null) {
+      return "tls";
+    }
+
+    String normalized = variant.trim().toLowerCase(Locale.US);
+    return normalized.equals("notls") || normalized.equals("no-tls") ? "notls" : "tls";
+  }
+
+  private String formatMinerVariant(String variant) {
+    return "notls".equals(variant) ? "No-TLS" : "TLS";
+  }
+
+  private String getMinerDownloadUrl(String variant) {
+    return "notls".equals(variant) ? NOTLS_MINER_DOWNLOAD_URL : TLS_MINER_DOWNLOAD_URL;
+  }
+
+  private File downloadMinerBinary(String variant) throws IOException {
+    File minersDir = new File(getContext().getFilesDir(), "miners");
+    if (!minersDir.exists() && !minersDir.mkdirs()) {
+      throw new IOException("Could not create miner storage directory.");
+    }
+
+    File target = new File(minersDir, "libxmrig.so");
+    File temp = new File(minersDir, "libxmrig.so.download");
+    HttpURLConnection connection =
+        (HttpURLConnection) new URL(getMinerDownloadUrl(variant)).openConnection();
+    connection.setRequestMethod("GET");
+    connection.setConnectTimeout(DOWNLOAD_CONNECT_TIMEOUT_MS);
+    connection.setReadTimeout(DOWNLOAD_READ_TIMEOUT_MS);
+    connection.setRequestProperty("Accept", "application/octet-stream");
+
+    try {
+      int responseCode = connection.getResponseCode();
+      if (responseCode < 200 || responseCode >= 300) {
+        throw new IOException("GitHub returned HTTP " + responseCode + ".");
+      }
+
+      long totalBytes = connection.getContentLengthLong();
+      long downloadedBytes = 0;
+      long lastProgressAtMs = 0;
+      notifyDownloadProgress(variant, 0, downloadedBytes, totalBytes);
+
+      try (InputStream input = connection.getInputStream();
+          FileOutputStream output = new FileOutputStream(temp, false)) {
+        byte[] buffer = new byte[8192];
+        int read;
+        while ((read = input.read(buffer)) != -1) {
+          output.write(buffer, 0, read);
+          downloadedBytes += read;
+
+          long now = System.currentTimeMillis();
+          if (now - lastProgressAtMs >= DOWNLOAD_PROGRESS_INTERVAL_MS) {
+            notifyDownloadProgress(
+                variant,
+                calculateDownloadPercent(downloadedBytes, totalBytes),
+                downloadedBytes,
+                totalBytes);
+            lastProgressAtMs = now;
+          }
+        }
+      }
+
+      if (temp.length() <= 0) {
+        throw new IOException("Downloaded miner binary was empty.");
+      }
+
+      if (target.exists() && !target.delete()) {
+        throw new IOException("Could not replace existing miner binary.");
+      }
+
+      if (!temp.renameTo(target)) {
+        throw new IOException("Could not install downloaded miner binary.");
+      }
+
+      target.setReadable(true, true);
+      target.setExecutable(true, true);
+      notifyDownloadProgress(
+          variant, 100, target.length(), totalBytes > 0 ? totalBytes : target.length());
+      return target;
+    } finally {
+      connection.disconnect();
+      if (temp.exists()) {
+        temp.delete();
+      }
+    }
+  }
+
+  private int calculateDownloadPercent(long downloadedBytes, long totalBytes) {
+    if (totalBytes <= 0) {
+      return 0;
+    }
+
+    return Math.min(99, Math.max(0, (int) ((downloadedBytes * 100) / totalBytes)));
+  }
+
+  private void notifyDownloadProgress(
+      String variant, int percent, long downloadedBytes, long totalBytes) {
+    JSObject progress = new JSObject();
+    progress.put("variant", variant);
+    progress.put("percent", percent);
+    progress.put("downloadedBytes", downloadedBytes);
+    progress.put("totalBytes", totalBytes > 0 ? totalBytes : null);
+    notifyListeners("downloadProgress", progress);
   }
 }

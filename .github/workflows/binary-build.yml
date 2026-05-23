@@ -41,7 +41,7 @@ jobs:
         env:
           XMRIG_REF: v6.26.0
           LIBUV_REF: v1.48.0
-          OPENSSL_REF: openssl-3.3.2
+          OPENSSL_REF: openssl-4.0.0
           WITH_TLS: ON
           QUIET: ON
         run: ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018" bash miner-builder/build-xmrig-android.sh
@@ -55,7 +55,7 @@ jobs:
         env:
           XMRIG_REF: v6.26.0
           LIBUV_REF: v1.48.0
-          OPENSSL_REF: openssl-3.3.2
+          OPENSSL_REF: openssl-4.0.0
           WITH_TLS: OFF
           QUIET: ON
         run: ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018" bash miner-builder/build-xmrig-android.sh

@@ -1,4 +1,4 @@
-import { Capacitor, registerPlugin } from '@capacitor/core';
+import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { cryptocurrencies, getCryptocurrencyById } from '../data/miningCatalog';
 import type {
@@ -34,14 +34,34 @@ interface NativeMinerStatus {
   apiTelemetry?: MiningApiTelemetry;
 }
 
+interface NativeMinerDownloadProgress {
+  variant?: MinerBinaryVariant;
+  percent?: number;
+  downloadedBytes?: number;
+  totalBytes?: number | null;
+}
+
 interface NativeMinerPlugin {
   start: (options: { config: MiningConfig }) => Promise<NativeMinerStatus>;
+  download: (options: { variant: MinerBinaryVariant }) => Promise<NativeMinerStatus>;
+  addListener: (
+    eventName: 'downloadProgress',
+    listenerFunc: (progress: NativeMinerDownloadProgress) => void
+  ) => Promise<PluginListenerHandle>;
   pause: () => Promise<NativeMinerStatus>;
   stop: () => Promise<NativeMinerStatus>;
   status: () => Promise<NativeMinerStatus>;
 }
 
-export type MinerBackendState = 'checking' | 'ready' | 'missing' | 'web-unavailable' | 'error';
+export type MinerBinaryVariant = 'tls' | 'notls';
+
+export type MinerBackendState =
+  | 'checking'
+  | 'ready'
+  | 'missing'
+  | 'downloading'
+  | 'web-unavailable'
+  | 'error';
 
 const NativeMiner = registerPlugin<NativeMinerPlugin>('NativeMiner');
 const maxHistoryPoints = 26;
@@ -177,6 +197,13 @@ const writeSessionHistory = (history: MiningSessionHistoryItem[]): void => {
   localStorage.setItem(sessionHistoryKey, JSON.stringify(history));
 };
 
+const emptyDownloadProgress = (): Required<NativeMinerDownloadProgress> => ({
+  variant: 'tls',
+  percent: 0,
+  downloadedBytes: 0,
+  totalBytes: null
+});
+
 const cloneConfig = (config: MiningConfig): MiningConfig => ({
   ...config,
   coin: {
@@ -191,6 +218,7 @@ export const useMiningController = () => {
   const connected = ref(false);
   const backendState = ref<MinerBackendState>('checking');
   const backendMessage = ref('Checking native miner backend...');
+  const downloadProgress = ref<Required<NativeMinerDownloadProgress>>(emptyDownloadProgress());
   const minerLogs = ref<string[]>([]);
   const config = reactive<MiningConfig>(cloneConfig(initialConfig));
   const stats = reactive<MiningStats>({ ...initialStats });
@@ -208,6 +236,7 @@ export const useMiningController = () => {
   let externalBatteryLevel: number | null = null;
   let externalCharging = false;
   let externalTemperature: number | null = null;
+  let downloadProgressHandle: PluginListenerHandle | null = null;
 
   const telemetry = computed<MiningTelemetry>(() => ({
     state: state.value,
@@ -263,7 +292,7 @@ export const useMiningController = () => {
       status.message ||
       (status.available
         ? 'Native miner backend is ready.'
-        : 'Native miner backend is missing an Android XMRig binary.');
+        : 'Native miner download is required before the first mining session.');
     minerLogs.value = Array.isArray(status.logs) ? status.logs : minerLogs.value;
     apiTelemetry.value = status.apiTelemetry || {
       ...apiTelemetry.value,
@@ -332,6 +361,10 @@ export const useMiningController = () => {
   };
 
   const refreshStatus = async (): Promise<void> => {
+    if (backendState.value === 'downloading') {
+      return;
+    }
+
     if (!Capacitor.isNativePlatform()) {
       connected.value = false;
       backendState.value = 'web-unavailable';
@@ -349,6 +382,40 @@ export const useMiningController = () => {
       backendState.value = 'error';
       backendMessage.value = error instanceof Error ? error.message : 'Native miner status failed.';
       state.value = 'idle';
+    }
+  };
+
+  const downloadMiner = async (variant: MinerBinaryVariant): Promise<boolean> => {
+    if (!Capacitor.isNativePlatform()) {
+      backendState.value = 'web-unavailable';
+      backendMessage.value = 'Build and run the Android app to download the miner.';
+      return false;
+    }
+
+    if (backendState.value === 'ready') {
+      return true;
+    }
+
+    downloadProgress.value = {
+      ...emptyDownloadProgress(),
+      variant
+    };
+    backendState.value = 'downloading';
+    backendMessage.value = `Downloading ${variant === 'tls' ? 'TLS' : 'no-TLS'} Android miner binary from GitHub...`;
+
+    try {
+      const status = await NativeMiner.download({ variant });
+      setBackendStatus(status);
+      downloadProgress.value = {
+        ...downloadProgress.value,
+        percent: status.available ? 100 : downloadProgress.value.percent
+      };
+      return status.available;
+    } catch (error) {
+      connected.value = false;
+      backendState.value = 'missing';
+      backendMessage.value = error instanceof Error ? error.message : 'Miner download failed.';
+      return false;
     }
   };
 
@@ -373,6 +440,11 @@ export const useMiningController = () => {
     if (!Capacitor.isNativePlatform()) {
       backendState.value = 'web-unavailable';
       backendMessage.value = 'Build and run the Android app to start a real miner.';
+      return;
+    }
+
+    if (backendState.value === 'missing') {
+      backendMessage.value = 'Download the Android miner binary before starting.';
       return;
     }
 
@@ -551,6 +623,22 @@ export const useMiningController = () => {
       isLoading.value = false;
     });
 
+    if (Capacitor.isNativePlatform()) {
+      void NativeMiner.addListener('downloadProgress', (progress) => {
+        downloadProgress.value = {
+          variant: progress.variant === 'notls' ? 'notls' : 'tls',
+          percent: bounded(Number(progress.percent ?? 0), 0, 100),
+          downloadedBytes: Math.max(0, Number(progress.downloadedBytes ?? 0)),
+          totalBytes:
+            typeof progress.totalBytes === 'number' && progress.totalBytes > 0
+              ? progress.totalBytes
+              : null
+        };
+      }).then((handle) => {
+        downloadProgressHandle = handle;
+      });
+    }
+
     pollHandle = window.setInterval(() => {
       void refreshStatus();
     }, 2000);
@@ -583,6 +671,7 @@ export const useMiningController = () => {
   onUnmounted(() => {
     window.clearInterval(pollHandle);
     window.clearInterval(uiTickHandle);
+    void downloadProgressHandle?.remove();
   });
 
   return {
@@ -592,6 +681,7 @@ export const useMiningController = () => {
     connected,
     backendState,
     backendMessage,
+    downloadProgress,
     minerLogs,
     apiTelemetry,
     config,
@@ -609,6 +699,7 @@ export const useMiningController = () => {
     applySavedProfile,
     deleteSessionHistoryItem,
     clearSessionHistory,
-    syncDeviceTelemetry
+    syncDeviceTelemetry,
+    downloadMiner
   };
 };

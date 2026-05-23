@@ -13,10 +13,11 @@ ABI="${ABI:-arm64-v8a}"
 ANDROID_PLATFORM="${ANDROID_PLATFORM:-android-29}"
 XMRIG_REF="${XMRIG_REF:-master}"
 LIBUV_REF="${LIBUV_REF:-v1.48.0}"
-OPENSSL_REF="${OPENSSL_REF:-openssl-3.3.2}"
+OPENSSL_REF="${OPENSSL_REF:-openssl-4.0.0}"
 WITH_TLS="${WITH_TLS:-ON}"
 QUIET="${QUIET:-ON}"
 JOBS="${JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)}"
+SKIP_INSTALL="${SKIP_INSTALL:-0}"
 
 ANDROID_SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
 if [[ -z "$ANDROID_SDK" ]]; then
@@ -241,6 +242,9 @@ if grep -q "pthread rt dl log" "$SRC_DIR/xmrig/CMakeLists.txt"; then
 fi
 perl -0pi -e 's/if \(WIN32\)/if (WIN32 AND NOT ANDROID)/g' "$SRC_DIR/xmrig/CMakeLists.txt"
 perl -0pi -e 's/NOT CMAKE_GENERATOR STREQUAL Xcode\)/NOT CMAKE_GENERATOR STREQUAL Xcode AND NOT ANDROID)/g' "$SRC_DIR/xmrig/CMakeLists.txt"
+if [[ -f "$SRC_DIR/xmrig/src/base/net/tls/TlsGen.cpp" ]]; then
+  perl -0pi -e 's/auto name = X509_get_subject_name\(m_x509\);/auto name = const_cast<X509_NAME *>(X509_get_subject_name(m_x509));/g' "$SRC_DIR/xmrig/src/base/net/tls/TlsGen.cpp"
+fi
 
 echo "==> Building XMRig (TLS=$WITH_TLS, HTTP API enabled, hwloc disabled)"
 rm -rf "$BUILD_DIR/xmrig-$ABI"
@@ -266,13 +270,26 @@ if [[ -z "$BUILT_XMRIG" ]]; then
   exit 1
 fi
 
-cp "$BUILT_XMRIG" "$OUTPUT_BINARY"
-chmod 755 "$OUTPUT_BINARY"
-
-echo "==> Installed Android miner:"
-echo "    $OUTPUT_BINARY"
+echo "==> Built Android miner:"
+echo "    $BUILT_XMRIG"
+if [[ "$SKIP_INSTALL" == "1" ]]; then
+  echo "==> Skipped Android project install because SKIP_INSTALL=1 was set."
+else
+  cp "$BUILT_XMRIG" "$OUTPUT_BINARY"
+  chmod 755 "$OUTPUT_BINARY"
+  echo "==> Installed Android miner:"
+  echo "    $OUTPUT_BINARY"
+fi
 echo
-echo "Next:"
-echo "  cd \"$ROOT_DIR\""
-echo "  npm run android:sync"
-echo "  cd android && ./gradlew assembleDebug"
+echo "Next steps:"
+echo "  1. cd \"$ROOT_DIR\""
+echo "  2. npm run android:sync"
+echo "  3. cd android"
+echo
+echo "Build commands:"
+echo "  Standard build:"
+echo "    ./gradlew assembleDebug"
+echo
+echo "  Build with bundled native miner:"
+echo "    ./gradlew assembleDebug -PbundleMiner=true"
+echo

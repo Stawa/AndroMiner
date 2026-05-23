@@ -42,7 +42,8 @@ const dashboardStatus = computed(() => {
   const labels: Record<MinerBackendState, { label: string; dot: string; text: string }> = {
     checking: { label: 'Checking backend', dot: 'bg-app-yellow', text: 'text-app-muted' },
     ready: { label: 'Miner ready', dot: 'bg-app-green', text: 'text-app-muted' },
-    missing: { label: 'Miner binary missing', dot: 'bg-app-yellow', text: 'text-app-muted' },
+    missing: { label: 'Miner download required', dot: 'bg-app-yellow', text: 'text-app-muted' },
+    downloading: { label: 'Downloading miner', dot: 'bg-app-yellow', text: 'text-app-muted' },
     'web-unavailable': {
       label: 'Android app required',
       dot: 'bg-app-yellow',
