@@ -29,7 +29,10 @@ export interface Cryptocurrency {
   symbol: string;
   algorithm: string;
   xmrigAlgo: string;
-  miner: 'xmrig';
+  miner: 'xmrig' | 'external';
+  minerName?: string;
+  supportStatus: 'bundled' | 'custom-miner-required';
+  supportNote?: string;
   defaultPort: number;
   defaultPoolUrl: string;
   defaultProtocol: MiningProtocol;
@@ -73,9 +76,12 @@ export interface MiningConfig {
 
 export interface MiningStats {
   hashrate: number;
+  difficulty: number | null;
+  networkLatencyMs: number | null;
   acceptedShares: number;
   rejectedShares: number;
   cpuUsage: number;
+  minerCpuUsage: number | null;
   temperature: number;
   batteryLevel: number;
   isCharging: boolean;

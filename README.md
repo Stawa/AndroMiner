@@ -88,13 +88,59 @@ cd android
 
 More build details are in [docs/TECHNICAL.md](docs/TECHNICAL.md) and [miner-builder/README.md](miner-builder/README.md).
 
+## Code Formatting
+
+Format the web app:
+
+```powershell
+npm run format
+```
+
+Format Android Java, Gradle, XML, properties, and ProGuard files:
+
+```powershell
+.\scripts\format-android.ps1
+```
+
+Check Android formatting without changing files:
+
+```powershell
+.\scripts\format-android.ps1 -Check
+```
+
 ## Supported Mining
 
-AndroMiner is focused on phone CPU mining. The default catalog is intentionally small:
+AndroMiner is focused on phone CPU mining with the bundled Android ARM64 XMRig binary.
+The app includes presets for coins and algorithms that XMRig can launch directly.
 
-| Coin         | Algorithm        | Notes                               |
-| ------------ | ---------------- | ----------------------------------- |
-| Monero (XMR) | RandomX / `rx/0` | CPU-minable and supported by XMRig. |
+| Coin                    | Symbol  | XMRig algorithm   | Status               |
+| ----------------------- | ------- | ----------------- | -------------------- |
+| Monero                  | XMR     | `rx/0`            | Bundled XMRig preset |
+| Zephyr Protocol         | ZEPH    | `rx/0`            | Bundled XMRig preset |
+| Wownero                 | WOW     | `rx/wow`          | Bundled XMRig preset |
+| ArQmA                   | ARQ     | `rx/arq`          | Bundled XMRig preset |
+| Safex Cash              | SFX     | `rx/sfx`          | Bundled XMRig preset |
+| KevaCoin                | KVA     | `rx/keva`         | Bundled XMRig preset |
+| Raptoreum               | RTM     | `gr`              | Bundled XMRig preset |
+| Yerbas                  | YERB    | `gr`              | Bundled XMRig preset |
+| GSP Coin                | GSPC    | `gr`              | Bundled XMRig preset |
+| Chukwa-compatible pools | CHUKWA  | `argon2/chukwa`   | Bundled XMRig preset |
+| Chukwa v2 pools         | CHUKWA2 | `argon2/chukwav2` | Bundled XMRig preset |
+| NinjaCoin               | NINJA   | `argon2/ninja`    | Bundled XMRig preset |
+| Conceal                 | CCX     | `cn/ccx`          | Bundled XMRig preset |
+| Talleo                  | TLO     | `cn-pico/tlo`     | Bundled XMRig preset |
+
+Some coins are shown in the app catalog for visibility, but they are disabled until
+AndroMiner has support for the required miner binary:
+
+| Coin  | Symbol | Required miner support                   |
+| ----- | ------ | ---------------------------------------- |
+| Scala | XLA    | XLArig or another Panthera-capable miner |
+| Dero  | DERO   | Current DERO miner / AstroBWT flow       |
+| Vkax  | VKAX   | XMRigCC-style build with the Mike algo   |
+
+Pool endpoints, ports, wallet formats, and active coin algorithms can change. Always
+check the pool's current setup guide before mining, especially for smaller coins.
 
 Bitcoin, Litecoin, Ethereum Classic, Ravencoin, and other GPU/ASIC-focused coins are not practical targets for this Android CPU miner.
 

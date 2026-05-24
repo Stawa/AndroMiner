@@ -7,6 +7,7 @@ import SessionControls from '../components/SessionControls.vue';
 import StatusIndicator from '../components/StatusIndicator.vue';
 import WarningBottomSheet, { type WarningType } from '../components/WarningBottomSheet.vue';
 import { profilePresets } from '../composables/useMiningController';
+import { useSheetDrag } from '../composables/useSheetDrag';
 import type {
   HistoryPoint,
   MiningApiTelemetry,
@@ -40,8 +41,6 @@ const emit = defineEmits<{
 const detailsOpen = ref(false);
 const profilePickerOpen = ref(false);
 const warningType = ref<WarningType | null>(null);
-const detailsDragStartY = ref<number | null>(null);
-const detailsDragY = ref(0);
 
 const recentHashrates = computed(() =>
   props.hashrateHistory
@@ -109,6 +108,13 @@ const readNumber = (record: Record<string, unknown> | null, key: string): number
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 };
 
+const firstPositiveNumber = (...values: Array<number | null | undefined>): number | null => {
+  const value = values.find(
+    (item) => typeof item === 'number' && Number.isFinite(item) && item > 0
+  );
+  return value ?? null;
+};
+
 const formatCompactNumber = (value: number | null): string => {
   if (value === null) {
     return 'Unknown';
@@ -120,54 +126,53 @@ const formatCompactNumber = (value: number | null): string => {
   }).format(value);
 };
 
+const formatCpuUsage = (value: number | null | undefined): string =>
+  typeof value === 'number' && Number.isFinite(value) ? `${Math.round(value)}%` : 'Measuring';
+
 const apiResults = computed(() => asRecord(props.apiTelemetry.results));
 const apiConnection = computed(() => asRecord(props.apiTelemetry.connection));
 const currentDifficultyLabel = computed(() =>
-  formatCompactNumber(readNumber(apiResults.value, 'diff_current'))
+  formatCompactNumber(
+    firstPositiveNumber(
+      readNumber(apiResults.value, 'diff_current'),
+      readNumber(apiConnection.value, 'diff'),
+      props.stats.difficulty
+    )
+  )
 );
 const networkLatencyLabel = computed(() => {
-  const ping = readNumber(apiConnection.value, 'ping');
+  const ping = firstPositiveNumber(
+    readNumber(apiConnection.value, 'ping'),
+    props.stats.networkLatencyMs
+  );
   return ping === null ? 'Unknown' : `${Math.round(ping)} ms`;
 });
 
 const toggleDetails = (): void => {
   detailsOpen.value = !detailsOpen.value;
-  detailsDragY.value = 0;
 };
 
 const closeDetails = (): void => {
   detailsOpen.value = false;
-  detailsDragStartY.value = null;
-  detailsDragY.value = 0;
 };
 
-const detailsSheetStyle = computed(() => ({
-  transform: `translateY(${detailsDragY.value}px)`
-}));
-
-const startDetailsDrag = (event: PointerEvent): void => {
-  detailsDragStartY.value = event.clientY;
-  detailsDragY.value = 0;
-  (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+const closeProfilePicker = (): void => {
+  profilePickerOpen.value = false;
 };
 
-const moveDetailsDrag = (event: PointerEvent): void => {
-  if (detailsDragStartY.value === null) {
-    return;
-  }
+const {
+  sheetDragStyle: detailsSheetStyle,
+  startSheetDrag: startDetailsDrag,
+  moveSheetDrag: moveDetailsDrag,
+  endSheetDrag: endDetailsDrag
+} = useSheetDrag(closeDetails);
 
-  detailsDragY.value = Math.max(0, event.clientY - detailsDragStartY.value);
-};
-
-const endDetailsDrag = (): void => {
-  if (detailsDragY.value > 86) {
-    closeDetails();
-    return;
-  }
-
-  detailsDragStartY.value = null;
-  detailsDragY.value = 0;
-};
+const {
+  sheetDragStyle: profileSheetStyle,
+  startSheetDrag: startProfileDrag,
+  moveSheetDrag: moveProfileDrag,
+  endSheetDrag: endProfileDrag
+} = useSheetDrag(closeProfilePicker);
 
 const showThermalWarning = (): void => {
   warningType.value = 'thermal';
@@ -207,7 +212,7 @@ const openProfilePicker = (): void => {
 
 const selectProfile = (profile: MiningProfile): void => {
   emit('profile', profile);
-  profilePickerOpen.value = false;
+  closeProfilePicker();
 };
 
 watch(
@@ -348,7 +353,7 @@ const trendIcon = computed(() => {
           :value="stats.rejectedShares.toLocaleString()"
           :tone="stats.rejectedShares > 0 ? 'danger' : 'normal'"
         />
-        <MiningMetric label="CPU usage" :value="`${Math.round(stats.cpuUsage)}%`" />
+        <MiningMetric label="Miner CPU" :value="formatCpuUsage(stats.minerCpuUsage)" />
         <MiningMetric
           label="Temperature"
           :value="`${Math.round(stats.temperature)} °C`"
@@ -448,6 +453,12 @@ const trendIcon = computed(() => {
             ><strong class="font-medium text-white">{{ totalHashesLabel }}</strong>
           </div>
           <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
+            <span class="text-app-muted">Miner CPU</span
+            ><strong class="font-medium text-white">{{
+              formatCpuUsage(stats.minerCpuUsage)
+            }}</strong>
+          </div>
+          <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
             <span class="text-app-muted">Network latency</span
             ><strong
               class="font-medium"
@@ -533,19 +544,24 @@ const trendIcon = computed(() => {
       <div
         v-if="profilePickerOpen"
         class="fixed inset-0 z-50 bg-black/[0.62]"
-        @click="profilePickerOpen = false"
+        @click="closeProfilePicker"
       />
     </Transition>
     <Transition name="sheet">
       <section
         v-if="profilePickerOpen"
         class="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-[420px] rounded-t-[28px] border border-app-line bg-app-card px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-3"
+        :style="profileSheetStyle"
       >
         <button
-          class="ripple mx-auto mb-3 block h-8 min-h-8 w-24 rounded-full"
+          class="ripple mx-auto mb-3 block h-8 min-h-8 w-24 touch-none rounded-full"
           type="button"
           aria-label="Close profile picker"
-          @click="profilePickerOpen = false"
+          @click="closeProfilePicker"
+          @pointerdown="startProfileDrag"
+          @pointermove="moveProfileDrag"
+          @pointerup="endProfileDrag"
+          @pointercancel="endProfileDrag"
         >
           <span class="mx-auto block h-1 w-10 rounded-full bg-white/25" />
         </button>

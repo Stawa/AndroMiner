@@ -4,6 +4,7 @@ import MaterialIcon from '../components/MaterialIcon.vue';
 import SettingGroup from '../components/SettingGroup.vue';
 import ToggleRow from '../components/ToggleRow.vue';
 import { useTheme } from '../composables/useTheme';
+import { useSheetDrag } from '../composables/useSheetDrag';
 import { useSettingsStore } from '../stores/settings';
 
 const settings = useSettingsStore();
@@ -28,6 +29,8 @@ const openAbout = (): void => {
 const closeAbout = (): void => {
   aboutOpen.value = false;
 };
+
+const { sheetDragStyle, startSheetDrag, moveSheetDrag, endSheetDrag } = useSheetDrag(closeAbout);
 </script>
 
 <template>
@@ -192,8 +195,20 @@ const closeAbout = (): void => {
     <section
       v-if="aboutOpen"
       class="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-[420px] rounded-t-[28px] border border-app-line bg-app-card p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
+      :style="sheetDragStyle"
     >
-      <div class="mx-auto mb-4 h-1 w-10 rounded-full bg-white/25" />
+      <button
+        class="ripple mx-auto mb-3 block h-8 min-h-8 w-24 touch-none rounded-full"
+        type="button"
+        aria-label="Close about sheet"
+        @click="closeAbout"
+        @pointerdown="startSheetDrag"
+        @pointermove="moveSheetDrag"
+        @pointerup="endSheetDrag"
+        @pointercancel="endSheetDrag"
+      >
+        <span class="mx-auto block h-1 w-10 rounded-full bg-white/25" />
+      </button>
       <div class="flex items-center gap-3">
         <div
           class="grid h-12 w-12 place-items-center rounded-full border-2 border-app-green text-app-green"

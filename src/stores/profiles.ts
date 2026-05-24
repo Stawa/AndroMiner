@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { getCryptocurrencyById } from '../data/miningCatalog';
 import type { MiningConfig, SavedMiningProfile } from '../types/mining';
 
 const profilesKey = 'androminer-profiles';
@@ -9,10 +10,14 @@ interface ProfilesState {
   loaded: boolean;
 }
 
-const cloneConfig = (config: MiningConfig): MiningConfig => ({
-  ...config,
-  coin: { ...config.coin, poolExamples: [...(config.coin.poolExamples || [])] }
-});
+const cloneConfig = (config: MiningConfig): MiningConfig => {
+  const catalogCoin = getCryptocurrencyById(config.coin.id) || config.coin;
+
+  return {
+    ...config,
+    coin: { ...catalogCoin, poolExamples: [...(catalogCoin.poolExamples || [])] }
+  };
+};
 
 const readProfiles = (): SavedMiningProfile[] => {
   try {

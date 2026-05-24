@@ -30,6 +30,7 @@ interface ConfigSelectOption {
   supportingText?: string;
   iconText?: string;
   iconClass?: string;
+  disabled?: boolean;
 }
 
 const props = defineProps<MiningConfigViewProps>();
@@ -90,9 +91,13 @@ const coinOptions = computed<ConfigSelectOption[]>(() =>
   cryptocurrencies.map((coin) => ({
     value: coin.id,
     label: `${coin.name} / ${coin.symbol}`,
-    supportingText: coin.algorithm,
+    supportingText:
+      coin.supportStatus === 'bundled'
+        ? `${coin.algorithm} / ${coin.xmrigAlgo}`
+        : `${coin.algorithm} · ${coin.supportNote || 'Custom miner required'}`,
     iconText: coin.logoText,
-    iconClass: coin.logoClass
+    iconClass: coin.logoClass,
+    disabled: coin.supportStatus !== 'bundled'
   }))
 );
 

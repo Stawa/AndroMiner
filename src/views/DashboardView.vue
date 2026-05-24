@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 import MaterialIcon from '../components/MaterialIcon.vue';
 import StatusIndicator from '../components/StatusIndicator.vue';
+import { useSheetDrag } from '../composables/useSheetDrag';
 import type {
   DeviceTelemetry,
   MiningConfig,
@@ -153,6 +154,13 @@ const reviewSession = (id: string): void => {
 const closeSessionReview = (): void => {
   selectedSessionId.value = null;
 };
+
+const {
+  sheetDragStyle: sessionSheetDragStyle,
+  startSheetDrag: startSessionSheetDrag,
+  moveSheetDrag: moveSessionSheetDrag,
+  endSheetDrag: endSessionSheetDrag
+} = useSheetDrag(closeSessionReview);
 
 const deleteSelectedSession = (id: string): void => {
   const confirmed = window.confirm('Delete this completed mining session from history?');
@@ -383,12 +391,17 @@ const clearSessionHistory = (): void => {
       <section
         v-if="selectedSession"
         class="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-[420px] rounded-t-[28px] border border-app-line bg-app-card px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-3"
+        :style="sessionSheetDragStyle"
       >
         <button
-          class="ripple mx-auto mb-3 block h-8 min-h-8 w-24 rounded-full"
+          class="ripple mx-auto mb-3 block h-8 min-h-8 w-24 touch-none rounded-full"
           type="button"
           aria-label="Close session review"
           @click="closeSessionReview"
+          @pointerdown="startSessionSheetDrag"
+          @pointermove="moveSessionSheetDrag"
+          @pointerup="endSessionSheetDrag"
+          @pointercancel="endSessionSheetDrag"
         >
           <span class="mx-auto block h-1 w-10 rounded-full bg-white/25" />
         </button>

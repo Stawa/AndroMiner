@@ -48,7 +48,11 @@ const minerDetails = [
   { label: 'Miner', value: 'XMRig v6.26.0, built from source for Android ARM64' },
   { label: 'Binary name', value: 'libxmrig.so' },
   { label: 'ABI', value: 'arm64-v8a' },
-  { label: 'Algorithm focus', value: 'RandomX / rx/0 for Monero CPU mining' },
+  {
+    label: 'Bundled algorithms',
+    value:
+      'RandomX, RandomWOW, RandomARQ, RandomKEVA, RandomSFX, GhostRider, CryptoNight, and Argon2 presets supported by XMRig'
+  },
   { label: 'Native stack', value: 'libuv v1.48.0, OpenSSL openssl-4.0.0, hwloc disabled' },
   { label: 'Variants', value: 'TLS and no-TLS builds are available' },
   { label: 'Download source', value: 'GitHub miner-builder branch after user approval' },

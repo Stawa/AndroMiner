@@ -8,6 +8,7 @@ interface ConfigSelectOption {
   supportingText?: string;
   iconText?: string;
   iconClass?: string;
+  disabled?: boolean;
 }
 
 interface ConfigSelectProps {
@@ -32,7 +33,17 @@ const selectedOption = computed(
 );
 
 const selectOption = (value: string): void => {
+  const option = props.options.find((item) => item.value === value);
+
+  if (option?.disabled) {
+    return;
+  }
+
   emit('update:modelValue', value);
+  open.value = false;
+};
+
+const closeSheet = (): void => {
   open.value = false;
 };
 </script>
@@ -72,40 +83,40 @@ const selectOption = (value: string): void => {
     <Transition name="fade">
       <button
         v-if="open"
-        class="fixed inset-0 z-50 h-full w-full bg-black/60"
+        class="fixed inset-0 z-50 h-full w-full bg-black/65"
         type="button"
         :aria-label="`Close ${label} selector`"
-        @click="open = false"
+        @click="closeSheet"
       />
     </Transition>
-    <Transition name="sheet">
+    <Transition name="dialog">
       <section
         v-if="open"
-        class="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[78vh] max-w-[420px] overflow-hidden rounded-t-[28px] border border-app-line bg-app-card pb-[env(safe-area-inset-bottom)]"
+        class="fixed left-1/2 top-1/2 z-50 flex max-h-[78vh] w-[calc(100vw-2rem)] max-w-[380px] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[24px] border border-app-line bg-app-card shadow-xl shadow-black/30"
         role="dialog"
+        aria-modal="true"
         :aria-label="label"
       >
-        <div class="px-4 pt-3">
-          <div class="mx-auto mb-4 h-1 w-10 rounded-full bg-white/25" />
-          <div class="mb-3 flex min-h-12 items-center justify-between gap-3">
-            <h2 class="text-[18px] font-semibold leading-6 text-white">{{ label }}</h2>
-            <button
-              class="ripple grid h-12 w-12 shrink-0 place-items-center rounded-full text-app-muted"
-              type="button"
-              aria-label="Close selector"
-              @click="open = false"
-            >
-              <MaterialIcon name="close" :size="22" />
-            </button>
-          </div>
+        <div class="flex min-h-14 items-center justify-between gap-3 border-b border-app-line px-4">
+          <h2 class="truncate text-[18px] font-semibold leading-6 text-white">{{ label }}</h2>
+          <button
+            class="ripple grid h-12 w-12 shrink-0 place-items-center rounded-full text-app-muted"
+            type="button"
+            aria-label="Close selector"
+            @click="closeSheet"
+          >
+            <MaterialIcon name="close" :size="22" />
+          </button>
         </div>
 
-        <div class="max-h-[calc(78vh-5rem)] overflow-y-auto px-2 pb-3">
+        <div class="overflow-y-auto px-2 py-2">
           <button
             v-for="option in options"
             :key="option.value"
             class="ripple flex min-h-14 w-full items-center gap-3 rounded-2xl px-3 py-2 text-left active:bg-white/10"
+            :class="{ 'opacity-45': option.disabled }"
             type="button"
+            :disabled="option.disabled"
             @click="selectOption(option.value)"
           >
             <span

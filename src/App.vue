@@ -373,8 +373,6 @@ onBeforeUnmount(() => {
         v-else-if="activeTab === 'statistics'"
         :config="miner.config"
         :stats="miner.stats"
-        :hashrate-history="miner.hashrateHistory.value"
-        :temperature-history="miner.temperatureHistory.value"
         :session-history="miner.sessionHistory.value"
       />
       <SettingsView

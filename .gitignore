@@ -37,6 +37,7 @@ android/key.properties
 .env.*
 !.env.example
 !.env.*.example
+scripts/*
 
 # Logs and local diagnostics
 *.log

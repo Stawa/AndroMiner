@@ -16,6 +16,10 @@ import type {
 
 interface NativeMinerStats {
   hashrate?: number;
+  difficulty?: number | null;
+  networkLatencyMs?: number | null;
+  cpuUsage?: number | null;
+  minerCpuUsage?: number | null;
   acceptedShares?: number;
   rejectedShares?: number;
   activeThreads?: number;
@@ -98,9 +102,12 @@ const initialConfig: MiningConfig = {
 
 const initialStats: MiningStats = {
   hashrate: 0,
+  difficulty: null,
+  networkLatencyMs: null,
   acceptedShares: 0,
   rejectedShares: 0,
   cpuUsage: 4,
+  minerCpuUsage: null,
   temperature: 36,
   batteryLevel: 86,
   isCharging: false,
@@ -207,8 +214,8 @@ const emptyDownloadProgress = (): Required<NativeMinerDownloadProgress> => ({
 const cloneConfig = (config: MiningConfig): MiningConfig => ({
   ...config,
   coin: {
-    ...config.coin,
-    poolExamples: [...(config.coin.poolExamples || [])]
+    ...(getCryptocurrencyById(config.coin.id) || config.coin),
+    poolExamples: [...((getCryptocurrencyById(config.coin.id) || config.coin).poolExamples || [])]
   }
 });
 
@@ -325,6 +332,26 @@ export const useMiningController = () => {
     }
 
     stats.hashrate = Number(nativeStats.hashrate ?? stats.hashrate);
+    const nativeMinerCpuUsage =
+      typeof nativeStats.minerCpuUsage === 'number' && Number.isFinite(nativeStats.minerCpuUsage)
+        ? nativeStats.minerCpuUsage
+        : typeof nativeStats.cpuUsage === 'number' && Number.isFinite(nativeStats.cpuUsage)
+          ? nativeStats.cpuUsage
+          : null;
+    if (nativeMinerCpuUsage !== null) {
+      stats.minerCpuUsage = bounded(nativeMinerCpuUsage, 0, 100);
+      stats.cpuUsage = stats.minerCpuUsage;
+    }
+
+    stats.difficulty =
+      typeof nativeStats.difficulty === 'number' && Number.isFinite(nativeStats.difficulty)
+        ? nativeStats.difficulty
+        : stats.difficulty;
+    stats.networkLatencyMs =
+      typeof nativeStats.networkLatencyMs === 'number' &&
+      Number.isFinite(nativeStats.networkLatencyMs)
+        ? nativeStats.networkLatencyMs
+        : stats.networkLatencyMs;
     stats.acceptedShares = Number(nativeStats.acceptedShares ?? stats.acceptedShares);
     stats.rejectedShares = Number(nativeStats.rejectedShares ?? stats.rejectedShares);
     stats.activeThreads = Number(nativeStats.activeThreads ?? stats.activeThreads);
@@ -337,10 +364,9 @@ export const useMiningController = () => {
     } else {
       stats.uptimeSeconds = nativeUptimeSeconds;
     }
-    stats.cpuUsage =
-      state.value === 'mining'
-        ? bounded(config.threadCount * 11 + 18, 0, 100)
-        : bounded(stats.cpuUsage * 0.75 + 4, 0, 100);
+    if (nativeMinerCpuUsage === null) {
+      stats.cpuUsage = stats.minerCpuUsage ?? 0;
+    }
     stats.estimatedEarnings = 0;
 
     if (stats.hashrate > 0) {
@@ -448,9 +474,19 @@ export const useMiningController = () => {
       return;
     }
 
+    if (config.coin.supportStatus !== 'bundled' || config.coin.miner !== 'xmrig') {
+      backendState.value = 'error';
+      backendMessage.value = `${config.coin.name} requires ${
+        config.coin.minerName || 'a custom miner'
+      }. The bundled Android binary currently supports XMRig presets only.`;
+      return;
+    }
+
     stats.uptimeSeconds = 0;
     stats.hashrate = 0;
     stats.activeThreads = 0;
+    stats.cpuUsage = 0;
+    stats.minerCpuUsage = null;
     apiTelemetry.value = defaultApiTelemetry();
     minerLogs.value = [];
     sessionStartedAt = Date.now();
@@ -569,15 +605,21 @@ export const useMiningController = () => {
   const updateCoin = (coinId: string): void => {
     const coin = getCryptocurrencyById(coinId);
 
-    if (!coin) {
+    if (!coin || coin.supportStatus !== 'bundled') {
       return;
     }
+
+    const placeholderWallet = /^YOUR_[A-Z0-9]+_WALLET_ADDRESS$/;
 
     config.coin = coin;
     config.algorithm = coin.algorithm;
     config.poolUrl = coin.defaultPoolUrl;
     config.poolPort = coin.defaultPort;
     config.protocol = coin.defaultProtocol;
+
+    if (!config.walletAddress || placeholderWallet.test(config.walletAddress)) {
+      config.walletAddress = `YOUR_${coin.symbol}_WALLET_ADDRESS`;
+    }
   };
 
   const applySavedProfile = (profile: SavedMiningProfile): void => {
