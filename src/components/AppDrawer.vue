@@ -12,6 +12,7 @@ interface DrawerItem {
 
 interface AppDrawerProps {
   open: boolean;
+  activeTab: AppTab;
 }
 
 const props = defineProps<AppDrawerProps>();
@@ -26,7 +27,7 @@ const emit = defineEmits<{
 const primaryItems: DrawerItem[] = [
   { label: 'Dashboard', icon: 'space_dashboard', tab: 'dashboard' },
   { label: 'Mining setup', icon: 'handyman', tab: 'mining' },
-  { label: 'Statistics', icon: 'bar_chart_4_bars', tab: 'statistics' },
+  { label: 'Insights', icon: 'insights', tab: 'statistics' },
   { label: 'Settings', icon: 'settings', tab: 'settings' }
 ];
 
@@ -73,14 +74,17 @@ const selectItem = (item: DrawerItem): void => {
   emit('close');
 };
 
+const isSelected = (item: DrawerItem): boolean => item.tab === props.activeTab;
+
 const backdropStyle = (open: boolean): Record<string, string> => ({
   '--drawer-backdrop-opacity': open ? '1' : '0',
   '--drawer-backdrop-delay': '0s'
 });
 
 const drawerStyle = (open: boolean): Record<string, string> => ({
-  '--drawer-x': open ? '0%' : '-104%',
-  '--drawer-opacity': open ? '1' : '0.64',
+  '--drawer-y': open ? '0px' : '14px',
+  '--drawer-scale': open ? '1' : '0.96',
+  '--drawer-opacity': open ? '1' : '0',
   '--drawer-delay': '0s, 0s'
 });
 
@@ -133,54 +137,89 @@ onBeforeUnmount(() => {
     :inert="!active"
     @click.stop
   >
-    <div class="flex items-center gap-3 border-b border-app-line pb-6">
+    <div class="flex items-center gap-3 border-b border-app-line pb-4">
       <div
-        class="grid h-14 w-14 place-items-center rounded-full border-2 border-app-green text-app-green"
+        class="grid h-12 w-12 place-items-center rounded-xl border border-app-green/40 bg-app-green-dim text-app-green"
       >
-        <MaterialIcon name="power_settings_new" :size="30" />
+        <MaterialIcon name="power_settings_new" :size="27" />
       </div>
-      <div class="min-w-0">
-        <p class="truncate text-[18px] font-semibold leading-6 text-white">AndroMiner</p>
+      <div class="min-w-0 flex-1">
+        <p class="truncate text-[17px] font-semibold leading-6 text-white">AndroMiner</p>
         <p class="text-[13px] leading-5 text-app-muted">Version 1.0.0</p>
       </div>
+      <button
+        class="ripple grid h-11 w-11 shrink-0 place-items-center rounded-full text-app-muted active:bg-app-elevated"
+        type="button"
+        aria-label="Close menu"
+        @click="emit('close')"
+      >
+        <MaterialIcon name="close" :size="22" />
+      </button>
     </div>
 
-    <nav class="mt-5 space-y-1">
+    <nav class="mt-4 grid grid-cols-2 gap-2" aria-label="Primary navigation">
       <button
         v-for="item in primaryItems"
         :key="item.label"
-        class="drawer-row ripple"
+        class="menu-tile ripple"
+        :class="{ 'menu-tile-selected': isSelected(item) }"
         type="button"
         @click="selectItem(item)"
       >
-        <MaterialIcon :name="item.icon" :size="22" />
-        <span>{{ item.label }}</span>
+        <span class="menu-tile-icon">
+          <MaterialIcon :name="item.icon" :size="22" :filled="isSelected(item)" />
+        </span>
+        <span class="truncate">{{ item.label }}</span>
       </button>
     </nav>
 
-    <nav class="mt-5 space-y-1 border-y border-app-line py-5">
+    <nav
+      class="mt-4 space-y-1 rounded-lg border border-app-line bg-app-elevated/45 p-1"
+      aria-label="Profile and configuration"
+    >
       <button
         v-for="item in secondaryItems.slice(0, 3)"
         :key="item.label"
         class="drawer-row ripple"
+        :class="{ 'drawer-row-selected': isSelected(item) }"
         type="button"
         @click="selectItem(item)"
       >
-        <MaterialIcon :name="item.icon" :size="22" />
-        <span>{{ item.label }}</span>
+        <span class="drawer-row-icon">
+          <MaterialIcon :name="item.icon" :size="21" :filled="isSelected(item)" />
+        </span>
+        <span class="min-w-0 flex-1 truncate">{{ item.label }}</span>
+        <MaterialIcon
+          v-if="isSelected(item)"
+          class="shrink-0 text-app-green"
+          name="check"
+          :size="20"
+        />
       </button>
     </nav>
 
-    <nav class="mt-5 space-y-1">
+    <nav
+      class="mt-3 space-y-1 rounded-lg border border-app-line bg-app-elevated/45 p-1"
+      aria-label="Support"
+    >
       <button
         v-for="item in secondaryItems.slice(3)"
         :key="item.label"
         class="drawer-row ripple"
+        :class="{ 'drawer-row-selected': isSelected(item) }"
         type="button"
         @click="selectItem(item)"
       >
-        <MaterialIcon :name="item.icon" :size="22" />
-        <span>{{ item.label }}</span>
+        <span class="drawer-row-icon">
+          <MaterialIcon :name="item.icon" :size="21" :filled="isSelected(item)" />
+        </span>
+        <span class="min-w-0 flex-1 truncate">{{ item.label }}</span>
+        <MaterialIcon
+          v-if="isSelected(item)"
+          class="shrink-0 text-app-green"
+          name="check"
+          :size="20"
+        />
       </button>
     </nav>
   </aside>

@@ -29,14 +29,14 @@ const emit = defineEmits<{
 const items: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: 'space_dashboard' },
   { id: 'mining', label: 'Mining', icon: 'handyman' },
-  { id: 'statistics', label: 'Statistics', icon: 'bar_chart_4_bars' },
+  { id: 'statistics', label: 'Insights', icon: 'insights' },
   { id: 'settings', label: 'Settings', icon: 'settings' }
 ];
 </script>
 
 <template>
   <nav class="app-bottom-nav">
-    <div class="mx-auto grid h-20 max-w-[420px] grid-cols-4 px-2">
+    <div class="mx-auto grid h-[72px] max-w-[440px] grid-cols-4 px-2">
       <button
         v-for="item in items"
         :key="item.id"

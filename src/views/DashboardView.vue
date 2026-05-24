@@ -7,14 +7,12 @@ import type {
   DeviceTelemetry,
   MiningConfig,
   MiningSessionHistoryItem,
-  MiningStats,
   SavedMiningProfile
 } from '../types/mining';
 import type { MinerBackendState } from '../composables/useMiningController';
 
 interface DashboardViewProps {
   config: MiningConfig;
-  stats: MiningStats;
   device: DeviceTelemetry;
   connected: boolean;
   backendState: MinerBackendState;
@@ -44,6 +42,15 @@ const walletPreview = computed(() =>
 );
 const profileName = computed(() => props.activeProfile?.name || 'Unsaved setup');
 const canStart = computed(() => props.backendState === 'ready' || props.backendState === 'missing');
+const primaryActionLabel = computed(() =>
+  props.backendState === 'missing' ? 'Download & Start' : 'Start Mining'
+);
+const hasPlaceholderWallet = computed(() =>
+  /^YOUR_[A-Z0-9]+_WALLET_ADDRESS$/.test(props.config.walletAddress)
+);
+const walletReady = computed(
+  () => props.config.walletAddress.trim().length > 12 && !hasPlaceholderWallet.value
+);
 const connectionStatus = computed(() => {
   if (props.connected) {
     return { label: 'Pool connected', tone: 'good' as const };
@@ -63,6 +70,112 @@ const connectionStatus = computed(() => {
 
   return labels[props.backendState];
 });
+
+const statusIcon = computed(() => {
+  const icons: Record<'good' | 'warning' | 'danger' | 'muted', string> = {
+    good: 'check_circle',
+    warning: 'info',
+    danger: 'error',
+    muted: 'radio_button_unchecked'
+  };
+
+  return icons[connectionStatus.value.tone];
+});
+
+const connectionDetail = computed(() => {
+  if (props.connected) {
+    return `${props.config.workerName} · ${props.config.protocol}`;
+  }
+
+  if (props.backendState === 'web-unavailable') {
+    return 'Use Android app for real mining';
+  }
+
+  return props.backendMessage;
+});
+
+const deviceReady = computed(
+  () =>
+    (props.device.isCharging || props.device.batteryLevel > 35) &&
+    props.device.thermalStatus !== 'hot'
+);
+const setupReady = computed(() => walletReady.value && canStart.value && deviceReady.value);
+const launchTitle = computed(() => {
+  if (!walletReady.value) {
+    return 'Wallet needed';
+  }
+
+  if (props.backendState === 'web-unavailable') {
+    return 'Android required';
+  }
+
+  if (props.backendState === 'missing') {
+    return 'Miner download ready';
+  }
+
+  if (props.backendState === 'downloading') {
+    return 'Downloading miner';
+  }
+
+  if (props.connected) {
+    return 'Pool connected';
+  }
+
+  if (props.backendState === 'ready') {
+    return 'Ready to start';
+  }
+
+  if (props.backendState === 'error') {
+    return 'Needs attention';
+  }
+
+  return 'Checking setup';
+});
+const launchTone = computed<'good' | 'warning' | 'danger' | 'muted'>(() => {
+  if (props.backendState === 'error') {
+    return 'danger';
+  }
+
+  if (
+    !walletReady.value ||
+    props.backendState === 'web-unavailable' ||
+    props.backendState === 'missing'
+  ) {
+    return 'warning';
+  }
+
+  if (setupReady.value || props.connected) {
+    return 'good';
+  }
+
+  return 'muted';
+});
+const launchIcon = computed(() => {
+  const icons: Record<'good' | 'warning' | 'danger' | 'muted', string> = {
+    good: 'rocket_launch',
+    warning: 'priority_high',
+    danger: 'error',
+    muted: 'hourglass_empty'
+  };
+
+  return icons[launchTone.value];
+});
+const launchDetail = computed(() => {
+  if (!walletReady.value) {
+    return 'Add a wallet address before a real run';
+  }
+
+  if (props.backendState === 'web-unavailable') {
+    return 'Open the Android app to mine';
+  }
+
+  if (props.backendState === 'missing') {
+    return 'Download XMRig binary on first start';
+  }
+
+  return `${props.config.coin.name} · ${props.config.algorithm} · ${props.config.threadCount}/${props.config.totalDetectedThreads} threads`;
+});
+
 const formatDuration = (seconds: number): string => {
   if (seconds < 60) {
     return `${Math.max(1, seconds)}s`;
@@ -125,9 +238,30 @@ const readinessItems = computed(() => [
   },
   {
     label: 'CPU',
-    value: `${props.config.threadCount}/${props.config.totalDetectedThreads} threads`,
+    value: `${props.config.threadCount}/${props.config.totalDetectedThreads}`,
     icon: 'memory',
     good: props.config.threadCount <= props.config.totalDetectedThreads
+  }
+]);
+
+const setupChecks = computed(() => [
+  {
+    label: 'Pool',
+    value: poolAddress.value,
+    icon: 'hub',
+    good: canStart.value || props.connected
+  },
+  {
+    label: 'Wallet',
+    value: walletReady.value ? walletPreview.value : 'Not set',
+    icon: 'account_balance_wallet',
+    good: walletReady.value
+  },
+  {
+    label: 'Device',
+    value: deviceReady.value ? 'Ready' : 'Check power or heat',
+    icon: 'smartphone',
+    good: deviceReady.value
   }
 ]);
 
@@ -135,10 +269,6 @@ const recentSessions = computed(() =>
   props.sessionHistory.slice(0, 5).map((session) => ({
     ...session,
     duration: formatDuration(session.durationSeconds),
-    detail:
-      session.acceptedShares + session.rejectedShares > 0
-        ? `${session.acceptedShares} accepted`
-        : formatRelativeDate(session.endedAt),
     endedLabel: formatRelativeDate(session.endedAt)
   }))
 );
@@ -187,122 +317,180 @@ const clearSessionHistory = (): void => {
 <template>
   <div class="phone-page">
     <section class="app-card overflow-hidden">
-      <button
-        class="ripple flex min-h-[88px] w-full items-center gap-3 p-4 text-left"
-        type="button"
-        @click="emit('configure')"
-      >
-        <div
-          class="grid h-12 w-12 shrink-0 place-items-center rounded-full text-[22px] font-bold text-white"
-          :class="config.coin.logoClass"
-        >
-          {{ config.coin.logoText }}
+      <div class="p-4">
+        <div class="flex items-start gap-3">
+          <button
+            class="ripple grid h-14 w-14 shrink-0 place-items-center rounded-lg text-[24px] font-bold text-white shadow-sm"
+            :class="config.coin.logoClass"
+            type="button"
+            aria-label="Edit mining setup"
+            @click="emit('configure')"
+          >
+            {{ config.coin.logoText }}
+          </button>
+          <button class="ripple min-w-0 flex-1 text-left" type="button" @click="emit('configure')">
+            <p class="truncate text-[12px] font-semibold uppercase leading-4 text-app-green">
+              Active setup
+            </p>
+            <h2 class="mt-1 truncate text-[22px] font-semibold leading-7 text-white">
+              {{ profileName }}
+            </h2>
+            <p class="truncate text-[13px] leading-5 text-app-muted">
+              {{ config.coin.name }} · {{ config.algorithm }}
+            </p>
+          </button>
+          <button
+            class="ripple grid h-11 w-11 shrink-0 place-items-center rounded-full text-app-muted active:bg-app-elevated"
+            type="button"
+            aria-label="Open profiles"
+            @click="emit('profiles')"
+          >
+            <MaterialIcon name="folder_managed" :size="22" />
+          </button>
         </div>
-        <div class="min-w-0 flex-1">
-          <p class="text-[12px] font-semibold uppercase leading-4 text-app-green">Active profile</p>
-          <h2 class="mt-1 truncate text-[20px] font-semibold leading-7 text-white">
-            {{ profileName }}
-          </h2>
-          <p class="truncate text-[13px] leading-5 text-app-muted">
-            {{ config.coin.name }} · {{ config.algorithm }}
-          </p>
-        </div>
-        <MaterialIcon class="shrink-0 text-app-muted" name="chevron_right" :size="26" />
-      </button>
-    </section>
 
-    <section class="app-card p-4">
-      <div class="mb-4 flex items-center justify-between gap-3">
-        <div>
-          <p class="text-[12px] font-semibold uppercase leading-4 text-app-green">Quick start</p>
-          <h2 class="mt-1 text-[18px] font-semibold leading-6 text-white">
-            {{ config.coin.symbol }} mining
-          </h2>
+        <div class="mt-4 rounded-lg bg-app-elevated p-4">
+          <div class="flex items-start gap-3">
+            <div
+              class="grid h-12 w-12 shrink-0 place-items-center rounded-full"
+              :class="{
+                'bg-app-green-dim text-app-green': launchTone === 'good',
+                'bg-app-yellow/15 text-app-yellow': launchTone === 'warning',
+                'bg-red-500/15 text-red-300': launchTone === 'danger',
+                'bg-app-card text-app-muted': launchTone === 'muted'
+              }"
+            >
+              <MaterialIcon :name="launchIcon" :size="25" />
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="text-[12px] font-semibold uppercase leading-4 text-app-muted">
+                Launch status
+              </p>
+              <h3 class="mt-1 text-[20px] font-semibold leading-6 text-white">
+                {{ launchTitle }}
+              </h3>
+              <p class="mt-1 text-[12px] leading-[18px] text-app-muted">
+                {{ launchDetail }}
+              </p>
+            </div>
+          </div>
+
+          <div
+            class="mt-4 flex min-h-11 min-w-0 items-center gap-3 rounded-full bg-app-card px-3 py-2"
+          >
+            <MaterialIcon
+              class="shrink-0"
+              :class="{
+                'text-app-green': connectionStatus.tone === 'good',
+                'text-app-yellow': connectionStatus.tone === 'warning',
+                'text-red-300': connectionStatus.tone === 'danger',
+                'text-app-muted': connectionStatus.tone === 'muted'
+              }"
+              :name="statusIcon"
+              :size="20"
+            />
+            <StatusIndicator
+              class="min-w-0 shrink-0"
+              :connected="connected"
+              :label="connectionStatus.label"
+              :tone="connectionStatus.tone"
+            />
+            <span class="min-w-0 flex-1 truncate text-right text-[12px] leading-4 text-app-muted">
+              {{ connectionDetail }}
+            </span>
+          </div>
         </div>
-        <StatusIndicator
-          :connected="connected"
-          :label="connectionStatus.label"
-          :tone="connectionStatus.tone"
-        />
+
+        <div class="mt-3 grid grid-cols-3 gap-2">
+          <div
+            v-for="item in readinessItems"
+            :key="item.label"
+            class="min-w-0 rounded-lg bg-app-elevated p-2.5 text-left"
+          >
+            <div class="flex items-center gap-2">
+              <div
+                class="grid h-8 w-8 shrink-0 place-items-center rounded-full"
+                :class="
+                  item.good ? 'bg-app-green-dim text-app-green' : 'bg-app-yellow/15 text-app-yellow'
+                "
+              >
+                <MaterialIcon :name="item.icon" :size="18" />
+              </div>
+              <div class="min-w-0">
+                <p class="truncate text-[11px] leading-4 text-app-muted">{{ item.label }}</p>
+                <p class="truncate text-[12px] font-semibold leading-4 text-white">
+                  {{ item.value }}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-3 overflow-hidden rounded-lg border border-app-line bg-app-elevated/60">
+          <div
+            v-for="check in setupChecks"
+            :key="check.label"
+            class="flex min-h-[54px] items-center gap-3 border-t border-app-line px-3 first:border-t-0"
+          >
+            <span
+              class="grid h-8 w-8 shrink-0 place-items-center rounded-full"
+              :class="
+                check.good ? 'bg-app-green-dim text-app-green' : 'bg-app-yellow/15 text-app-yellow'
+              "
+            >
+              <MaterialIcon :name="check.icon" :size="18" />
+            </span>
+            <span class="min-w-0 flex-1">
+              <span class="block text-[12px] font-medium leading-4 text-white">
+                {{ check.label }}
+              </span>
+              <span class="block truncate text-[11px] leading-4 text-app-muted">
+                {{ check.value }}
+              </span>
+            </span>
+            <MaterialIcon
+              class="shrink-0"
+              :class="check.good ? 'text-app-green' : 'text-app-yellow'"
+              :name="check.good ? 'check_circle' : 'info'"
+              :size="19"
+            />
+          </div>
+        </div>
+
+        <div class="mt-4 grid grid-cols-[1fr_52px] gap-2">
+          <button
+            class="ripple flex h-14 items-center justify-center gap-2 rounded-full bg-app-green text-[16px] font-semibold text-white shadow-[0_8px_18px_rgb(25_128_88/0.22)] disabled:opacity-45"
+            type="button"
+            :disabled="!canStart"
+            @click="emit('start')"
+          >
+            <MaterialIcon name="play_arrow" :size="24" filled />
+            {{ primaryActionLabel }}
+          </button>
+          <button
+            class="ripple grid h-14 place-items-center rounded-full border border-app-line bg-app-elevated text-app-on"
+            type="button"
+            aria-label="Edit mining setup"
+            @click="emit('configure')"
+          >
+            <MaterialIcon name="tune" :size="23" />
+          </button>
+        </div>
       </div>
-
-      <div class="space-y-2 rounded-2xl bg-app-elevated p-3 text-[14px] leading-5">
-        <div class="flex min-w-0 justify-between gap-3">
-          <span class="text-app-muted">Pool</span>
-          <strong class="min-w-0 break-all text-right font-medium text-white">{{
-            poolAddress
-          }}</strong>
-        </div>
-        <div class="flex min-w-0 justify-between gap-3">
-          <span class="text-app-muted">Wallet</span>
-          <strong class="min-w-0 truncate text-right font-medium text-white">{{
-            walletPreview
-          }}</strong>
-        </div>
-        <div class="flex min-w-0 justify-between gap-3">
-          <span class="text-app-muted">Worker</span>
-          <strong class="min-w-0 truncate text-right font-medium text-white">{{
-            config.workerName
-          }}</strong>
-        </div>
-      </div>
-
-      <div
-        v-if="backendState !== 'ready'"
-        class="mt-3 rounded-xl border border-app-line bg-app-elevated/70 p-3 text-[12px] leading-[18px] text-app-muted"
-      >
-        {{ backendMessage }}
-      </div>
-
-      <div class="mt-4 grid grid-cols-3 gap-2">
-        <button
-          class="ripple col-span-2 flex h-14 items-center justify-center gap-2 rounded-xl bg-app-green-dim text-[16px] font-semibold text-app-green disabled:opacity-45"
-          type="button"
-          :disabled="!canStart"
-          @click="emit('start')"
-        >
-          <MaterialIcon name="play_arrow" :size="24" filled />
-          Start
-        </button>
-        <button
-          class="ripple grid h-14 place-items-center rounded-xl bg-app-elevated text-white"
-          type="button"
-          aria-label="Edit mining setup"
-          @click="emit('configure')"
-        >
-          <MaterialIcon name="tune" :size="24" />
-        </button>
-      </div>
-    </section>
-
-    <section class="grid grid-cols-1 gap-2 min-[380px]:grid-cols-3">
-      <button
-        v-for="item in readinessItems"
-        :key="item.label"
-        class="ripple app-card min-h-[88px] p-3 text-left active:bg-white/5"
-        type="button"
-        @click="item.label === 'CPU' ? emit('configure') : emit('statistics')"
-      >
-        <div
-          class="mb-2 grid h-8 w-8 place-items-center rounded-full"
-          :class="
-            item.good ? 'bg-app-green-dim text-app-green' : 'bg-app-yellow/15 text-app-yellow'
-          "
-        >
-          <MaterialIcon :name="item.icon" :size="19" />
-        </div>
-        <p class="text-[12px] leading-4 text-app-muted">{{ item.label }}</p>
-        <p class="mt-1 truncate text-[14px] font-semibold leading-5 text-white">{{ item.value }}</p>
-      </button>
     </section>
 
     <section class="app-card overflow-hidden">
       <div class="flex min-h-14 items-center justify-between gap-3 px-4">
-        <h2 class="text-[15px] font-semibold text-white">Recent sessions</h2>
+        <div class="min-w-0">
+          <h2 class="text-[15px] font-semibold text-white">Recent sessions</h2>
+          <p class="mt-0.5 text-[12px] text-app-muted">
+            {{ recentSessions.length }} saved run{{ recentSessions.length === 1 ? '' : 's' }}
+          </p>
+        </div>
         <div class="flex items-center gap-1">
           <button
             v-if="recentSessions.length > 0"
-            class="ripple grid h-12 w-12 place-items-center rounded-full text-app-muted active:bg-white/10"
+            class="ripple grid h-11 w-11 place-items-center rounded-full text-app-muted active:bg-app-elevated"
             type="button"
             aria-label="Clear session history"
             @click="clearSessionHistory"
@@ -310,11 +498,11 @@ const clearSessionHistory = (): void => {
             <MaterialIcon name="delete_sweep" :size="22" />
           </button>
           <button
-            class="ripple min-h-12 rounded-full px-3 text-[13px] font-medium text-app-green"
+            class="ripple min-h-11 rounded-full px-3 text-[13px] font-medium text-app-green active:bg-app-green-dim"
             type="button"
             @click="emit('statistics')"
           >
-            View stats
+            View
           </button>
         </div>
       </div>
@@ -322,10 +510,10 @@ const clearSessionHistory = (): void => {
         <div
           v-for="session in recentSessions"
           :key="session.id"
-          class="flex min-h-[72px] w-full items-center gap-2 px-4 py-3"
+          class="flex min-h-[76px] w-full items-center gap-2 px-3 py-2"
         >
           <button
-            class="ripple flex min-h-[48px] min-w-0 flex-1 items-center gap-3 text-left active:bg-white/5"
+            class="ripple flex min-h-[56px] min-w-0 flex-1 items-center gap-3 rounded-lg px-2 text-left active:bg-app-elevated"
             type="button"
             @click="reviewSession(session.id)"
           >
@@ -341,13 +529,12 @@ const clearSessionHistory = (): void => {
                 {{ session.subtitle }} · {{ session.endedLabel }}
               </p>
             </div>
-            <div class="min-w-[72px] text-right">
-              <p class="text-[13px] font-medium text-white">{{ session.duration }}</p>
-              <p class="truncate text-[11px] text-app-muted">{{ session.detail }}</p>
+            <div class="rounded-lg bg-app-elevated px-2 py-1 text-right">
+              <p class="truncate text-[13px] font-semibold text-white">{{ session.duration }}</p>
             </div>
           </button>
           <button
-            class="ripple grid h-11 w-11 shrink-0 place-items-center rounded-full text-app-muted active:bg-white/10"
+            class="ripple grid h-11 w-11 shrink-0 place-items-center rounded-full text-app-muted active:bg-app-elevated"
             type="button"
             aria-label="Delete session"
             @click="deleteSelectedSession(session.id)"
@@ -359,25 +546,6 @@ const clearSessionHistory = (): void => {
           No completed sessions yet.
         </div>
       </div>
-    </section>
-
-    <section class="grid grid-cols-2 gap-2">
-      <button
-        class="ripple app-card flex min-h-14 items-center justify-center gap-2 px-3 text-[14px] font-medium text-white"
-        type="button"
-        @click="emit('profiles')"
-      >
-        <MaterialIcon name="folder_managed" :size="21" />
-        Profiles
-      </button>
-      <button
-        class="ripple app-card flex min-h-14 items-center justify-center gap-2 px-3 text-[14px] font-medium text-white"
-        type="button"
-        @click="emit('statistics')"
-      >
-        <MaterialIcon name="monitoring" :size="21" />
-        Statistics
-      </button>
     </section>
 
     <Transition name="fade">

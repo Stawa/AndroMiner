@@ -21,7 +21,7 @@ const emit = defineEmits<{
 const titles: Record<AppTab, string> = {
   dashboard: 'AndroMiner',
   mining: 'Mining setup',
-  statistics: 'Statistics',
+  statistics: 'Insights',
   settings: 'Settings',
   profiles: 'Profiles',
   help: 'Help & support',
@@ -58,9 +58,9 @@ const dashboardStatus = computed(() => {
 
 <template>
   <header
-    class="sticky top-0 z-30 bg-app-bg/96 px-4 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur"
+    class="sticky top-0 z-30 border-b border-app-line/70 bg-app-bg/92 px-4 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur"
   >
-    <div class="mx-auto w-full max-w-[420px]">
+    <div class="mx-auto w-full max-w-[430px]">
       <div class="flex h-16 items-center gap-2">
         <button
           class="top-icon-button"

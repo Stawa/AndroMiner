@@ -52,7 +52,7 @@ const closeSheet = (): void => {
   <div class="config-field">
     <span class="config-label">{{ label }}</span>
     <button
-      class="ripple flex min-h-14 w-full min-w-0 items-center gap-3 rounded-xl bg-app-elevated px-4 text-left text-white active:bg-white/10"
+      class="ripple flex min-h-14 w-full min-w-0 items-center gap-3 rounded-lg border border-app-line bg-app-elevated/80 px-4 text-left text-white active:bg-app-line/40"
       type="button"
       :aria-expanded="open"
       @click="open = true"
@@ -113,8 +113,11 @@ const closeSheet = (): void => {
           <button
             v-for="option in options"
             :key="option.value"
-            class="ripple flex min-h-14 w-full items-center gap-3 rounded-2xl px-3 py-2 text-left active:bg-white/10"
-            :class="{ 'opacity-45': option.disabled }"
+            class="ripple flex min-h-14 w-full items-center gap-3 rounded-lg px-3 py-2 text-left active:bg-app-elevated"
+            :class="{
+              'bg-app-green-dim': option.value === modelValue,
+              'opacity-45': option.disabled
+            }"
             type="button"
             :disabled="option.disabled"
             @click="selectOption(option.value)"
@@ -127,9 +130,11 @@ const closeSheet = (): void => {
               {{ option.iconText }}
             </span>
             <span class="min-w-0 flex-1">
-              <span class="block truncate text-[15px] font-medium leading-5 text-white">{{
-                option.label
-              }}</span>
+              <span
+                class="block truncate text-[15px] font-medium leading-5"
+                :class="option.value === modelValue ? 'text-app-green' : 'text-white'"
+                >{{ option.label }}</span
+              >
               <span
                 v-if="option.supportingText"
                 class="mt-0.5 block truncate text-[12px] leading-[18px] text-app-muted"

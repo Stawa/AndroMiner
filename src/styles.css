@@ -4,30 +4,32 @@
 
 @layer base {
   html {
-    --color-app-bg: 248 250 247;
+    --color-app-bg: 247 250 248;
     --color-app-card: 255 255 255;
-    --color-app-elevated: 238 243 238;
-    --color-app-line: 211 220 211;
-    --color-app-muted: 94 108 99;
-    --color-app-on: 23 29 25;
-    --color-app-green: 37 130 86;
-    --color-app-green-dim: 213 247 223;
-    --color-app-yellow: 183 122 19;
+    --color-app-elevated: 241 246 243;
+    --color-app-line: 218 228 223;
+    --color-app-muted: 82 99 91;
+    --color-app-on: 18 27 23;
+    --color-app-green: 25 128 88;
+    --color-app-green-dim: 211 245 224;
+    --color-app-yellow: 174 116 22;
 
     -webkit-tap-highlight-color: transparent;
+    color-scheme: light;
     background: rgb(var(--color-app-bg));
   }
 
   html.dark {
-    --color-app-bg: 17 22 21;
-    --color-app-card: 26 33 31;
-    --color-app-elevated: 34 42 39;
-    --color-app-line: 45 56 52;
-    --color-app-muted: 174 184 179;
-    --color-app-on: 255 255 255;
-    --color-app-green: 90 217 137;
-    --color-app-green-dim: 23 77 52;
-    --color-app-yellow: 248 195 56;
+    --color-app-bg: 10 15 14;
+    --color-app-card: 19 25 23;
+    --color-app-elevated: 27 35 32;
+    --color-app-line: 44 57 52;
+    --color-app-muted: 169 182 175;
+    --color-app-on: 244 249 246;
+    --color-app-green: 92 220 145;
+    --color-app-green-dim: 24 72 50;
+    --color-app-yellow: 244 193 64;
+    color-scheme: dark;
   }
 
   body {
@@ -35,9 +37,15 @@
     min-width: 320px;
     min-height: 100vh;
     overflow-x: hidden;
-    background: rgb(var(--color-app-bg));
+    background:
+      linear-gradient(
+        180deg,
+        rgb(var(--color-app-bg)) 0%,
+        rgb(var(--color-app-elevated) / 0.36) 100%
+      ),
+      rgb(var(--color-app-bg));
     color: rgb(var(--color-app-on));
-    font-family: Inter, Roboto, ui-sans-serif, system-ui, sans-serif;
+    font-family: Roboto, Inter, ui-sans-serif, system-ui, sans-serif;
     overscroll-behavior-y: none;
   }
 
@@ -91,15 +99,40 @@
   }
 
   .phone-page {
-    @apply mx-auto w-full max-w-[420px] space-y-3 px-4 pb-[calc(5.75rem+env(safe-area-inset-bottom))] pt-1;
+    @apply mx-auto w-full max-w-[440px] space-y-3 px-4 pb-[calc(6.75rem+env(safe-area-inset-bottom))] pt-2;
   }
 
   .session-page {
-    @apply mx-auto flex min-h-screen w-full max-w-[420px] flex-col px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))];
+    @apply mx-auto flex min-h-screen w-full max-w-[440px] flex-col px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))];
   }
 
   .app-card {
-    @apply rounded-[20px] border border-app-line bg-app-card text-app-on shadow-none;
+    @apply min-w-0 rounded-lg border text-app-on;
+    width: 100%;
+    border-color: rgb(var(--color-app-line) / 0.72);
+    background: rgb(var(--color-app-card));
+    box-shadow:
+      0 1px 0 rgb(255 255 255 / 0.72),
+      0 1px 2px rgb(15 23 42 / 0.04),
+      0 8px 18px rgb(15 23 42 / 0.035);
+    overflow-wrap: break-word;
+  }
+
+  html.dark .app-card {
+    border-color: rgb(var(--color-app-line) / 0.68);
+    background: rgb(var(--color-app-card));
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.025),
+      0 1px 2px rgb(0 0 0 / 0.22),
+      0 10px 22px rgb(0 0 0 / 0.16);
+  }
+
+  .app-card [class*='bg-app-elevated'] {
+    box-shadow: inset 0 0 0 1px rgb(var(--color-app-line) / 0.38);
+  }
+
+  html.dark .app-card [class*='bg-app-elevated'] {
+    box-shadow: inset 0 0 0 1px rgb(var(--color-app-line) / 0.34);
   }
 
   .ripple {
@@ -116,15 +149,19 @@
   }
 
   .top-icon-button {
-    @apply ripple grid h-12 w-12 shrink-0 place-items-center rounded-full text-app-on transition-colors duration-150 active:bg-white/10;
+    @apply ripple grid h-12 w-12 shrink-0 place-items-center rounded-full text-app-on transition-colors duration-150 active:bg-app-elevated;
   }
 
   .app-bottom-nav {
-    @apply fixed inset-x-0 bottom-0 z-40 border-t border-app-line bg-app-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur;
+    @apply fixed inset-x-0 bottom-0 z-40 border-t border-app-line bg-app-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur;
+  }
+
+  .app-bottom-nav > div {
+    @apply bg-transparent shadow-none;
   }
 
   .bottom-nav-button {
-    @apply ripple flex min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-1 text-[11px] font-medium leading-4 text-app-muted transition-colors duration-150;
+    @apply ripple flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-medium leading-4 text-app-muted transition-colors duration-150 active:bg-app-elevated;
   }
 
   .bottom-nav-button-active {
@@ -132,19 +169,23 @@
   }
 
   .bottom-nav-icon {
-    @apply grid h-8 min-w-12 place-items-center rounded-full transition-colors duration-150;
+    @apply grid h-8 min-w-12 place-items-center transition-colors duration-150;
   }
 
   .bottom-nav-button-active .bottom-nav-icon {
-    @apply bg-app-green-dim;
+    @apply bg-transparent;
   }
 
   .setting-row {
-    @apply flex min-h-[64px] w-full items-center gap-3 border-t border-app-line px-4 py-3 first:border-t-0;
+    @apply flex min-h-[72px] w-full items-center gap-3 border-t border-app-line px-4 py-3 first:border-t-0 transition-colors duration-150 active:bg-app-elevated;
   }
 
   .setting-icon {
-    @apply shrink-0 text-app-muted;
+    @apply grid h-10 w-10 shrink-0 place-items-center rounded-full bg-app-elevated text-app-muted transition-colors duration-150;
+  }
+
+  .setting-row:has(input:checked) .setting-icon {
+    @apply bg-app-green-dim text-app-green;
   }
 
   .settings-heading {
@@ -152,19 +193,28 @@
   }
 
   .md-switch {
-    @apply relative h-8 w-[52px] shrink-0 rounded-full border-2 border-app-muted/[0.7] bg-white/[0.14] transition-colors duration-200;
+    @apply relative h-8 w-[52px] shrink-0 rounded-full border border-app-line bg-app-elevated transition-[background-color,border-color,box-shadow] duration-200;
   }
 
   .md-switch-thumb {
-    @apply absolute left-[3px] top-1/2 h-6 w-6 -translate-y-1/2 rounded-full bg-app-muted transition-all duration-200;
+    @apply absolute left-[3px] top-1/2 h-6 w-6 -translate-y-1/2 rounded-full bg-app-card shadow-[0_1px_3px_rgb(0_0_0/0.22)] transition-all duration-200;
+  }
+
+  .md-switch-thumb::after {
+    content: '';
+    @apply absolute left-1/2 top-1/2 h-0 w-0 -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity duration-150;
   }
 
   .peer:checked + .md-switch {
-    @apply border-app-green bg-app-green/[0.8];
+    @apply border-app-green bg-app-green-dim shadow-[0_2px_8px_rgb(25_128_88/0.18)];
   }
 
   .peer:checked + .md-switch .md-switch-thumb {
-    @apply left-[22px] bg-white;
+    @apply left-[23px] bg-app-green shadow-[0_1px_3px_rgb(0_0_0/0.22)];
+  }
+
+  .peer:checked + .md-switch .md-switch-thumb::after {
+    @apply h-[7px] w-[11px] -translate-y-[58%] rotate-[-45deg] border-b-2 border-l-2 border-white opacity-100;
   }
 
   .peer:focus-visible + .md-switch {
@@ -172,23 +222,28 @@
   }
 
   .peer:disabled + .md-switch {
-    @apply opacity-45;
+    @apply opacity-45 saturate-50;
   }
 
   .profile-chip {
-    @apply min-h-[56px] rounded-xl bg-app-elevated px-3 py-2 text-center text-app-muted transition-colors duration-150 active:bg-white/10;
+    @apply min-h-[56px] rounded-lg border border-transparent bg-app-elevated px-3 py-2 text-center text-app-muted transition-colors duration-150 active:bg-app-line/40;
   }
 
   .profile-chip-selected {
-    @apply bg-app-green-dim text-app-green;
+    @apply border-app-green/30 bg-app-green-dim text-app-green;
   }
 
   .stat-card {
-    @apply min-w-0 rounded-2xl border border-app-line bg-app-card p-3;
+    @apply app-card p-3;
+  }
+
+  .surface-tile {
+    @apply min-w-0 rounded-lg border border-app-line bg-app-elevated p-3;
+    box-shadow: inset 0 0 0 1px rgb(var(--color-app-line) / 0.28);
   }
 
   .session-action {
-    @apply flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-1 rounded-xl border border-app-line bg-app-card px-2 text-[13px] font-medium leading-5 text-app-on active:bg-white/10;
+    @apply flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-1 rounded-lg border border-app-line bg-app-card px-2 text-[13px] font-medium leading-5 text-app-on active:bg-app-elevated;
   }
 
   .config-field {
@@ -201,7 +256,8 @@
 
   .config-input,
   .config-select {
-    @apply h-14 w-full min-w-0 rounded-xl border border-transparent bg-app-elevated px-4 text-[16px] leading-6 text-app-on outline-none transition-colors duration-150 placeholder:text-app-muted focus:border-app-green;
+    @apply h-14 w-full min-w-0 rounded-lg border border-app-line bg-app-elevated/80 px-4 text-[16px] leading-6 text-app-on outline-none transition-colors duration-150 placeholder:text-app-muted focus:border-app-green focus:bg-app-card;
+    box-shadow: inset 0 0 0 1px rgb(var(--color-app-line) / 0.18);
   }
 
   .config-select {
@@ -213,11 +269,11 @@
   }
 
   .android-slider::-webkit-slider-runnable-track {
-    @apply h-1 rounded-full bg-white/[0.18];
+    @apply h-1 rounded-full bg-app-line;
   }
 
   .android-slider::-webkit-slider-thumb {
-    @apply -mt-3 h-7 w-7 appearance-none rounded-full border-2 border-white bg-white;
+    @apply -mt-3 h-7 w-7 appearance-none rounded-full border-2 border-app-card bg-app-green shadow-sm;
   }
 
   .chart-card {
@@ -225,34 +281,66 @@
   }
 
   .drawer-row {
-    @apply flex min-h-12 w-full items-center gap-4 rounded-xl px-3 text-left text-[15px] text-app-on active:bg-white/10;
+    @apply flex min-h-12 w-full items-center gap-3 rounded-md px-3 text-left text-[15px] text-app-on transition-colors duration-150 active:bg-app-line/40;
+  }
+
+  .drawer-row-selected {
+    @apply bg-app-card text-app-green shadow-[0_1px_2px_rgb(15_23_42/0.05)];
+  }
+
+  .drawer-row-icon {
+    @apply grid h-9 w-9 shrink-0 place-items-center rounded-full bg-app-card text-app-muted;
+  }
+
+  .drawer-row-selected .drawer-row-icon {
+    @apply bg-app-green-dim text-app-green;
+  }
+
+  .menu-tile {
+    @apply flex min-h-[82px] min-w-0 flex-col items-start justify-between rounded-lg border border-app-line bg-app-elevated/70 p-3 text-left text-[13px] font-semibold leading-5 text-app-on transition-colors duration-150 active:bg-app-line/40;
+  }
+
+  .menu-tile-selected {
+    @apply border-app-green/30 bg-app-green-dim text-app-green;
+  }
+
+  .menu-tile-icon {
+    @apply grid h-9 w-9 place-items-center rounded-full bg-app-card text-app-muted;
+  }
+
+  .menu-tile-selected .menu-tile-icon {
+    @apply bg-app-card/80 text-app-green;
   }
 
   .drawer-backdrop {
-    @apply pointer-events-none fixed inset-0 z-50 bg-black/[0.55];
+    @apply pointer-events-none fixed inset-0 z-50 bg-black/[0.5];
     opacity: var(--drawer-backdrop-opacity, 0);
-    transition: opacity 220ms ease;
+    transition: none;
     transition-delay: var(--drawer-backdrop-delay, 0s, 220ms);
   }
 
   .drawer-backdrop.drawer-backdrop-open {
     @apply pointer-events-auto;
+    opacity: 1;
   }
 
   .app-drawer {
-    @apply fixed inset-y-0 left-0 z-50 w-[min(84vw,304px)] bg-app-card px-4 pb-6 pt-[max(2.25rem,env(safe-area-inset-top))] shadow-xl shadow-black/40;
-    opacity: var(--drawer-opacity, 0.64);
-    transform: translate3d(var(--drawer-x, -104%), 0, 0);
-    transition:
-      opacity 260ms cubic-bezier(0.2, 0, 0, 1),
-      transform 260ms cubic-bezier(0.2, 0, 0, 1);
+    @apply pointer-events-none fixed left-1/2 top-1/2 z-50 max-h-[min(82vh,720px)] w-[calc(100vw-2rem)] max-w-[380px] overflow-y-auto rounded-[24px] border border-app-line bg-app-card p-4 shadow-xl shadow-black/30;
+    opacity: var(--drawer-opacity, 0);
+    transform: translate3d(-50%, calc(-50% + var(--drawer-y, 14px)), 0)
+      scale(var(--drawer-scale, 0.96));
+    transition: none;
     transition-delay: var(--drawer-delay, 0s, 0s);
     will-change: opacity, transform;
   }
 
   .app-drawer.app-drawer-open {
     --drawer-opacity: 1;
-    --drawer-x: 0%;
+    --drawer-y: 0px;
+    --drawer-scale: 1;
+    pointer-events: auto;
+    opacity: 1;
+    transform: translate3d(-50%, -50%, 0) scale(1);
   }
 
   .fade-enter-active,
@@ -309,6 +397,36 @@
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 1ms !important;
+  }
+
+  @media (max-width: 380px) {
+    .phone-page {
+      @apply space-y-2 px-3 pb-[calc(6.25rem+env(safe-area-inset-bottom))];
+    }
+
+    .session-page {
+      @apply px-3;
+    }
+
+    .app-card {
+      box-shadow:
+        0 1px 0 rgb(255 255 255 / 0.58),
+        0 1px 2px rgb(15 23 42 / 0.035);
+    }
+
+    html.dark .app-card {
+      box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 0.02),
+        0 1px 2px rgb(0 0 0 / 0.18);
+    }
+
+    .app-bottom-nav {
+      @apply px-0;
+    }
+
+    .app-bottom-nav > div {
+      height: 68px;
+    }
   }
 
   @keyframes ringPulse {

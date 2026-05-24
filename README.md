@@ -154,9 +154,9 @@ Bitcoin, Litecoin, Ethereum Classic, Ravencoin, and other GPU/ASIC-focused coins
 | --------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | <img src="overview/mining-setup.png" alt="Mining setup screen" width="220"> | <img src="overview/statistics.png" alt="Statistics screen" width="220"> |
 
-| Live Session                                                                       |
-| ---------------------------------------------------------------------------------- |
-| <img src="overview/live-session.png" alt="Live mining session screen" width="220"> |
+| Settings                                                             | Live Session                                                                       |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| <img src="overview/settings.png" alt="Settings screen" width="220"> | <img src="overview/live-session.png" alt="Live mining session screen" width="220"> |
 
 ## More Documentation
 

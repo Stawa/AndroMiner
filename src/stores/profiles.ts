@@ -83,7 +83,7 @@ export const useProfilesStore = defineStore('profiles', {
       return profile;
     },
     createDefaults(config: MiningConfig): void {
-      this.saveFromConfig('Profile 1', config);
+      this.saveFromConfig(`${config.coin.symbol} Balanced`, config);
     },
     renameProfile(id: string, name: string): void {
       const profile = this.profiles.find((item) => item.id === id);

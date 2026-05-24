@@ -345,7 +345,6 @@ onBeforeUnmount(() => {
       <DashboardView
         v-if="activeTab === 'dashboard'"
         :config="miner.config"
-        :stats="miner.stats"
         :device="device"
         :connected="miner.connected.value"
         :backend-state="miner.backendState.value"
@@ -372,7 +371,6 @@ onBeforeUnmount(() => {
       <StatisticsView
         v-else-if="activeTab === 'statistics'"
         :config="miner.config"
-        :stats="miner.stats"
         :session-history="miner.sessionHistory.value"
       />
       <SettingsView
@@ -401,6 +399,7 @@ onBeforeUnmount(() => {
     <AppDrawer
       v-if="systemCheckComplete && !sessionActive"
       :open="drawerOpen"
+      :active-tab="activeTab"
       @close="drawerOpen = false"
       @navigate="activeTab = $event"
       @export-config="exportConfig"

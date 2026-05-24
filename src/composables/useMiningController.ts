@@ -73,16 +73,17 @@ const maxSessionHistoryItems = 20;
 const activeSessionKey = 'androminer-active-session';
 const uptimeKey = 'androminer-uptime-seconds';
 const sessionHistoryKey = 'androminer-session-history';
+const defaultCoin = getCryptocurrencyById('xmr') || cryptocurrencies[0];
 
 const initialConfig: MiningConfig = {
-  coin: cryptocurrencies[0],
-  algorithm: cryptocurrencies[0].algorithm,
-  poolUrl: cryptocurrencies[0].defaultPoolUrl,
-  poolPort: cryptocurrencies[0].defaultPort,
-  protocol: cryptocurrencies[0].defaultProtocol,
+  coin: defaultCoin,
+  algorithm: defaultCoin.algorithm,
+  poolUrl: defaultCoin.defaultPoolUrl,
+  poolPort: defaultCoin.defaultPort,
+  protocol: defaultCoin.defaultProtocol,
   walletAddress: 'YOUR_XMR_WALLET_ADDRESS',
   workerName: 'android-phone',
-  password: 'x',
+  password: '',
   threadCount: 2,
   customThreadCount: 2,
   totalDetectedThreads: 8,
@@ -589,6 +590,17 @@ export const useMiningController = () => {
   };
 
   const updateProfile = (profile: MiningProfile): void => {
+    if (profile === 'custom') {
+      config.profile = 'custom';
+      config.threadCount = bounded(
+        config.customThreadCount || config.threadCount,
+        1,
+        config.totalDetectedThreads
+      );
+      config.customThreadCount = config.threadCount;
+      return;
+    }
+
     const preset = profilePresets.find((item) => item.id === profile);
 
     if (!preset) {
@@ -616,6 +628,9 @@ export const useMiningController = () => {
     config.poolUrl = coin.defaultPoolUrl;
     config.poolPort = coin.defaultPort;
     config.protocol = coin.defaultProtocol;
+    if (config.password === 'x') {
+      config.password = '';
+    }
 
     if (!config.walletAddress || placeholderWallet.test(config.walletAddress)) {
       config.walletAddress = `YOUR_${coin.symbol}_WALLET_ADDRESS`;
