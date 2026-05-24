@@ -154,8 +154,8 @@ Bitcoin, Litecoin, Ethereum Classic, Ravencoin, and other GPU/ASIC-focused coins
 | --------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | <img src="overview/mining-setup.png" alt="Mining setup screen" width="220"> | <img src="overview/statistics.png" alt="Statistics screen" width="220"> |
 
-| Settings                                                             | Live Session                                                                       |
-| -------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Settings                                                            | Live Session                                                                       |
+| ------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | <img src="overview/settings.png" alt="Settings screen" width="220"> | <img src="overview/live-session.png" alt="Live mining session screen" width="220"> |
 
 ## More Documentation
@@ -171,6 +171,6 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## Contributors
 
-<a href="https://github.com/Stawa/AndroMiner/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=Stawa/AndroMiner" />
+<a href="https://github.com/stawa/androminer/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=stawa/androminer" />
 </a>
