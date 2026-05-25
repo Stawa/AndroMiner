@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import HashrateRing from '../components/HashrateRing.vue';
 import MaterialIcon from '../components/MaterialIcon.vue';
 import MiningMetric from '../components/MiningMetric.vue';
@@ -29,6 +30,11 @@ interface MiningSessionViewProps {
   hashrateHistory: HistoryPoint[];
 }
 
+interface ImmersiveModePlugin {
+  enter: () => Promise<{ active: boolean }>;
+  exit: () => Promise<{ active: boolean }>;
+}
+
 const props = defineProps<MiningSessionViewProps>();
 
 const emit = defineEmits<{
@@ -39,8 +45,11 @@ const emit = defineEmits<{
 }>();
 
 const detailsOpen = ref(false);
+const fullscreenActive = ref(false);
+const fullscreenBusy = ref(false);
 const profilePickerOpen = ref(false);
 const warningType = ref<WarningType | null>(null);
+const ImmersiveMode = registerPlugin<ImmersiveModePlugin>('ImmersiveMode');
 
 const recentHashrates = computed(() =>
   props.hashrateHistory
@@ -156,6 +165,69 @@ const closeDetails = (): void => {
   detailsOpen.value = false;
 };
 
+const enterBrowserFullscreen = async (): Promise<void> => {
+  const element = document.documentElement;
+  if (document.fullscreenEnabled && !document.fullscreenElement) {
+    await element.requestFullscreen();
+  }
+};
+
+const exitBrowserFullscreen = async (): Promise<void> => {
+  if (document.fullscreenElement) {
+    await document.exitFullscreen();
+  }
+};
+
+const exitFullscreenMode = async (): Promise<void> => {
+  try {
+    if (Capacitor.isNativePlatform()) {
+      await ImmersiveMode.exit();
+    } else {
+      await exitBrowserFullscreen();
+    }
+  } finally {
+    fullscreenActive.value = false;
+    fullscreenBusy.value = false;
+  }
+};
+
+const setFullscreen = async (enabled: boolean): Promise<void> => {
+  if (fullscreenBusy.value || fullscreenActive.value === enabled) {
+    return;
+  }
+
+  fullscreenBusy.value = true;
+
+  try {
+    if (!enabled) {
+      await exitFullscreenMode();
+      return;
+    }
+
+    if (Capacitor.isNativePlatform()) {
+      await ImmersiveMode.enter();
+    } else {
+      await enterBrowserFullscreen();
+    }
+
+    fullscreenActive.value = true;
+  } catch {
+    fullscreenActive.value = enabled;
+  } finally {
+    fullscreenBusy.value = false;
+  }
+};
+
+const toggleFullscreen = (): void => {
+  void setFullscreen(!fullscreenActive.value);
+};
+
+const syncBrowserFullscreenState = (): void => {
+  if (!Capacitor.isNativePlatform()) {
+    fullscreenActive.value = Boolean(document.fullscreenElement);
+  }
+};
+
 const closeProfilePicker = (): void => {
   profilePickerOpen.value = false;
 };
@@ -235,6 +307,15 @@ watch(
   }
 );
 
+onMounted(() => {
+  document.addEventListener('fullscreenchange', syncBrowserFullscreenState);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener('fullscreenchange', syncBrowserFullscreenState);
+  void exitFullscreenMode();
+});
+
 const trendLabel = computed(() => {
   const current = props.stats.hashrate;
   const average = averageHashrate.value;
@@ -277,7 +358,7 @@ const trendIcon = computed(() => {
 </script>
 
 <template>
-  <div class="session-page">
+  <div class="session-page" :class="{ 'session-page-fullscreen': fullscreenActive }">
     <header class="flex items-center gap-3">
       <div
         class="grid h-12 w-12 shrink-0 place-items-center rounded-full text-[22px] font-bold text-white"
@@ -296,11 +377,14 @@ const trendIcon = computed(() => {
       </div>
       <button
         class="top-icon-button"
+        :class="{ 'bg-app-green-dim text-app-green': fullscreenActive }"
         type="button"
-        aria-label="Open session details"
-        @click="toggleDetails"
+        :aria-label="fullscreenActive ? 'Exit fullscreen' : 'Enter fullscreen'"
+        :aria-pressed="fullscreenActive"
+        :disabled="fullscreenBusy"
+        @click="toggleFullscreen"
       >
-        <MaterialIcon name="fullscreen" :size="23" />
+        <MaterialIcon :name="fullscreenActive ? 'fullscreen_exit' : 'fullscreen'" :size="23" />
       </button>
     </header>
 

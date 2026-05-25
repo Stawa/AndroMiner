@@ -106,6 +106,13 @@
     @apply mx-auto flex min-h-screen w-full max-w-[440px] flex-col px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))];
   }
 
+  .session-page-fullscreen {
+    max-width: none;
+    min-height: 100dvh;
+    padding-top: max(0.5rem, env(safe-area-inset-top));
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+
   .app-card {
     @apply min-w-0 rounded-lg border text-app-on;
     width: 100%;

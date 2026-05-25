@@ -22,6 +22,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         registerPlugin(DeviceStatusPlugin.class);
+        registerPlugin(ImmersiveModePlugin.class);
         registerPlugin(MiningNotificationPlugin.class);
         registerPlugin(NativeMinerPlugin.class);
         super.onCreate(savedInstanceState);
