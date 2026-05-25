@@ -1,6 +1,18 @@
 apply plugin: 'com.android.application'
 
 def bundleMiner = project.findProperty('bundleMiner') == 'true'
+def normalizeApkVariant = { value ->
+    def normalized = (value ?: '').toString().trim().toLowerCase(Locale.US)
+    if (normalized == 'notls' || normalized == 'no-tls') {
+        return 'notls'
+    }
+    if (normalized == 'tls') {
+        return 'tls'
+    }
+    return 'download'
+}
+def apkVariant = normalizeApkVariant(
+        project.findProperty('minerVariant') ?: (bundleMiner ? 'tls' : 'download'))
 def targetSdkVersionOverride = project.findProperty('targetSdkVersionOverride')
 def versionCodeOverride = project.findProperty('versionCodeOverride')
 def versionNameOverride = project.findProperty('versionNameOverride')
@@ -13,12 +25,16 @@ def hasReleaseSigning = releaseKeystoreFile && releaseKeystorePassword && releas
 android {
     namespace "com.androminer.dashboard"
     compileSdk rootProject.ext.compileSdkVersion
+    buildFeatures {
+        buildConfig true
+    }
     defaultConfig {
         applicationId "com.androminer.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion targetSdkVersionOverride ? targetSdkVersionOverride.toInteger() : rootProject.ext.targetSdkVersion
         versionCode versionCodeOverride ? versionCodeOverride.toInteger() : 1
         versionName versionNameOverride ?: "1.0"
+        buildConfigField "String", "ANDROMINER_APK_VARIANT", "\"${apkVariant}\""
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

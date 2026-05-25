@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import MaterialIcon from '../components/MaterialIcon.vue';
 import ToggleRow from '../components/ToggleRow.vue';
+import { useGitHubReleaseUpdater } from '../composables/useGitHubReleaseUpdater';
 import { useTheme } from '../composables/useTheme';
-import { useSheetDrag } from '../composables/useSheetDrag';
 import { useSettingsStore } from '../stores/settings';
 
 type SettingsSection = 'alerts' | 'power' | 'performance' | 'data';
@@ -25,7 +25,22 @@ interface ThemeOption {
 
 const settings = useSettingsStore();
 const { theme, setTheme } = useTheme();
-const aboutOpen = ref(false);
+const {
+  apkAssets,
+  availableVersion,
+  checkForUpdates: runUpdateCheck,
+  checking: updateChecking,
+  currentVersion,
+  currentVersionDisplay,
+  formatAssetLabel,
+  lastCheckedAt,
+  message: updateMessage,
+  openAsset,
+  openRelease,
+  refreshCurrentVersion,
+  releaseUrl,
+  status: updateStatus
+} = useGitHubReleaseUpdater();
 const settingsSection = ref<SettingsSection>('alerts');
 
 const settingsSections: SettingsSectionItem[] = [
@@ -72,25 +87,74 @@ const batteryModeLabel = computed(() =>
 const performanceModeLabel = computed(() =>
   settings.performance.adaptiveIntensity ? 'Adaptive' : 'Manual'
 );
+const updateStatusLabel = computed(() => {
+  const labels: Record<typeof updateStatus.value, string> = {
+    checking: 'Checking',
+    error: 'Attention',
+    idle: 'Idle',
+    ready: 'Ready',
+    'up-to-date': 'Current'
+  };
+
+  return labels[updateStatus.value];
+});
+const updateStatusClass = computed(() => {
+  if (updateStatus.value === 'error') {
+    return 'bg-red-500/10 text-red-200';
+  }
+
+  if (updateStatus.value === 'ready' || updateStatus.value === 'up-to-date') {
+    return 'bg-app-green-dim text-app-green';
+  }
+
+  return 'bg-app-elevated text-app-muted';
+});
+const lastCheckedLabel = computed(() => {
+  if (!lastCheckedAt.value) {
+    return 'Never';
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  }).format(new Date(lastCheckedAt.value));
+});
+const updateBusy = computed(() => updateChecking.value);
 
 const emit = defineEmits<{
   exportConfig: [];
   importConfig: [];
+  openAbout: [];
 }>();
 
 const selectTheme = (mode: ThemeMode): void => {
   setTheme(mode);
 };
 
-const openAbout = (): void => {
-  aboutOpen.value = true;
+const checkForUpdates = (): void => {
+  void runUpdateCheck();
 };
 
-const closeAbout = (): void => {
-  aboutOpen.value = false;
+const openGitHubRelease = (): void => {
+  void openRelease();
 };
 
-const { sheetDragStyle, startSheetDrag, moveSheetDrag, endSheetDrag } = useSheetDrag(closeAbout);
+onMounted(() => {
+  void refreshCurrentVersion();
+});
+
+watch(
+  () => settings.updates.autoUpdate,
+  (enabled) => {
+    if (!enabled) {
+      return;
+    }
+
+    void runUpdateCheck();
+  }
+);
 </script>
 
 <template>
@@ -405,6 +469,105 @@ const { sheetDragStyle, startSheetDrag, moveSheetDrag, endSheetDrag } = useSheet
         </div>
       </div>
       <div class="border-t border-app-line">
+        <div class="flex min-h-14 items-center justify-between gap-3 px-4">
+          <div class="flex min-w-0 items-center gap-3">
+            <MaterialIcon class="shrink-0 text-app-green" name="system_update_alt" :size="21" />
+            <div class="min-w-0">
+              <h4 class="text-[15px] font-semibold leading-5 text-white">GitHub releases</h4>
+              <p class="mt-0.5 text-[12px] leading-4 text-app-muted">APK release source</p>
+            </div>
+          </div>
+          <span
+            class="shrink-0 rounded-full px-2.5 py-1 text-[12px] font-semibold leading-4"
+            :class="updateStatusClass"
+          >
+            {{ updateStatusLabel }}
+          </span>
+        </div>
+
+        <ToggleRow
+          v-model="settings.updates.autoUpdate"
+          icon="sync"
+          label="Auto-check for updates"
+          supporting-text="Check GitHub Releases for newer APKs when the app opens"
+        />
+
+        <div class="border-t border-app-line px-4 py-3">
+          <div class="flex items-start gap-3">
+            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-app-elevated">
+              <MaterialIcon
+                class="text-app-green"
+                :name="updateStatus === 'error' ? 'error' : 'new_releases'"
+                :size="21"
+              />
+            </span>
+            <div class="min-w-0 flex-1">
+              <p class="text-[14px] font-semibold leading-5 text-white">
+                {{ updateMessage }}
+              </p>
+              <p class="mt-1 text-[12px] leading-[18px] text-app-muted">
+                Last checked: {{ lastCheckedLabel }}
+              </p>
+            </div>
+          </div>
+
+          <dl class="mt-3 grid grid-cols-2 gap-2">
+            <div class="min-w-0 rounded-lg bg-app-elevated p-2.5">
+              <dt class="text-[11px] font-semibold uppercase leading-4 text-app-muted">Current</dt>
+              <dd class="mt-1 truncate text-[13px] font-semibold leading-5 text-white">
+                {{ currentVersionDisplay || currentVersion || 'Unknown' }}
+              </dd>
+            </div>
+            <div class="min-w-0 rounded-lg bg-app-elevated p-2.5">
+              <dt class="text-[11px] font-semibold uppercase leading-4 text-app-muted">Latest</dt>
+              <dd class="mt-1 truncate text-[13px] font-semibold leading-5 text-white">
+                {{ availableVersion || 'None' }}
+              </dd>
+            </div>
+          </dl>
+
+          <button
+            class="ripple mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-app-green-dim px-4 text-[14px] font-semibold text-app-green disabled:opacity-50"
+            type="button"
+            :disabled="updateBusy"
+            @click="checkForUpdates"
+          >
+            <MaterialIcon :name="updateChecking ? 'sync' : 'travel_explore'" :size="20" />
+            <span>{{ updateChecking ? 'Checking...' : 'Check for updates' }}</span>
+          </button>
+
+          <button
+            v-if="releaseUrl"
+            class="ripple mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-app-elevated px-4 text-[14px] font-semibold text-white"
+            type="button"
+            @click="openGitHubRelease"
+          >
+            <MaterialIcon name="open_in_new" :size="20" />
+            <span>Open GitHub release</span>
+          </button>
+
+          <div v-if="apkAssets.length > 0" class="mt-3 space-y-2">
+            <button
+              v-for="asset in apkAssets"
+              :key="asset.id"
+              class="ripple flex min-h-12 w-full min-w-0 items-center gap-3 rounded-lg bg-app-elevated px-3 py-2 text-left active:bg-app-card"
+              type="button"
+              @click="openAsset(asset)"
+            >
+              <MaterialIcon class="shrink-0 text-app-green" name="download" :size="20" />
+              <span class="min-w-0 flex-1">
+                <span class="block truncate text-[13px] font-semibold leading-5 text-white">
+                  {{ formatAssetLabel(asset) }}
+                </span>
+                <span class="block truncate text-[11px] leading-4 text-app-muted">
+                  {{ asset.name }}
+                </span>
+              </span>
+              <MaterialIcon class="shrink-0 text-app-muted" name="chevron_right" :size="19" />
+            </button>
+          </div>
+        </div>
+
         <button
           class="ripple flex min-h-[76px] w-full items-center gap-3 border-t border-app-line px-4 py-3 text-left first:border-t-0 active:bg-app-elevated"
           type="button"
@@ -444,7 +607,7 @@ const { sheetDragStyle, startSheetDrag, moveSheetDrag, endSheetDrag } = useSheet
         <button
           class="ripple flex min-h-[76px] w-full items-center gap-3 border-t border-app-line px-4 py-3 text-left first:border-t-0 active:bg-app-elevated"
           type="button"
-          @click="openAbout"
+          @click="emit('openAbout')"
         >
           <span
             class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-app-elevated text-app-green"
@@ -462,50 +625,4 @@ const { sheetDragStyle, startSheetDrag, moveSheetDrag, endSheetDrag } = useSheet
       </div>
     </section>
   </div>
-
-  <Transition name="fade">
-    <div v-if="aboutOpen" class="fixed inset-0 z-50 bg-black/[0.55]" @click="closeAbout" />
-  </Transition>
-  <Transition name="sheet">
-    <section
-      v-if="aboutOpen"
-      class="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-[420px] rounded-t-[28px] border border-app-line bg-app-card p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
-      :style="sheetDragStyle"
-    >
-      <button
-        class="ripple mx-auto mb-3 block h-8 min-h-8 w-24 touch-none rounded-full"
-        type="button"
-        aria-label="Close about sheet"
-        @click="closeAbout"
-        @pointerdown="startSheetDrag"
-        @pointermove="moveSheetDrag"
-        @pointerup="endSheetDrag"
-        @pointercancel="endSheetDrag"
-      >
-        <span class="mx-auto block h-1 w-10 rounded-full bg-white/25" />
-      </button>
-      <div class="flex items-center gap-3">
-        <div
-          class="grid h-12 w-12 place-items-center rounded-full border-2 border-app-green text-app-green"
-        >
-          <MaterialIcon name="power_settings_new" :size="26" />
-        </div>
-        <div>
-          <h2 class="text-[20px] font-semibold leading-7 text-white">AndroMiner</h2>
-          <p class="text-[13px] leading-5 text-app-muted">Version 1.0.0 · Capacitor-ready UI</p>
-        </div>
-      </div>
-      <p class="mt-4 text-[13px] leading-5 text-app-muted">
-        Android-native interface for launching an XMRig-compatible miner binary, tracking real pool
-        shares, and mirroring device safety telemetry.
-      </p>
-      <button
-        class="ripple mt-5 h-12 w-full rounded-full bg-app-green-dim text-[15px] font-semibold text-app-green"
-        type="button"
-        @click="closeAbout"
-      >
-        Done
-      </button>
-    </section>
-  </Transition>
 </template>

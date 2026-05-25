@@ -1,6 +1,7 @@
 package com.androminer.dashboard;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -49,6 +50,8 @@ public class NativeMinerPlugin extends Plugin {
                     "\\bdiff\\s+([0-9]+(?:\\.[0-9]+)?)([kKmMgG]?)\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern LATENCY_PATTERN =
             Pattern.compile("\\(([0-9]+)\\s*ms\\)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern XMRIG_VERSION_PATTERN =
+            Pattern.compile("\\bXMRig\\s+([^\\s]+)", Pattern.CASE_INSENSITIVE);
     private static final String[] BINARY_CANDIDATES = {
         "miners/libxmrig.so", "miners/xmrig", "miners/xmrig-aarch64", "libxmrig.so"
     };
@@ -64,6 +67,8 @@ public class NativeMinerPlugin extends Plugin {
     private static final int API_READ_TIMEOUT_MS = 650;
     private static final int API_FALLBACK_PORT = 39089;
     private static final int MAX_LOG_LINES = 80;
+    private static final String PREFS_NAME = "androminer_native_miner";
+    private static final String PREF_MINER_VARIANT = "miner_variant";
 
     private static class ApiTelemetry {
 
@@ -83,6 +88,7 @@ public class NativeMinerPlugin extends Plugin {
     }
 
     private final ExecutorService outputExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService metadataExecutor = Executors.newSingleThreadExecutor();
     private final List<String> recentLogs = new ArrayList<>();
     private final SimpleDateFormat logTimeFormat = new SimpleDateFormat("HH:mm:ss", Locale.US);
     private Process minerProcess;
@@ -111,6 +117,11 @@ public class NativeMinerPlugin extends Plugin {
     @PluginMethod
     public void status(PluginCall call) {
         call.resolve(createStatus());
+    }
+
+    @PluginMethod
+    public void info(PluginCall call) {
+        metadataExecutor.execute(() -> call.resolve(createInfo()));
     }
 
     @PluginMethod
@@ -146,6 +157,7 @@ public class NativeMinerPlugin extends Plugin {
 
                     try {
                         File binary = downloadMinerBinary(variant);
+                        saveInstalledMinerVariant(variant);
                         synchronized (NativeMinerPlugin.this) {
                             lastMessage =
                                     formatMinerVariant(variant)
@@ -528,6 +540,41 @@ public class NativeMinerPlugin extends Plugin {
         } catch (IOException | NumberFormatException exception) {
             return -1;
         }
+    }
+
+    private JSObject createInfo() {
+        File binary = findMinerBinary();
+        String apkVariant = normalizeApkVariant(BuildConfig.ANDROMINER_APK_VARIANT);
+
+        JSObject result = new JSObject();
+        result.put("apkVariant", apkVariant);
+        result.put("apkVariantLabel", formatApkVariant(apkVariant));
+        result.put("miner", createMinerInfo(binary, apkVariant));
+        return result;
+    }
+
+    private JSObject createMinerInfo(File binary, String apkVariant) {
+        JSObject miner = new JSObject();
+        boolean installed = binary != null;
+        String source = resolveMinerSource(binary);
+        String versionOutput = installed ? readMinerVersionOutput(binary) : "";
+        String version = parseMinerVersion(versionOutput);
+        String variant = resolveInstalledMinerVariant(source, apkVariant, versionOutput);
+
+        miner.put("installed", installed);
+        miner.put("version", version);
+        miner.put("versionOutput", versionOutput);
+        miner.put("variant", variant);
+        miner.put("variantLabel", formatInstalledMinerVariant(variant));
+        miner.put("source", source);
+        miner.put("sourceLabel", formatMinerSource(source));
+        miner.put("abi", "arm64-v8a");
+        miner.put("fileName", installed ? binary.getName() : "libxmrig.so");
+        miner.put("path", installed ? binary.getAbsolutePath() : "");
+        miner.put("sizeBytes", installed ? binary.length() : null);
+        miner.put("lastModifiedAt", installed ? binary.lastModified() : null);
+
+        return miner;
     }
 
     private JSObject createStatus() {
@@ -1144,6 +1191,179 @@ public class NativeMinerPlugin extends Plugin {
         }
 
         return null;
+    }
+
+    private String resolveMinerSource(File binary) {
+        if (binary == null) {
+            return "missing";
+        }
+
+        String path = binary.getAbsolutePath();
+        String nativeLibraryDir = getContext().getApplicationInfo().nativeLibraryDir;
+        if (nativeLibraryDir != null
+                && path.startsWith(new File(nativeLibraryDir).getAbsolutePath())) {
+            return "bundled";
+        }
+
+        if (path.startsWith(getContext().getFilesDir().getAbsolutePath())) {
+            return "downloaded";
+        }
+
+        return "custom";
+    }
+
+    private String formatMinerSource(String source) {
+        switch (source) {
+            case "bundled":
+                return "Bundled in this APK";
+            case "downloaded":
+                return "Downloaded from GitHub miner-builder";
+            case "custom":
+                return "Installed in app storage";
+            default:
+                return "Not installed";
+        }
+    }
+
+    private String resolveInstalledMinerVariant(
+            String source, String apkVariant, String versionOutput) {
+        if ("bundled".equals(source)) {
+            return "notls".equals(apkVariant) ? "notls" : "tls";
+        }
+
+        if ("downloaded".equals(source)) {
+            String savedVariant = readInstalledMinerVariant();
+            return "unknown".equals(savedVariant)
+                    ? inferMinerVariantFromVersionOutput(versionOutput)
+                    : savedVariant;
+        }
+
+        if ("custom".equals(source)) {
+            return inferMinerVariantFromVersionOutput(versionOutput);
+        }
+
+        return "unknown";
+    }
+
+    private String inferMinerVariantFromVersionOutput(String versionOutput) {
+        if (versionOutput == null || versionOutput.isBlank()) {
+            return "unknown";
+        }
+
+        return versionOutput.toLowerCase(Locale.US).contains("openssl") ? "tls" : "notls";
+    }
+
+    private String readMinerVersionOutput(File binary) {
+        if (binary == null || !binary.exists()) {
+            return "";
+        }
+
+        try {
+            binary.setExecutable(true);
+            ProcessBuilder builder = new ProcessBuilder(binary.getAbsolutePath(), "--version");
+            builder.redirectErrorStream(true);
+            Process process = builder.start();
+            boolean finished = process.waitFor(2, TimeUnit.SECONDS);
+            if (!finished) {
+                process.destroyForcibly();
+                return "";
+            }
+
+            StringBuilder output = new StringBuilder();
+            try (BufferedReader reader =
+                    new BufferedReader(
+                            new InputStreamReader(
+                                    process.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (output.length() > 0) {
+                        output.append('\n');
+                    }
+                    output.append(line);
+                }
+            }
+
+            return output.toString().trim();
+        } catch (IOException | InterruptedException exception) {
+            if (exception instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            return "";
+        }
+    }
+
+    private String parseMinerVersion(String versionOutput) {
+        if (versionOutput == null || versionOutput.isBlank()) {
+            return "";
+        }
+
+        Matcher matcher = XMRIG_VERSION_PATTERN.matcher(versionOutput);
+        return matcher.find() ? matcher.group(1) : "";
+    }
+
+    private String normalizeApkVariant(String variant) {
+        if (variant == null) {
+            return "download";
+        }
+
+        String normalized = variant.trim().toLowerCase(Locale.US);
+        if (normalized.equals("notls") || normalized.equals("no-tls")) {
+            return "notls";
+        }
+
+        if (normalized.equals("tls")) {
+            return "tls";
+        }
+
+        return "download";
+    }
+
+    private String formatApkVariant(String variant) {
+        switch (normalizeApkVariant(variant)) {
+            case "tls":
+                return "TLS";
+            case "notls":
+                return "No-TLS";
+            default:
+                return "Download";
+        }
+    }
+
+    private String formatInstalledMinerVariant(String variant) {
+        if ("tls".equals(variant)) {
+            return "TLS";
+        }
+
+        if ("notls".equals(variant)) {
+            return "No-TLS";
+        }
+
+        return "Unknown";
+    }
+
+    private SharedPreferences getMinerPreferences() {
+        return getContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+    }
+
+    private String readInstalledMinerVariant() {
+        String variant = getMinerPreferences().getString(PREF_MINER_VARIANT, "unknown");
+        String normalized = variant == null ? "unknown" : variant.trim().toLowerCase(Locale.US);
+        if (normalized.equals("notls") || normalized.equals("no-tls")) {
+            return "notls";
+        }
+
+        if (normalized.equals("tls")) {
+            return "tls";
+        }
+
+        return "unknown";
+    }
+
+    private void saveInstalledMinerVariant(String variant) {
+        getMinerPreferences()
+                .edit()
+                .putString(PREF_MINER_VARIANT, normalizeMinerVariant(variant))
+                .apply();
     }
 
     private String normalizeMinerVariant(String variant) {

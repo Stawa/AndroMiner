@@ -22,6 +22,10 @@ export interface PerformanceSettings {
   animationsEnabled: boolean;
 }
 
+export interface UpdateSettings {
+  autoUpdate: boolean;
+}
+
 export interface SettingsState {
   notifications: NotificationSettings;
   autoStart: boolean;
@@ -29,6 +33,7 @@ export interface SettingsState {
   thermalThreshold: number;
   batterySafety: BatterySafetySettings;
   performance: PerformanceSettings;
+  updates: UpdateSettings;
 }
 
 const defaultSettings = (): SettingsState => ({
@@ -51,8 +56,36 @@ const defaultSettings = (): SettingsState => ({
     backgroundThrottle: true,
     adaptiveIntensity: true,
     animationsEnabled: true
+  },
+  updates: {
+    autoUpdate: true
   }
 });
+
+const normalizeSettings = (settings: Partial<SettingsState>): SettingsState => {
+  const defaults = defaultSettings();
+
+  return {
+    ...defaults,
+    ...settings,
+    notifications: {
+      ...defaults.notifications,
+      ...settings.notifications
+    },
+    batterySafety: {
+      ...defaults.batterySafety,
+      ...settings.batterySafety
+    },
+    performance: {
+      ...defaults.performance,
+      ...settings.performance
+    },
+    updates: {
+      ...defaults.updates,
+      ...settings.updates
+    }
+  };
+};
 
 export const useSettingsStore = defineStore('settings', {
   state: (): SettingsState => defaultSettings(),
@@ -65,22 +98,7 @@ export const useSettingsStore = defineStore('settings', {
         }
 
         const parsed = JSON.parse(raw) as Partial<SettingsState>;
-        this.$patch({
-          ...defaultSettings(),
-          ...parsed,
-          notifications: {
-            ...defaultSettings().notifications,
-            ...parsed.notifications
-          },
-          batterySafety: {
-            ...defaultSettings().batterySafety,
-            ...parsed.batterySafety
-          },
-          performance: {
-            ...defaultSettings().performance,
-            ...parsed.performance
-          }
-        });
+        this.$patch(normalizeSettings(parsed));
       } catch {
         this.$patch(defaultSettings());
       }
@@ -89,7 +107,7 @@ export const useSettingsStore = defineStore('settings', {
       localStorage.setItem(settingsKey, JSON.stringify(this.$state));
     },
     replace(next: SettingsState): void {
-      this.$patch(next);
+      this.$patch(normalizeSettings(next));
       this.persist();
     }
   }

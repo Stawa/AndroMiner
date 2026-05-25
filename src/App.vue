@@ -8,6 +8,7 @@ import AppHeader from './components/AppHeader.vue';
 import BottomNav, { type AppTab } from './components/BottomNav.vue';
 import MinerDownloadWarningSheet from './components/MinerDownloadWarningSheet.vue';
 import { useDeviceTelemetry } from './composables/useDeviceTelemetry';
+import { useGitHubReleaseUpdater } from './composables/useGitHubReleaseUpdater';
 import { useMiningController, type MinerBinaryVariant } from './composables/useMiningController';
 import { useTheme } from './composables/useTheme';
 import { useProfilesStore } from './stores/profiles';
@@ -33,10 +34,12 @@ const miner = useMiningController();
 const settings = useSettingsStore();
 const profiles = useProfilesStore();
 const { device } = useDeviceTelemetry();
+const updater = useGitHubReleaseUpdater();
 useTheme();
 const sessionActive = computed(() => miner.state.value !== 'idle');
 const configAutosaveReady = ref(false);
 let configAutosaveHandle = 0;
+const updateCheckIntervalMs = 10 * 60 * 1000;
 
 interface MiningNotificationPlugin {
   show: (options: { title: string; body: string }) => Promise<void>;
@@ -111,6 +114,22 @@ const scheduleConfigAutosave = (): void => {
 const flushConfigAutosave = (): void => {
   window.clearTimeout(configAutosaveHandle);
   autosaveCurrentConfig();
+};
+
+const runAutoUpdateCheck = (minIntervalMs = 0): void => {
+  if (!settings.updates.autoUpdate) {
+    return;
+  }
+
+  void updater.checkForUpdates({ minIntervalMs });
+};
+
+const checkUpdatesWhenVisible = (): void => {
+  if (document.visibilityState !== 'visible') {
+    return;
+  }
+
+  runAutoUpdateCheck(updateCheckIntervalMs);
 };
 
 const navigateToSetup = (): void => {
@@ -226,10 +245,12 @@ onMounted(() => {
     miner.applySavedProfile(profiles.activeProfile);
   }
 
+  runAutoUpdateCheck();
   window.setTimeout(() => {
     configAutosaveReady.value = true;
   }, 0);
   document.addEventListener('visibilitychange', flushConfigAutosave);
+  document.addEventListener('visibilitychange', checkUpdatesWhenVisible);
   window.addEventListener('pagehide', flushConfigAutosave);
 });
 
@@ -299,6 +320,7 @@ watch(
 onBeforeUnmount(() => {
   flushConfigAutosave();
   document.removeEventListener('visibilitychange', flushConfigAutosave);
+  document.removeEventListener('visibilitychange', checkUpdatesWhenVisible);
   window.removeEventListener('pagehide', flushConfigAutosave);
 });
 </script>
@@ -377,6 +399,7 @@ onBeforeUnmount(() => {
         v-else-if="activeTab === 'settings'"
         @export-config="exportConfig"
         @import-config="openImportPicker"
+        @open-about="activeTab = 'about'"
       />
       <ProfilesView
         v-else-if="activeTab === 'profiles'"

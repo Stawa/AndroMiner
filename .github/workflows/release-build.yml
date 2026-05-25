@@ -116,6 +116,7 @@ jobs:
           {
             echo "ANDROID_VERSION_NAME=$version_name"
             echo "ANDROID_VERSION_CODE=$RELEASE_RUN_NUMBER"
+            echo "VITE_APP_VERSION=$version_name"
           } >> "$GITHUB_ENV"
 
       - name: Check formatting
@@ -173,7 +174,7 @@ jobs:
         run: |
           chmod +x android/gradlew
           mkdir -p release-assets
-          (cd android && ./gradlew clean assembleRelease -PtargetSdkVersionOverride=28 -PversionNameOverride="$ANDROID_VERSION_NAME" -PversionCodeOverride="$ANDROID_VERSION_CODE" --stacktrace)
+          (cd android && ./gradlew clean assembleRelease -PminerVariant=download -PtargetSdkVersionOverride=28 -PversionNameOverride="$ANDROID_VERSION_NAME" -PversionCodeOverride="$ANDROID_VERSION_CODE" --stacktrace)
           apk="$(find android/app/build/outputs/apk/release -type f -name "*.apk" ! -name "*unsigned*.apk" | head -n 1)"
           test -n "$apk"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$apk"
@@ -192,7 +193,7 @@ jobs:
       - name: Build TLS bundled APK
         if: github.event_name == 'release'
         run: |
-          (cd android && ./gradlew clean assembleRelease -PbundleMiner=true -PversionNameOverride="$ANDROID_VERSION_NAME" -PversionCodeOverride="$ANDROID_VERSION_CODE" --stacktrace)
+          (cd android && ./gradlew clean assembleRelease -PbundleMiner=true -PminerVariant=tls -PversionNameOverride="$ANDROID_VERSION_NAME" -PversionCodeOverride="$ANDROID_VERSION_CODE" --stacktrace)
           apk="$(find android/app/build/outputs/apk/release -type f -name "*.apk" ! -name "*unsigned*.apk" | head -n 1)"
           test -n "$apk"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$apk"
@@ -211,7 +212,7 @@ jobs:
       - name: Build no-TLS bundled APK
         if: github.event_name == 'release'
         run: |
-          (cd android && ./gradlew clean assembleRelease -PbundleMiner=true -PversionNameOverride="$ANDROID_VERSION_NAME" -PversionCodeOverride="$ANDROID_VERSION_CODE" --stacktrace)
+          (cd android && ./gradlew clean assembleRelease -PbundleMiner=true -PminerVariant=notls -PversionNameOverride="$ANDROID_VERSION_NAME" -PversionCodeOverride="$ANDROID_VERSION_CODE" --stacktrace)
           apk="$(find android/app/build/outputs/apk/release -type f -name "*.apk" ! -name "*unsigned*.apk" | head -n 1)"
           test -n "$apk"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$apk"

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { useAppVersion } from '../composables/useAppVersion';
 import MaterialIcon from './MaterialIcon.vue';
 import type { AppTab } from './BottomNav.vue';
 
@@ -41,6 +42,8 @@ const secondaryItems: DrawerItem[] = [
 
 const rendered = ref(props.open);
 const active = ref(false);
+const { displayVersion, refreshAppVersion } = useAppVersion();
+const versionLabel = computed(() => `Version ${displayVersion.value}`);
 let closeTimer = 0;
 let openTimer = 0;
 
@@ -114,6 +117,10 @@ watch(
   { immediate: true }
 );
 
+onMounted(() => {
+  void refreshAppVersion();
+});
+
 onBeforeUnmount(() => {
   clearCloseTimer();
   clearOpenTimer();
@@ -145,7 +152,7 @@ onBeforeUnmount(() => {
       </div>
       <div class="min-w-0 flex-1">
         <p class="truncate text-[17px] font-semibold leading-6 text-white">AndroMiner</p>
-        <p class="text-[13px] leading-5 text-app-muted">Version 1.0.0</p>
+        <p class="text-[13px] leading-5 text-app-muted">{{ versionLabel }}</p>
       </div>
       <button
         class="ripple grid h-11 w-11 shrink-0 place-items-center rounded-full text-app-muted active:bg-app-elevated"

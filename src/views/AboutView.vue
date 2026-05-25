@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { computed, onMounted } from 'vue';
 import SettingGroup from '../components/SettingGroup.vue';
 import MaterialIcon from '../components/MaterialIcon.vue';
+import { useAppVersion } from '../composables/useAppVersion';
+import { useNativeMinerInfo } from '../composables/useNativeMinerInfo';
 import type { DeviceTelemetry } from '../types/mining';
 
 interface AboutViewProps {
@@ -8,6 +11,10 @@ interface AboutViewProps {
 }
 
 defineProps<AboutViewProps>();
+
+const { displayVersion, refreshAppVersion } = useAppVersion();
+const { minerInfo } = useNativeMinerInfo();
+const versionLabel = computed(() => `Version ${displayVersion.value} · Capacitor Android`);
 
 const androidPermissions = [
   {
@@ -44,20 +51,54 @@ const androidPermissions = [
   }
 ];
 
-const minerDetails = [
-  { label: 'Miner', value: 'XMRig v6.26.0, built from source for Android ARM64' },
-  { label: 'Binary name', value: 'libxmrig.so' },
-  { label: 'ABI', value: 'arm64-v8a' },
-  {
-    label: 'Bundled algorithms',
-    value:
-      'RandomX, RandomWOW, RandomARQ, RandomKEVA, RandomSFX, GhostRider, CryptoNight, and Argon2 presets supported by XMRig'
-  },
-  { label: 'Native stack', value: 'libuv v1.48.0, OpenSSL openssl-4.0.0, hwloc disabled' },
-  { label: 'Variants', value: 'TLS and no-TLS builds are available' },
-  { label: 'Download source', value: 'GitHub miner-builder branch after user approval' },
-  { label: 'Bundled APKs', value: 'Include the miner directly inside the APK native library path' }
-];
+const formatBytes = (bytes: number | null): string => {
+  if (!bytes) {
+    return 'Unavailable';
+  }
+
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = bytes;
+  let unitIndex = 0;
+
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+};
+
+const formatVersionOutput = (output: string): string => {
+  const lines = output
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) {
+    return 'Unavailable until an Android miner binary is installed.';
+  }
+
+  return lines.slice(0, 3).join(' · ');
+};
+
+const minerDetails = computed(() => {
+  const miner = minerInfo.value;
+
+  return [
+    { label: 'Status', value: miner.installed ? 'Installed' : 'Not installed' },
+    { label: 'Version', value: miner.version || (miner.installed ? 'Unknown' : 'Unavailable') },
+    { label: 'Variant', value: miner.installed ? miner.variantLabel : 'None' },
+    { label: 'Source', value: miner.sourceLabel },
+    { label: 'Binary name', value: miner.fileName },
+    { label: 'ABI', value: miner.abi },
+    { label: 'Size', value: formatBytes(miner.sizeBytes) },
+    { label: 'Version output', value: formatVersionOutput(miner.versionOutput) }
+  ];
+});
+
+onMounted(() => {
+  void refreshAppVersion();
+});
 </script>
 
 <template>
@@ -71,7 +112,7 @@ const minerDetails = [
         </div>
         <div>
           <h2 class="text-[20px] font-semibold text-white">AndroMiner</h2>
-          <p class="text-[13px] text-app-muted">Version 1.0.0 · Capacitor Android</p>
+          <p class="text-[13px] text-app-muted">{{ versionLabel }}</p>
         </div>
       </div>
     </section>
