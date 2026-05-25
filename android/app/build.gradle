@@ -2,6 +2,8 @@ apply plugin: 'com.android.application'
 
 def bundleMiner = project.findProperty('bundleMiner') == 'true'
 def targetSdkVersionOverride = project.findProperty('targetSdkVersionOverride')
+def versionCodeOverride = project.findProperty('versionCodeOverride')
+def versionNameOverride = project.findProperty('versionNameOverride')
 def releaseKeystoreFile = System.getenv('ANDROID_KEYSTORE_FILE')
 def releaseKeystorePassword = System.getenv('ANDROID_KEYSTORE_PASSWORD')
 def releaseKeyAlias = System.getenv('ANDROID_KEY_ALIAS')
@@ -15,8 +17,8 @@ android {
         applicationId "com.androminer.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion targetSdkVersionOverride ? targetSdkVersionOverride.toInteger() : rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode versionCodeOverride ? versionCodeOverride.toInteger() : 1
+        versionName versionNameOverride ?: "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
