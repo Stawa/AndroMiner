@@ -91,6 +91,10 @@ const minerDetails = computed(() => {
     { label: 'Source', value: miner.sourceLabel },
     { label: 'Binary name', value: miner.fileName },
     { label: 'ABI', value: miner.abi },
+    {
+      label: 'Target SDK',
+      value: miner.targetSdkVersion === null ? 'Unknown' : String(miner.targetSdkVersion)
+    },
     { label: 'Size', value: formatBytes(miner.sizeBytes) },
     { label: 'Version output', value: formatVersionOutput(miner.versionOutput) }
   ];
@@ -136,6 +140,12 @@ onMounted(() => {
         <div class="flex min-h-12 items-center justify-between gap-3 px-4 py-2 text-[14px]">
           <span class="text-app-muted">CPU threads</span
           ><strong class="text-right font-medium text-white">{{ device.cpuThreads }}</strong>
+        </div>
+        <div class="flex min-h-12 items-center justify-between gap-3 px-4 py-2 text-[14px]">
+          <span class="text-app-muted">CPU</span
+          ><strong class="text-right font-medium text-white"
+            >{{ device.cpuName }} · {{ device.cpuClockLabel }}</strong
+          >
         </div>
         <div class="flex min-h-12 items-center justify-between gap-3 px-4 py-2 text-[14px]">
           <span class="text-app-muted">Battery</span

@@ -16,6 +16,12 @@ interface NativeDeviceStatus {
   batteryLevel: number;
   isCharging: boolean;
   cpuThreads: number;
+  cpuName?: string;
+  cpuClockGhz?: number | null;
+  cpuClockLabel?: string;
+  gpuName?: string;
+  gpuClockMhz?: number | null;
+  gpuClockLabel?: string;
   temperatureC?: number;
   temperatureSource?: DeviceTelemetry['thermalSource'];
   temperatureSensor?: string;
@@ -87,6 +93,12 @@ export const useDeviceTelemetry = () => {
     batteryLevel: 100,
     isCharging: false,
     cpuThreads: getHardwareConcurrency(),
+    cpuName: 'Android CPU',
+    cpuClockGhz: null,
+    cpuClockLabel: '-',
+    gpuName: 'Android GPU',
+    gpuClockMhz: null,
+    gpuClockLabel: '-',
     deviceMemoryGb: getDeviceMemory(),
     temperatureC: null,
     thermalStatus: 'unknown',
@@ -121,6 +133,17 @@ export const useDeviceTelemetry = () => {
       device.osVersion = info.osVersion;
       device.manufacturer = info.manufacturer || 'unknown';
       device.cpuThreads = nativeStatus?.cpuThreads || getHardwareConcurrency();
+      device.cpuName =
+        nativeStatus?.cpuName ||
+        [info.manufacturer, info.model].filter(Boolean).join(' ') ||
+        'Android CPU';
+      device.cpuClockGhz =
+        typeof nativeStatus?.cpuClockGhz === 'number' ? nativeStatus.cpuClockGhz : null;
+      device.cpuClockLabel = nativeStatus?.cpuClockLabel || '-';
+      device.gpuName = nativeStatus?.gpuName || 'Android GPU';
+      device.gpuClockMhz =
+        typeof nativeStatus?.gpuClockMhz === 'number' ? nativeStatus.gpuClockMhz : null;
+      device.gpuClockLabel = nativeStatus?.gpuClockLabel || '-';
       device.deviceMemoryGb = getDeviceMemory();
       device.batteryLevel = nativeLevel ?? capacitorLevel ?? webLevel ?? device.batteryLevel;
       device.isCharging = nativeStatus?.isCharging ?? Boolean(capacitorCharging || webCharging);
@@ -138,6 +161,12 @@ export const useDeviceTelemetry = () => {
       device.thermalSensorName = nativeStatus?.temperatureSensor || null;
     } catch {
       device.cpuThreads = getHardwareConcurrency();
+      device.cpuName = 'Android CPU';
+      device.cpuClockGhz = null;
+      device.cpuClockLabel = '-';
+      device.gpuName = 'Android GPU';
+      device.gpuClockMhz = null;
+      device.gpuClockLabel = '-';
       device.deviceMemoryGb = getDeviceMemory();
       device.temperatureC = null;
       device.thermalStatus = 'unavailable';

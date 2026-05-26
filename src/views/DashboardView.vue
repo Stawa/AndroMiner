@@ -43,7 +43,7 @@ const walletPreview = computed(() =>
 const profileName = computed(() => props.activeProfile?.name || 'Unsaved setup');
 const canStart = computed(() => props.backendState === 'ready' || props.backendState === 'missing');
 const primaryActionLabel = computed(() =>
-  props.backendState === 'missing' ? 'Download & Start' : 'Start Mining'
+  props.backendState === 'missing' ? 'Download Miner' : 'Start Mining'
 );
 const hasPlaceholderWallet = computed(() =>
   /^YOUR_[A-Z0-9]+_WALLET_ADDRESS$/.test(props.config.walletAddress)
@@ -173,7 +173,7 @@ const launchDetail = computed(() => {
     return 'Download XMRig binary on first start';
   }
 
-  return `${props.config.coin.name} · ${props.config.algorithm} · ${props.config.threadCount}/${props.config.totalDetectedThreads} threads`;
+  return `${props.config.coin.name} · ${props.config.threadCount}/${props.config.totalDetectedThreads} CPU threads`;
 });
 
 const formatDuration = (seconds: number): string => {
@@ -235,12 +235,6 @@ const readinessItems = computed(() => [
         : `${Math.round(props.device.temperatureC)} °C`,
     icon: 'device_thermostat',
     good: props.device.thermalStatus !== 'hot'
-  },
-  {
-    label: 'CPU',
-    value: `${props.config.threadCount}/${props.config.totalDetectedThreads}`,
-    icon: 'memory',
-    good: props.config.threadCount <= props.config.totalDetectedThreads
   }
 ]);
 
@@ -401,7 +395,7 @@ const clearSessionHistory = (): void => {
           </div>
         </div>
 
-        <div class="mt-3 grid grid-cols-3 gap-2">
+        <div class="mt-3 grid grid-cols-2 gap-2">
           <div
             v-for="item in readinessItems"
             :key="item.label"

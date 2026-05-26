@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
 @CapacitorPlugin(name = "DeviceStatus")
 public class DeviceStatusPlugin extends Plugin {
@@ -29,10 +30,18 @@ public class DeviceStatusPlugin extends Plugin {
                 getContext()
                         .registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
         TemperatureReading temperature = getBestPhoneTemperature(batteryIntent);
+        HardwareInfo cpu = getCpuHardwareInfo();
+        HardwareInfo gpu = getGpuHardwareInfo();
 
         result.put("batteryLevel", getBatteryLevel(batteryIntent));
         result.put("isCharging", isCharging(batteryIntent));
         result.put("cpuThreads", Runtime.getRuntime().availableProcessors());
+        result.put("cpuName", cpu.name);
+        result.put("cpuClockGhz", cpu.clockValue);
+        result.put("cpuClockLabel", cpu.clockLabel);
+        result.put("gpuName", gpu.name);
+        result.put("gpuClockMhz", gpu.clockValue);
+        result.put("gpuClockLabel", gpu.clockLabel);
         if (temperature != null) {
             result.put("temperatureC", temperature.valueC);
             result.put("temperatureSource", temperature.source);
@@ -290,6 +299,314 @@ public class DeviceStatusPlugin extends Plugin {
         return "unknown";
     }
 
+    private HardwareInfo getCpuHardwareInfo() {
+        String name =
+                firstMeaningful(
+                        getSocName(),
+                        readCpuInfoValue("Hardware"),
+                        readCpuInfoValue("model name"),
+                        readCpuInfoValue("Processor"),
+                        Build.HARDWARE,
+                        Build.BOARD);
+        Double clockGhz = readBestCpuClockGhz();
+
+        return new HardwareInfo(
+                cleanHardwareName(name, "CPU"),
+                clockGhz,
+                clockGhz == null ? "-" : String.format(Locale.US, "%.2f GHz", clockGhz));
+    }
+
+    private HardwareInfo getGpuHardwareInfo() {
+        String name =
+                firstMeaningful(
+                        readFirstLine(new File("/sys/class/kgsl/kgsl-3d0/gpu_model")),
+                        findDevfreqGpuName(),
+                        inferGpuFamilyName());
+        Double clockMhz = readBestGpuClockMhz();
+
+        return new HardwareInfo(
+                cleanHardwareName(name, "GPU"),
+                clockMhz,
+                clockMhz == null ? "-" : String.format(Locale.US, "%.0f MHz", clockMhz));
+    }
+
+    private String getSocName() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            return null;
+        }
+
+        return firstMeaningful(
+                joinHardwareName(Build.SOC_MANUFACTURER, Build.SOC_MODEL),
+                Build.SOC_MODEL,
+                Build.SOC_MANUFACTURER);
+    }
+
+    private String joinHardwareName(String manufacturer, String model) {
+        String left = manufacturer == null ? "" : manufacturer.trim();
+        String right = model == null ? "" : model.trim();
+
+        if (left.isEmpty()) {
+            return right;
+        }
+        if (right.isEmpty()) {
+            return left;
+        }
+        if (right.toLowerCase(Locale.US).contains(left.toLowerCase(Locale.US))) {
+            return right;
+        }
+
+        return left + " " + right;
+    }
+
+    private String readCpuInfoValue(String key) {
+        File cpuInfo = new File("/proc/cpuinfo");
+        try (BufferedReader reader = new BufferedReader(new FileReader(cpuInfo))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                int split = line.indexOf(':');
+                if (split <= 0) {
+                    continue;
+                }
+
+                String candidateKey = line.substring(0, split).trim();
+                if (!candidateKey.equalsIgnoreCase(key)) {
+                    continue;
+                }
+
+                String value = line.substring(split + 1).trim();
+                if (isMeaningful(value)) {
+                    return value;
+                }
+            }
+        } catch (IOException ignored) {
+
+        }
+
+        return null;
+    }
+
+    private Double readBestCpuClockGhz() {
+        File cpuDirectory = new File("/sys/devices/system/cpu");
+        File[] cpuEntries = cpuDirectory.listFiles();
+        long bestKhz = -1;
+
+        if (cpuEntries == null) {
+            return null;
+        }
+
+        for (File cpuEntry : cpuEntries) {
+            if (!cpuEntry.getName().matches("cpu\\d+")) {
+                continue;
+            }
+
+            bestKhz =
+                    Math.max(
+                            bestKhz,
+                            readBestFrequencyKhz(
+                                    new File(cpuEntry, "cpufreq/cpuinfo_max_freq"),
+                                    new File(cpuEntry, "cpufreq/scaling_max_freq"),
+                                    new File(cpuEntry, "cpufreq/scaling_cur_freq")));
+        }
+
+        return bestKhz > 0 ? bestKhz / 1_000_000.0 : null;
+    }
+
+    private String findDevfreqGpuName() {
+        File devfreqDirectory = new File("/sys/class/devfreq");
+        File[] entries = devfreqDirectory.listFiles();
+
+        if (entries == null) {
+            return null;
+        }
+
+        for (File entry : entries) {
+            String descriptor =
+                    (entry.getName()
+                                    + " "
+                                    + readNullable(new File(entry, "name"))
+                                    + " "
+                                    + readNullable(new File(entry, "device/name")))
+                            .toLowerCase(Locale.US);
+            if (!looksLikeGpuDescriptor(descriptor)) {
+                continue;
+            }
+
+            return firstMeaningful(
+                    readFirstLine(new File(entry, "gpu_model")),
+                    readFirstLine(new File(entry, "name")),
+                    entry.getName());
+        }
+
+        return null;
+    }
+
+    private Double readBestGpuClockMhz() {
+        long bestRaw =
+                readBestRawFrequency(
+                        new File("/sys/class/kgsl/kgsl-3d0/devfreq/max_freq"),
+                        new File("/sys/class/kgsl/kgsl-3d0/max_gpuclk"),
+                        new File("/sys/class/kgsl/kgsl-3d0/devfreq/cur_freq"),
+                        new File("/sys/class/kgsl/kgsl-3d0/gpuclk"));
+
+        File devfreqDirectory = new File("/sys/class/devfreq");
+        File[] entries = devfreqDirectory.listFiles();
+
+        if (entries != null) {
+            for (File entry : entries) {
+                String descriptor =
+                        (entry.getName()
+                                        + " "
+                                        + readNullable(new File(entry, "name"))
+                                        + " "
+                                        + readNullable(new File(entry, "device/name")))
+                                .toLowerCase(Locale.US);
+                if (!looksLikeGpuDescriptor(descriptor)) {
+                    continue;
+                }
+
+                bestRaw =
+                        Math.max(
+                                bestRaw,
+                                readBestRawFrequency(
+                                        new File(entry, "max_freq"), new File(entry, "cur_freq")));
+            }
+        }
+
+        return normalizeGpuFrequencyMhz(bestRaw);
+    }
+
+    private long readBestFrequencyKhz(File... files) {
+        long best = -1;
+
+        for (File file : files) {
+            Long raw = readLong(file);
+            if (raw == null || raw <= 0) {
+                continue;
+            }
+
+            long khz = raw > 10_000_000L ? raw / 1000L : raw;
+            best = Math.max(best, khz);
+        }
+
+        return best;
+    }
+
+    private long readBestRawFrequency(File... files) {
+        long best = -1;
+
+        for (File file : files) {
+            Long raw = readLong(file);
+            if (raw != null && raw > 0) {
+                best = Math.max(best, raw);
+            }
+        }
+
+        return best;
+    }
+
+    private Double normalizeGpuFrequencyMhz(long rawFrequency) {
+        if (rawFrequency <= 0) {
+            return null;
+        }
+
+        double mhz;
+        if (rawFrequency >= 1_000_000L) {
+            mhz = rawFrequency / 1_000_000.0;
+        } else if (rawFrequency >= 10_000L) {
+            mhz = rawFrequency / 1000.0;
+        } else {
+            mhz = rawFrequency;
+        }
+
+        return mhz > 0 && mhz < 5000 ? mhz : null;
+    }
+
+    private Long readLong(File file) {
+        String raw = readFirstLine(file);
+        if (raw == null) {
+            return null;
+        }
+
+        try {
+            return Long.parseLong(raw.trim());
+        } catch (NumberFormatException exception) {
+            return null;
+        }
+    }
+
+    private String inferGpuFamilyName() {
+        String hardware = (Build.HARDWARE == null ? "" : Build.HARDWARE).toLowerCase(Locale.US);
+        String board = (Build.BOARD == null ? "" : Build.BOARD).toLowerCase(Locale.US);
+        String combined = hardware + " " + board;
+
+        if (combined.contains("qcom")
+                || combined.contains("qualcomm")
+                || combined.contains("kgsl")) {
+            return "Adreno GPU";
+        }
+        if (combined.contains("mali") || combined.contains("mt") || combined.contains("exynos")) {
+            return "Mali GPU";
+        }
+        if (combined.contains("powervr") || combined.contains("img")) {
+            return "PowerVR GPU";
+        }
+
+        return null;
+    }
+
+    private boolean looksLikeGpuDescriptor(String descriptor) {
+        return descriptor.contains("gpu")
+                || descriptor.contains("kgsl")
+                || descriptor.contains("adreno")
+                || descriptor.contains("mali")
+                || descriptor.contains("powervr")
+                || descriptor.contains("3d");
+    }
+
+    private String readNullable(File file) {
+        String value = readFirstLine(file);
+        return value == null ? "" : value;
+    }
+
+    private String firstMeaningful(String... values) {
+        for (String value : values) {
+            if (isMeaningful(value)) {
+                return value.trim();
+            }
+        }
+
+        return null;
+    }
+
+    private boolean isMeaningful(String value) {
+        if (value == null) {
+            return false;
+        }
+
+        String normalized = value.trim();
+        return !normalized.isEmpty()
+                && !normalized.equals("0")
+                && !normalized.equalsIgnoreCase("unknown")
+                && !normalized.equalsIgnoreCase("null");
+    }
+
+    private String cleanHardwareName(String value, String fallback) {
+        String cleaned = isMeaningful(value) ? value.trim() : fallback;
+        cleaned = cleaned.replace('\t', ' ').replace('_', ' ').replaceAll("\\s+", " ");
+        cleaned = cleaned.replace("Qualcomm Technologies, Inc", "Qualcomm");
+
+        if (cleaned.toLowerCase(Locale.US).contains("kgsl")) {
+            return "Adreno GPU";
+        }
+        if (cleaned.toLowerCase(Locale.US).contains("mali")) {
+            return cleaned.toUpperCase(Locale.US).contains("MALI")
+                    ? cleaned
+                    : cleaned.replace("mali", "Mali");
+        }
+
+        return cleaned;
+    }
+
     private enum SensorClass {
         BATTERY,
         SKIN_OR_BODY,
@@ -307,6 +624,19 @@ public class DeviceStatusPlugin extends Plugin {
             this.valueC = valueC;
             this.source = source;
             this.sensorName = sensorName;
+        }
+    }
+
+    private static class HardwareInfo {
+
+        final String name;
+        final Double clockValue;
+        final String clockLabel;
+
+        HardwareInfo(String name, Double clockValue, String clockLabel) {
+            this.name = name;
+            this.clockValue = clockValue;
+            this.clockLabel = clockLabel;
         }
     }
 }

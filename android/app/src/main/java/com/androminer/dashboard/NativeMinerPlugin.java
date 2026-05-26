@@ -108,6 +108,7 @@ public class NativeMinerPlugin extends Plugin {
     private String lastFailureReason = "";
     private int lastExitCode = Integer.MIN_VALUE;
     private boolean stopRequested;
+    private String activeHardwareMode = "cpu";
     private int apiPort;
     private String apiToken = "";
     private boolean apiTelemetryAvailable;
@@ -192,6 +193,8 @@ public class NativeMinerPlugin extends Plugin {
         }
 
         JSObject config = call.getObject("config", new JSObject());
+        String hardwareMode = normalizeHardwareMode(config.getString("hardwareMode", "cpu"));
+
         apiPort = findAvailableApiPort();
         apiToken = "androminer-" + UUID.randomUUID();
         apiTelemetryAvailable = false;
@@ -228,6 +231,7 @@ public class NativeMinerPlugin extends Plugin {
             rejectedShares = 0;
             activeThreads =
                     config.getInteger("threadCount", Runtime.getRuntime().availableProcessors());
+            activeHardwareMode = hardwareMode;
             lastMessage = "Native miner process started.";
             lastFailureReason = "";
             lastExitCode = Integer.MIN_VALUE;
@@ -237,7 +241,9 @@ public class NativeMinerPlugin extends Plugin {
             appendLog("Pool endpoint: " + poolEndpoint);
             appendLog("XMRig API: http://" + API_HOST + ":" + apiPort + "/2/summary");
             appendLog(
-                    "Threads: "
+                    "Hardware mode: "
+                            + formatHardwareMode(hardwareMode)
+                            + ", threads: "
                             + activeThreads
                             + ", priority: "
                             + config.getString("priority", "low"));
@@ -257,6 +263,7 @@ public class NativeMinerPlugin extends Plugin {
         hashrate = 0;
         activeThreads = 0;
         minerPid = -1;
+        activeHardwareMode = "cpu";
         resetCpuUsageSampling();
         lastMessage = "Native miner paused.";
         appendLog(lastMessage);
@@ -270,6 +277,7 @@ public class NativeMinerPlugin extends Plugin {
         minerPid = -1;
         resetCpuUsageSampling();
         activeThreads = 0;
+        activeHardwareMode = "cpu";
         apiTelemetryAvailable = false;
         lastApiTelemetryAtMs = 0;
         apiTelemetryMessage = "XMRig API telemetry stopped.";
@@ -573,6 +581,12 @@ public class NativeMinerPlugin extends Plugin {
         miner.put("path", installed ? binary.getAbsolutePath() : "");
         miner.put("sizeBytes", installed ? binary.length() : null);
         miner.put("lastModifiedAt", installed ? binary.lastModified() : null);
+        miner.put("targetSdkVersion", getContext().getApplicationInfo().targetSdkVersion);
+
+        JSObject capabilities = new JSObject();
+        capabilities.put("cpu", installed);
+        capabilities.put("cuda", false);
+        miner.put("capabilities", capabilities);
 
         return miner;
     }
@@ -598,6 +612,7 @@ public class NativeMinerPlugin extends Plugin {
         boolean telemetryAvailable;
         long telemetryUpdatedAt;
         String telemetryMessage;
+        String hardwareModeSnapshot;
         List<String> logSnapshot;
 
         synchronized (this) {
@@ -628,6 +643,7 @@ public class NativeMinerPlugin extends Plugin {
             telemetryAvailable = apiTelemetryAvailable;
             telemetryUpdatedAt = lastApiTelemetryAtMs;
             telemetryMessage = apiTelemetryMessage;
+            hardwareModeSnapshot = activeHardwareMode;
             logSnapshot = new ArrayList<>(recentLogs);
         }
 
@@ -676,6 +692,7 @@ public class NativeMinerPlugin extends Plugin {
         result.put("available", binary != null);
         result.put("running", running);
         result.put("message", message);
+        result.put("hardwareMode", running ? hardwareModeSnapshot : "cpu");
 
         JSObject stats = new JSObject();
         stats.put("hashrate", fallbackHashrate);
@@ -985,6 +1002,7 @@ public class NativeMinerPlugin extends Plugin {
                     minerProcess = null;
                     hashrate = 0;
                     activeThreads = 0;
+                    activeHardwareMode = "cpu";
                     minerPid = -1;
                     resetCpuUsageSampling();
                     lastExitCode = exitCode;
@@ -1254,16 +1272,20 @@ public class NativeMinerPlugin extends Plugin {
     }
 
     private String readMinerVersionOutput(File binary) {
+        return readMinerCommandOutput(binary, "--version", 2);
+    }
+
+    private String readMinerCommandOutput(File binary, String argument, int timeoutSeconds) {
         if (binary == null || !binary.exists()) {
             return "";
         }
 
         try {
             binary.setExecutable(true);
-            ProcessBuilder builder = new ProcessBuilder(binary.getAbsolutePath(), "--version");
+            ProcessBuilder builder = new ProcessBuilder(binary.getAbsolutePath(), argument);
             builder.redirectErrorStream(true);
             Process process = builder.start();
-            boolean finished = process.waitFor(2, TimeUnit.SECONDS);
+            boolean finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
             if (!finished) {
                 process.destroyForcibly();
                 return "";
@@ -1299,6 +1321,14 @@ public class NativeMinerPlugin extends Plugin {
 
         Matcher matcher = XMRIG_VERSION_PATTERN.matcher(versionOutput);
         return matcher.find() ? matcher.group(1) : "";
+    }
+
+    private String normalizeHardwareMode(String mode) {
+        return "cpu";
+    }
+
+    private String formatHardwareMode(String mode) {
+        return "Native XMRig";
     }
 
     private String normalizeApkVariant(String variant) {

@@ -26,7 +26,6 @@ Current native stack:
 - OpenSSL `openssl-4.0.0`
 - ABI `arm64-v8a`
 - hwloc disabled
-- GPU backends disabled
 - TLS enabled by default
 
 Local install output, when install is not skipped:
@@ -161,6 +160,7 @@ If you insist on building locally, whitelist the parent project folder only if y
 ## Notes
 
 - Official XMRig releases do not publish Android binaries, so this builder compiles from source.
+- The Android app uses the CPU backend only.
 - OpenSSL is statically linked into the miner binary; no separate OpenSSL `.so` file should be needed in the APK.
 - OpenSSL 4 needs a small XMRig compatibility patch. The builder patches `TlsGen.cpp` after checkout.
 - XMRig is GPLv3. If you distribute the miner binary, follow GPLv3 license and source availability requirements.

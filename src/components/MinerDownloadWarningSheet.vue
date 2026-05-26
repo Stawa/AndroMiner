@@ -140,7 +140,7 @@ const formatBytes = (bytes: number): string => {
             {{
               downloading
                 ? `Downloading ${Math.round(progress.percent)}%`
-                : `Download ${selectedVariant === 'tls' ? 'TLS' : 'No TLS'} & Start`
+                : `Download ${selectedVariant === 'tls' ? 'TLS' : 'No TLS'} & Continue`
             }}
           </span>
         </button>

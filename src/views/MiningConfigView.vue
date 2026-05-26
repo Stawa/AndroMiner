@@ -11,6 +11,7 @@ import { useProfilesStore } from '../stores/profiles';
 import type {
   CpuAffinity,
   CpuPriority,
+  DeviceTelemetry,
   MiningConfig,
   MiningProfile,
   MiningProtocol,
@@ -19,6 +20,7 @@ import type {
 
 interface MiningConfigViewProps {
   config: MiningConfig;
+  device: DeviceTelemetry;
   backendState: MinerBackendState;
   backendMessage: string;
 }
@@ -52,7 +54,7 @@ let saveFeedbackTimer = 0;
 const setupSections: Array<{ id: SetupSection; label: string; icon: string }> = [
   { id: 'setup', label: 'Setup', icon: 'folder_managed' },
   { id: 'pool', label: 'Pool', icon: 'hub' },
-  { id: 'performance', label: 'CPU', icon: 'memory' },
+  { id: 'performance', label: 'Engine', icon: 'memory' },
   { id: 'safety', label: 'Safety', icon: 'health_and_safety' }
 ];
 
@@ -150,8 +152,22 @@ const protocolSelectOptions: ConfigSelectOption[] = protocolOptions.map((option)
 
 const activeSavedProfile = computed(() => savedProfiles.activeProfile);
 
+const engineLabel = 'Native XMRig';
+const hardwareModeLabel = (_mode?: unknown): string => engineLabel;
+const cpuHardwareName = computed(() => props.device.cpuName || props.device.model || 'Android CPU');
+const cpuClockLabel = computed(() => props.device.cpuClockLabel || '-');
+const activeThreadLabel = computed(
+  () => `${props.config.threadCount}/${props.config.totalDetectedThreads}`
+);
+const engineAlgorithmLabel = computed(() => props.config.coin.xmrigAlgo || props.config.algorithm);
+const engineDescription = computed(
+  () => `${cpuHardwareName.value} · ${cpuClockLabel.value} · ${activeThreadLabel.value} threads`
+);
+
 const profileSummary = (profile: SavedMiningProfile): string =>
-  `${profile.config.coin.symbol} · ${profile.config.threadCount} threads · ${profile.config.poolUrl}:${profile.config.poolPort}`;
+  `${profile.config.coin.symbol} · ${hardwareModeLabel(
+    profile.config.hardwareMode || 'cpu'
+  )} · ${profile.config.threadCount} threads · ${profile.config.poolUrl}:${profile.config.poolPort}`;
 
 const backendStatus = computed(() => {
   const labels: Record<MinerBackendState, { label: string; icon: string; tone: string }> = {
@@ -508,6 +524,62 @@ onBeforeUnmount(() => {
     </section>
 
     <section v-else-if="setupSection === 'performance'" class="space-y-3">
+      <section class="app-card overflow-hidden">
+        <div class="flex min-h-14 items-center gap-3 px-4">
+          <MaterialIcon class="text-app-green" name="memory" :size="21" />
+          <div class="min-w-0">
+            <h2 class="text-[15px] font-semibold leading-5 text-white">Mining engine</h2>
+            <p class="mt-0.5 text-[12px] leading-4 text-app-muted">
+              {{ hardwareModeLabel(config.hardwareMode || 'cpu') }}
+            </p>
+          </div>
+        </div>
+        <div class="space-y-3 border-t border-app-line p-4">
+          <div class="flex items-start gap-3">
+            <span class="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-app-green-dim">
+              <MaterialIcon class="text-app-green" name="developer_board" :size="24" />
+            </span>
+            <div class="min-w-0 flex-1">
+              <div class="flex min-w-0 items-center gap-2">
+                <p class="truncate text-[15px] font-semibold leading-5 text-white">
+                  {{ engineLabel }}
+                </p>
+                <span
+                  class="shrink-0 rounded-full bg-app-green-dim px-2 py-0.5 text-[10px] font-semibold uppercase leading-4 text-app-green"
+                >
+                  CPU
+                </span>
+              </div>
+              <p class="mt-1 break-words text-[12px] leading-[18px] text-app-muted">
+                {{ engineDescription }}
+              </p>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div class="min-w-0 rounded-lg bg-app-elevated p-3">
+              <p class="truncate text-[10px] font-medium uppercase leading-4 text-app-muted">
+                CPU hardware
+              </p>
+              <p class="mt-1 truncate text-[13px] font-semibold leading-5 text-white">
+                {{ cpuHardwareName }}
+              </p>
+              <p class="truncate text-[11px] leading-4 text-app-muted">{{ cpuClockLabel }}</p>
+            </div>
+            <div class="min-w-0 rounded-lg bg-app-elevated p-3">
+              <p class="truncate text-[10px] font-medium uppercase leading-4 text-app-muted">
+                Runtime
+              </p>
+              <p class="mt-1 truncate text-[13px] font-semibold leading-5 text-white">
+                {{ activeThreadLabel }} threads
+              </p>
+              <p class="truncate text-[11px] leading-4 text-app-muted">
+                {{ engineAlgorithmLabel }}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section class="app-card p-4">
         <div class="mb-3 flex items-center justify-between gap-3">
           <div class="min-w-0">
@@ -563,7 +635,7 @@ onBeforeUnmount(() => {
         <div class="flex min-h-14 items-center gap-3 px-4">
           <MaterialIcon class="text-app-green" name="memory" :size="21" />
           <div class="min-w-0">
-            <h2 class="text-[15px] font-semibold leading-5 text-white">CPU and miner</h2>
+            <h2 class="text-[15px] font-semibold leading-5 text-white">CPU settings</h2>
             <p class="mt-0.5 text-[12px] leading-4 text-app-muted">
               Scheduling and runtime options
             </p>

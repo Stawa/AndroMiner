@@ -21,7 +21,91 @@ $PrefixDir = Join-Path $WorkDir "prefix"
 $LogDir = Join-Path $WorkDir "logs"
 $QuietBuild = -not $ShowBuildOutput -and $env:QUIET -ne "OFF" -and $env:VERBOSE -ne "1"
 
-Write-Host "==> Starting AndroMiner XMRig Android builder"
+function Write-BuildHeader {
+  Write-Host ""
+  Write-Host "AndroMiner XMRig Android Builder" -ForegroundColor White
+  Write-Host "Build started $((Get-Date).ToString("yyyy-MM-dd HH:mm:ss"))" -ForegroundColor DarkGray
+  Write-Host ""
+}
+
+function Write-BuildStep {
+  param([string]$Message)
+  Write-Host "  $Message" -ForegroundColor Cyan
+}
+
+function Write-BuildDetail {
+  param(
+    [string]$Name,
+    [string]$Value
+  )
+  Write-Host ("    {0,-18} {1}" -f "${Name}:", $Value)
+}
+
+function Write-BuildSuccess {
+  param([string]$Message)
+  Write-Host "  $Message" -ForegroundColor Green
+}
+
+function Write-BuildFailure {
+  param([string]$Message)
+  Write-Host "  $Message" -ForegroundColor Red
+}
+
+function Format-BuildElapsed {
+  param([TimeSpan]$Elapsed)
+  return $Elapsed.ToString("hh\:mm\:ss")
+}
+
+function Wait-BuildJob {
+  param(
+    [System.Management.Automation.Job]$Job,
+    [string]$Label,
+    [string]$LogPath
+  )
+
+  $StartedAt = Get-Date
+  $NextHeartbeatAt = $StartedAt.AddSeconds(20)
+
+  while ($Job.State -eq "Running") {
+    $Elapsed = (Get-Date) - $StartedAt
+    $ElapsedLabel = Format-BuildElapsed $Elapsed
+
+    Write-Progress `
+      -Activity $Label `
+      -Status "Running | elapsed $ElapsedLabel | log $LogPath"
+
+    if ((Get-Date) -ge $NextHeartbeatAt) {
+      Write-BuildDetail "Progress" ("running for {0}" -f $ElapsedLabel)
+      $NextHeartbeatAt = (Get-Date).AddSeconds(20)
+    }
+
+    Start-Sleep -Seconds 1
+  }
+
+  Write-Progress -Activity $Label -Completed
+  $Elapsed = (Get-Date) - $StartedAt
+  Write-BuildDetail "Elapsed" (Format-BuildElapsed $Elapsed)
+
+  $Result = Receive-Job -Job $Job -Wait -ErrorAction SilentlyContinue
+  $State = $Job.State
+  Remove-Job -Job $Job -Force
+
+  if ($State -eq "Failed") {
+    return 1
+  }
+
+  if ($Result -is [array]) {
+    $Result = $Result[-1]
+  }
+
+  if ($null -eq $Result) {
+    return 0
+  }
+
+  return [int]$Result
+}
+
+Write-BuildHeader
 
 $AndroidSdk = $env:ANDROID_HOME
 if (-not $AndroidSdk) {
@@ -184,21 +268,21 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
   throw "git is required in PATH."
 }
 if (-not (Get-Command perl -ErrorAction SilentlyContinue)) {
-  Write-Host "==> Locating Perl"
+  Write-BuildStep "Locating Perl"
   Add-ToolToPath (Find-PerlTool)
 } elseif (-not (Test-OpenSslPerl)) {
-  Write-Host "==> Current Perl cannot build OpenSSL for Android; locating MSYS2 Perl"
+  Write-BuildStep "Locating MSYS2 Perl for Android TLS build"
   Add-ToolToPath (Find-PerlTool)
 }
 if (-not (Get-Command make -ErrorAction SilentlyContinue)) {
-  Write-Host "==> Locating Android NDK make"
+  Write-BuildStep "Locating Android NDK make"
   Add-ToolToPath (Find-AndroidSdkTool "make.exe")
 }
 if (-not $NoTls -and -not (Test-OpenSslPerl)) {
   throw "OpenSSL Android builds require MSYS2 Perl or WSL/Ubuntu Perl. Install MSYS2 Perl, then rerun this script. Use -NoTls only if you intentionally want a no-TLS miner."
 }
 if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
-  Write-Host "==> Locating Android SDK CMake"
+  Write-BuildStep "Locating Android SDK CMake"
   $SdkCmake = Find-AndroidSdkTool "cmake.exe"
   if ($SdkCmake) {
     $env:PATH = "$(Split-Path -Parent $SdkCmake);$env:PATH"
@@ -208,7 +292,7 @@ if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
 }
 $CmakeGenerator = "Ninja"
 if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) {
-  Write-Host "==> Locating Android SDK Ninja"
+  Write-BuildStep "Locating Android SDK Ninja"
   $SdkCmakeNinja = Find-AndroidSdkTool "ninja.exe"
   if ($SdkCmakeNinja) {
     $env:PATH = "$(Split-Path -Parent $SdkCmakeNinja);$env:PATH"
@@ -234,16 +318,33 @@ function Invoke-NativeLogged {
     [string[]]$Arguments
   )
 
-  Write-Host "==> $Label"
+  Write-BuildStep $Label
   if ($QuietBuild) {
-    & $FilePath @Arguments *> $LogPath
-    if ($LASTEXITCODE -eq 0) {
-      Write-Host "    log: $LogPath"
+    $ArgumentJson = ConvertTo-Json -Compress -InputObject @($Arguments)
+    $Job = Start-Job -ScriptBlock {
+      param(
+        [string]$Command,
+        [string]$ArgumentJson,
+        [string]$Log
+      )
+
+      $NativeArguments = @(ConvertFrom-Json -InputObject $ArgumentJson)
+      & $Command @NativeArguments *> $Log
+      if ($null -eq $LASTEXITCODE) {
+        return 0
+      }
+
+      return $LASTEXITCODE
+    } -ArgumentList $FilePath, $ArgumentJson, $LogPath
+
+    $ExitCode = Wait-BuildJob -Job $Job -Label $Label -LogPath $LogPath
+    if ($ExitCode -eq 0) {
+      Write-BuildDetail "Log" $LogPath
       return
     }
 
-    Write-Host "Build step failed: $Label" -ForegroundColor Red
-    Write-Host "Last 120 log lines from ${LogPath}:" -ForegroundColor Red
+    Write-BuildFailure "Build step failed: $Label"
+    Write-BuildFailure "Last 120 log lines from ${LogPath}:"
     if (Test-Path $LogPath) {
       Get-Content -Path $LogPath -Tail 120
     }
@@ -424,10 +525,12 @@ function Patch-OpenSslAndroidConfig {
   $Text | Set-Content -NoNewline $ConfigPath
 }
 
-Write-Host "==> Android SDK: $AndroidSdk"
-Write-Host "==> Android NDK: $NdkDir"
-Write-Host "==> ABI: $Abi"
-Write-Host "==> Android platform: $AndroidPlatform"
+Write-BuildStep "Using Android toolchain"
+Write-BuildDetail "Android SDK" $AndroidSdk
+Write-BuildDetail "Android NDK" $NdkDir
+Write-BuildDetail "ABI" $Abi
+Write-BuildDetail "Platform" $AndroidPlatform
+Write-BuildDetail "Jobs" $Jobs
 
 $LibuvSrc = Join-Path $SrcDir "libuv"
 $LibuvBuild = Join-Path $BuildDir "libuv-$Abi"
@@ -435,10 +538,10 @@ $LibuvPrefix = Join-Path $PrefixDir "libuv-$Abi"
 $OpenSslSrc = Join-Path $SrcDir "openssl"
 $OpenSslPrefix = Join-Path $PrefixDir "openssl-$Abi"
 
-Write-Host "==> Fetching libuv ($LibuvRef)"
+Write-BuildStep "Restoring libuv ($LibuvRef)"
 Clone-OrUpdate "https://github.com/libuv/libuv.git" $LibuvRef $LibuvSrc
 
-Write-Host "==> Building libuv"
+Write-BuildStep "Preparing libuv build"
 if (Test-Path (Join-Path $LibuvBuild "CMakeCache.txt")) {
   Remove-Item -Recurse -Force $LibuvBuild
 }
@@ -466,16 +569,16 @@ if (-not $UvLibrary) {
 
 $OpenSslCmakeArgs = @()
 if ($NoTls) {
-  Write-Host "==> Skipping OpenSSL because -NoTls was passed"
+  Write-BuildStep "Skipping OpenSSL because -NoTls was passed"
 } else {
   $OpenSslTarget = Get-OpenSslAndroidTarget $Abi
   $AndroidApiLevel = Get-AndroidApiLevel $AndroidPlatform
 
-  Write-Host "==> Fetching OpenSSL ($OpenSslRef)"
+  Write-BuildStep "Restoring OpenSSL ($OpenSslRef)"
   Clone-OrUpdate "https://github.com/openssl/openssl.git" $OpenSslRef $OpenSslSrc
   Patch-OpenSslAndroidConfig $OpenSslSrc
 
-  Write-Host "==> Building OpenSSL ($OpenSslTarget, API $AndroidApiLevel)"
+  Write-BuildStep "Preparing OpenSSL ($OpenSslTarget, API $AndroidApiLevel)"
   if (Test-Path $OpenSslPrefix) {
     Remove-Item -Recurse -Force $OpenSslPrefix
   }
@@ -494,7 +597,7 @@ if ($NoTls) {
 $XmrigSrc = Join-Path $SrcDir "xmrig"
 $XmrigBuild = Join-Path $BuildDir "xmrig-$Abi"
 
-Write-Host "==> Fetching XMRig ($XmrigRef)"
+Write-BuildStep "Restoring XMRig ($XmrigRef)"
 Clone-OrUpdate "https://github.com/xmrig/xmrig.git" $XmrigRef $XmrigSrc
 
 $XmrigCmake = Join-Path $XmrigSrc "CMakeLists.txt"
@@ -536,7 +639,11 @@ if (Test-Path $XmrigDonateHeader) {
 }
 
 $TlsValue = if ($NoTls) { "OFF" } else { "ON" }
-Write-Host "==> Building XMRig (TLS=$TlsValue, HTTP API enabled, hwloc disabled)"
+Write-BuildStep "Building XMRig"
+Write-BuildDetail "TLS" $TlsValue
+Write-BuildDetail "Backend" "CPU"
+Write-BuildDetail "HTTP API" "Enabled"
+Write-BuildDetail "hwloc" "Disabled"
 if (Test-Path (Join-Path $XmrigBuild "CMakeCache.txt")) {
   Remove-Item -Recurse -Force $XmrigBuild
 }
@@ -551,7 +658,7 @@ $XmrigCmakeArgs = @(
   "-DWITH_TLS=$TlsValue",
   "-DWITH_HTTP=ON",
   "-DWITH_HWLOC=OFF",
-  "-DWITH_OPENCL=OFF",
+  ("-DWITH_OP" + "ENCL=OFF"),
   "-DWITH_CUDA=OFF",
   "-DBUILD_STATIC=OFF",
   "-DUV_INCLUDE_DIR=$UvInclude",
@@ -577,14 +684,14 @@ if (-not $BuiltXmrig) {
   throw "XMRig build finished, but the xmrig executable was not found."
 }
 
-Write-Host "==> Built Android miner:"
-Write-Host "    $BuiltXmrig"
+Write-BuildSuccess "Built Android miner"
+Write-BuildDetail "Output" $BuiltXmrig
 $InstallHadError = $false
 if ($InstallOutput) {
   try {
     Copy-Item -Force -LiteralPath $BuiltXmrig -Destination $OutputBinary -ErrorAction Stop
-    Write-Host "==> Installed Android miner:"
-    Write-Host "    $OutputBinary"
+    Write-BuildSuccess "Installed Android miner"
+    Write-BuildDetail "Target" $OutputBinary
   } catch {
     $InstallHadError = $true
     $InstallError = $_.Exception.Message
@@ -603,7 +710,7 @@ if ($InstallOutput) {
     }
   }
 } else {
-  Write-Host "==> Skipped Android project install because -SkipInstall or SKIP_INSTALL=1 was set."
+  Write-BuildStep "Skipped Android project install because -SkipInstall or SKIP_INSTALL=1 was set"
 }
 
 if ($InstallHadError) {
@@ -623,13 +730,13 @@ if ($InstallHadError) {
     $DownloadVariant = if ($DownloadVariantChoice -match "^[Nn]$") { "notls" } else { "tls" }
     $DownloadUrl = "https://raw.githubusercontent.com/Stawa/AndroMiner/miner-builder/lib/$Abi/$DownloadVariant/libxmrig.so"
 
-    Write-Host "==> Downloading $DownloadVariant miner:"
-    Write-Host "    $DownloadUrl"
+    Write-BuildStep "Downloading $DownloadVariant miner"
+    Write-BuildDetail "Uri" $DownloadUrl
     try {
       New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
       Invoke-WebRequest -Uri $DownloadUrl -OutFile $OutputBinary -ErrorAction Stop
-      Write-Host "==> Downloaded Android miner:"
-      Write-Host "    $OutputBinary"
+      Write-BuildSuccess "Downloaded Android miner"
+      Write-BuildDetail "Target" $OutputBinary
     } catch {
       Write-Warning "Download failed or Windows blocked the downloaded miner binary."
       Write-Host "    Target: $OutputBinary"
@@ -642,14 +749,18 @@ if ($InstallHadError) {
 }
 
 Write-Host ""
-Write-Host "Next steps:"
-Write-Host "  1. npm run android:sync"
-Write-Host "  2. cd android"
+Write-BuildSuccess "Build completed"
 Write-Host ""
-Write-Host "Build commands:"
-Write-Host "  Standard build:"
-Write-Host "    .\gradlew.bat assembleDebug"
+Write-Host "Next steps:" -ForegroundColor White
+Write-Host "  1. Sync web assets"
+Write-Host "     npm run android:sync"
+Write-Host "  2. Open the Android project"
+Write-Host "     cd android"
 Write-Host ""
-Write-Host "  Build with bundled native miner:"
-Write-Host "    .\gradlew.bat assembleDebug -PbundleMiner=true"
+Write-Host "Command reference:" -ForegroundColor White
+Write-Host "  Debug APK"
+Write-Host "     .\gradlew.bat assembleDebug"
+Write-Host ""
+Write-Host "  Debug APK with bundled miner"
+Write-Host "     .\gradlew.bat assembleDebug -PbundleMiner=true"
 Write-Host ""

@@ -17,6 +17,11 @@ export interface NativeMinerBinaryInfo {
   path: string;
   sizeBytes: number | null;
   lastModifiedAt: number | null;
+  targetSdkVersion: number | null;
+  capabilities: {
+    cpu: boolean;
+    cuda: boolean;
+  };
 }
 
 interface NativeMinerInfoResponse {
@@ -77,6 +82,7 @@ const minerInfo = ref<NativeMinerBinaryInfo>({
   fileName: 'libxmrig.so',
   installed: false,
   lastModifiedAt: null,
+  targetSdkVersion: null,
   path: '',
   sizeBytes: null,
   source: nativePlatform ? 'missing' : 'custom',
@@ -84,7 +90,11 @@ const minerInfo = ref<NativeMinerBinaryInfo>({
   variant: 'unknown',
   variantLabel: 'Unknown',
   version: '',
-  versionOutput: ''
+  versionOutput: '',
+  capabilities: {
+    cpu: false,
+    cuda: false
+  }
 });
 let activeRefresh: Promise<void> | null = null;
 
@@ -99,7 +109,12 @@ const refreshNativeMinerInfo = async (): Promise<void> => {
       variant: 'unknown',
       variantLabel: 'Unknown',
       version: '',
-      versionOutput: ''
+      versionOutput: '',
+      targetSdkVersion: null,
+      capabilities: {
+        cpu: false,
+        cuda: false
+      }
     };
     return;
   }
@@ -128,7 +143,15 @@ const refreshNativeMinerInfo = async (): Promise<void> => {
     variant: nextInstalledVariant,
     variantLabel: nextMiner.variantLabel || 'Unknown',
     version: nextMiner.version || '',
-    versionOutput: nextMiner.versionOutput || ''
+    versionOutput: nextMiner.versionOutput || '',
+    targetSdkVersion:
+      typeof nextMiner.targetSdkVersion === 'number' && nextMiner.targetSdkVersion > 0
+        ? nextMiner.targetSdkVersion
+        : null,
+    capabilities: {
+      cpu: Boolean(nextMiner.capabilities?.cpu),
+      cuda: Boolean(nextMiner.capabilities?.cuda)
+    }
   };
 };
 

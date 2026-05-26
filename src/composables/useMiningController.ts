@@ -5,6 +5,7 @@ import type {
   HistoryPoint,
   MiningApiTelemetry,
   MiningConfig,
+  MiningHardwareMode,
   MiningProfile,
   MiningSessionHistoryItem,
   MiningState,
@@ -87,6 +88,7 @@ const initialConfig: MiningConfig = {
   threadCount: 2,
   customThreadCount: 2,
   totalDetectedThreads: 8,
+  hardwareMode: 'cpu',
   affinity: 'auto',
   priority: 'normal',
   donateLevel: 0,
@@ -178,6 +180,10 @@ const createEmptyHistory = (): HistoryPoint[] =>
 const bounded = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
 
+const normalizeHardwareMode = (_value: unknown): MiningHardwareMode => 'cpu';
+
+const hardwareModeLabel = (_mode: MiningHardwareMode): string => 'Native XMRig';
+
 const formatUptime = (totalSeconds: number): string => {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -214,6 +220,7 @@ const emptyDownloadProgress = (): Required<NativeMinerDownloadProgress> => ({
 
 const cloneConfig = (config: MiningConfig): MiningConfig => ({
   ...config,
+  hardwareMode: normalizeHardwareMode(config.hardwareMode),
   coin: {
     ...(getCryptocurrencyById(config.coin.id) || config.coin),
     poolExamples: [...((getCryptocurrencyById(config.coin.id) || config.coin).poolExamples || [])]
@@ -505,6 +512,7 @@ export const useMiningController = () => {
         nativeConfig.totalDetectedThreads
       );
       nativeConfig.customThreadCount = nativeConfig.threadCount;
+      nativeConfig.hardwareMode = normalizeHardwareMode(nativeConfig.hardwareMode);
 
       const status = await NativeMiner.start({ config: nativeConfig });
       setBackendStatus(status);
@@ -534,7 +542,9 @@ export const useMiningController = () => {
     const item: MiningSessionHistoryItem = {
       id: crypto.randomUUID(),
       title: `${config.coin.symbol} mining`,
-      subtitle: `${config.algorithm} · ${config.threadCount} threads`,
+      subtitle: `${config.algorithm} · ${hardwareModeLabel(
+        normalizeHardwareMode(config.hardwareMode)
+      )} · ${config.threadCount} threads`,
       coinSymbol: config.coin.symbol,
       coinLogoText: config.coin.logoText,
       coinLogoClass: config.coin.logoClass,

@@ -23,6 +23,8 @@ export type CpuAffinity = 'auto' | 'little' | 'big' | 'custom';
 
 export type CpuPriority = 'low' | 'normal' | 'high';
 
+export type MiningHardwareMode = 'cpu';
+
 export interface Cryptocurrency {
   id: string;
   name: string;
@@ -60,6 +62,7 @@ export interface MiningConfig {
   threadCount: number;
   customThreadCount: number;
   totalDetectedThreads: number;
+  hardwareMode: MiningHardwareMode;
   affinity: CpuAffinity;
   priority: CpuPriority;
   donateLevel: number;
@@ -164,6 +167,12 @@ export interface DeviceTelemetry {
   batteryLevel: number;
   isCharging: boolean;
   cpuThreads: number;
+  cpuName: string;
+  cpuClockGhz: number | null;
+  cpuClockLabel: string;
+  gpuName: string;
+  gpuClockMhz: number | null;
+  gpuClockLabel: string;
   deviceMemoryGb: number | null;
   temperatureC: number | null;
   thermalStatus: 'unknown' | 'cool' | 'normal' | 'warm' | 'hot' | 'unavailable';

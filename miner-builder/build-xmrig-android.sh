@@ -19,6 +19,45 @@ QUIET="${QUIET:-ON}"
 JOBS="${JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)}"
 SKIP_INSTALL="${SKIP_INSTALL:-0}"
 
+if [[ -t 1 ]]; then
+  COLOR_CYAN=$'\033[36m'
+  COLOR_GREEN=$'\033[32m'
+  COLOR_RED=$'\033[31m'
+  COLOR_WHITE=$'\033[37m'
+  COLOR_DIM=$'\033[90m'
+  COLOR_RESET=$'\033[0m'
+else
+  COLOR_CYAN=""
+  COLOR_GREEN=""
+  COLOR_RED=""
+  COLOR_WHITE=""
+  COLOR_DIM=""
+  COLOR_RESET=""
+fi
+
+log_header() {
+  printf '\n%sAndroMiner XMRig Android Builder%s\n' "$COLOR_WHITE" "$COLOR_RESET"
+  printf '%sBuild started %s%s\n\n' "$COLOR_DIM" "$(date '+%Y-%m-%d %H:%M:%S')" "$COLOR_RESET"
+}
+
+log_step() {
+  printf '  %s%s%s\n' "$COLOR_CYAN" "$*" "$COLOR_RESET"
+}
+
+log_detail() {
+  printf '    %-18s %s\n' "$1:" "$2"
+}
+
+log_success() {
+  printf '  %s%s%s\n' "$COLOR_GREEN" "$*" "$COLOR_RESET"
+}
+
+log_error() {
+  printf '  %s%s%s\n' "$COLOR_RED" "$*" "$COLOR_RESET" >&2
+}
+
+log_header
+
 ANDROID_SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
 if [[ -z "$ANDROID_SDK" ]]; then
   echo "Set ANDROID_HOME or ANDROID_SDK_ROOT to your Android SDK path." >&2
@@ -52,25 +91,80 @@ quiet_enabled() {
   [[ "${QUIET^^}" != "OFF" && "${VERBOSE:-0}" != "1" ]]
 }
 
+format_elapsed() {
+  local seconds="$1"
+  printf '%02d:%02d:%02d' "$((seconds / 3600))" "$(((seconds % 3600) / 60))" "$((seconds % 60))"
+}
+
+wait_with_progress() {
+  local label="$1"
+  local log_file="$2"
+  local pid="$3"
+  local started_at
+  local next_heartbeat
+  local now
+  local elapsed
+  local elapsed_label
+  local status
+
+  started_at="$(date +%s)"
+  next_heartbeat=$((started_at + 20))
+
+  while kill -0 "$pid" 2>/dev/null; do
+    now="$(date +%s)"
+    elapsed=$((now - started_at))
+    elapsed_label="$(format_elapsed "$elapsed")"
+
+    if [[ -t 1 ]]; then
+      printf '\r    Running | elapsed %s | log %s' "$elapsed_label" "$log_file"
+    fi
+
+    if (( now >= next_heartbeat )); then
+      if [[ -t 1 ]]; then
+        printf '\n'
+      fi
+      log_detail "Progress" "running for $elapsed_label"
+      next_heartbeat=$((now + 20))
+    fi
+
+    sleep 1
+  done
+
+  set +e
+  wait "$pid"
+  status=$?
+  set -e
+
+  if [[ -t 1 ]]; then
+    printf '\r%*s\r' 120 ''
+  fi
+
+  elapsed=$(( $(date +%s) - started_at ))
+  log_detail "Elapsed" "$(format_elapsed "$elapsed")"
+  return "$status"
+}
+
 run_logged() {
   local label="$1"
   local log_file="$2"
   shift 2
 
   if quiet_enabled; then
-    echo "==> $label"
-    if "$@" >"$log_file" 2>&1; then
-      echo "    log: $log_file"
+    log_step "$label"
+    "$@" >"$log_file" 2>&1 &
+    local command_pid=$!
+    if wait_with_progress "$label" "$log_file" "$command_pid"; then
+      log_detail "Log" "$log_file"
       return 0
     fi
 
-    echo "Build step failed: $label" >&2
-    echo "Last 120 log lines from $log_file:" >&2
+    log_error "Build step failed: $label"
+    log_error "Last 120 log lines from $log_file:"
     tail -n 120 "$log_file" >&2 || true
     return 1
   fi
 
-  echo "==> $label"
+  log_step "$label"
   "$@"
 }
 
@@ -138,9 +232,9 @@ build_openssl() {
   mkdir -p "$prefix"
 
   local log_file="$LOG_DIR/openssl-$ABI.log"
-  echo "==> Building OpenSSL ($target, API $api_level)"
+  log_step "Building OpenSSL ($target, API $api_level)"
   if quiet_enabled; then
-    if (
+    (
       cd "$source_dir"
       export ANDROID_NDK_ROOT="$NDK_DIR"
       export ANDROID_NDK_HOME="$NDK_DIR"
@@ -156,13 +250,15 @@ build_openssl() {
         "-D__ANDROID_API__=$api_level"
       make -j "$JOBS"
       make install_sw
-    ) >"$log_file" 2>&1; then
-      echo "    log: $log_file"
+    ) >"$log_file" 2>&1 &
+    local openssl_pid=$!
+    if wait_with_progress "Building OpenSSL ($target, API $api_level)" "$log_file" "$openssl_pid"; then
+      log_detail "Log" "$log_file"
       return 0
     fi
 
-    echo "Build step failed: OpenSSL" >&2
-    echo "Last 120 log lines from $log_file:" >&2
+    log_error "Build step failed: OpenSSL"
+    log_error "Last 120 log lines from $log_file:"
     tail -n 120 "$log_file" >&2 || true
     return 1
   fi
@@ -186,12 +282,14 @@ build_openssl() {
   )
 }
 
-echo "==> Android SDK: $ANDROID_SDK"
-echo "==> Android NDK: $NDK_DIR"
-echo "==> ABI: $ABI"
-echo "==> Android platform: $ANDROID_PLATFORM"
+log_step "Using Android toolchain"
+log_detail "Android SDK" "$ANDROID_SDK"
+log_detail "Android NDK" "$NDK_DIR"
+log_detail "ABI" "$ABI"
+log_detail "Platform" "$ANDROID_PLATFORM"
+log_detail "Jobs" "$JOBS"
 
-echo "==> Fetching libuv ($LIBUV_REF)"
+log_step "Restoring libuv ($LIBUV_REF)"
 clone_or_update "https://github.com/libuv/libuv.git" "$LIBUV_REF" "$SRC_DIR/libuv"
 
 rm -rf "$BUILD_DIR/libuv-$ABI"
@@ -217,7 +315,7 @@ if [[ "$WITH_TLS" == "ON" ]]; then
   OPENSSL_TARGET="$(openssl_android_target)"
   ANDROID_API="$(android_api_level)"
 
-  echo "==> Fetching OpenSSL ($OPENSSL_REF)"
+  log_step "Restoring OpenSSL ($OPENSSL_REF)"
   clone_or_update "https://github.com/openssl/openssl.git" "$OPENSSL_REF" "$SRC_DIR/openssl"
 
   build_openssl "$SRC_DIR/openssl" "$PREFIX_DIR/openssl-$ABI" "$OPENSSL_TARGET" "$ANDROID_API"
@@ -230,13 +328,13 @@ if [[ "$WITH_TLS" == "ON" ]]; then
     "-DOPENSSL_CRYPTO_LIBRARY=$PREFIX_DIR/openssl-$ABI/lib/libcrypto.a"
   )
 else
-  echo "==> Skipping OpenSSL because WITH_TLS=$WITH_TLS"
+  log_step "Skipping OpenSSL because WITH_TLS=$WITH_TLS"
 fi
 
-echo "==> Fetching XMRig ($XMRIG_REF)"
+log_step "Restoring XMRig ($XMRIG_REF)"
 clone_or_update "https://github.com/xmrig/xmrig.git" "$XMRIG_REF" "$SRC_DIR/xmrig"
 
-echo "==> Preparing XMRig Android CMake patch"
+log_step "Preparing XMRig Android CMake patch"
 if grep -q "pthread rt dl log" "$SRC_DIR/xmrig/CMakeLists.txt"; then
   perl -0pi -e 's/pthread rt dl log/dl/g' "$SRC_DIR/xmrig/CMakeLists.txt"
 fi
@@ -249,7 +347,11 @@ if [[ -f "$SRC_DIR/xmrig/src/donate.h" ]]; then
   perl -0pi -e 's/constexpr const int kDefaultDonateLevel = 1;/constexpr const int kDefaultDonateLevel = 0;/g; s/constexpr const int kMinimumDonateLevel = 1;/constexpr const int kMinimumDonateLevel = 0;/g' "$SRC_DIR/xmrig/src/donate.h"
 fi
 
-echo "==> Building XMRig (TLS=$WITH_TLS, HTTP API enabled, hwloc disabled)"
+log_step "Building XMRig"
+log_detail "TLS" "$WITH_TLS"
+log_detail "Backend" "CPU"
+log_detail "HTTP API" "Enabled"
+log_detail "hwloc" "Disabled"
 rm -rf "$BUILD_DIR/xmrig-$ABI"
 run_logged "Configuring XMRig" "$LOG_DIR/xmrig-configure-$ABI-$WITH_TLS.log" cmake -G Ninja -S "$SRC_DIR/xmrig" -B "$BUILD_DIR/xmrig-$ABI" \
   -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
@@ -259,7 +361,7 @@ run_logged "Configuring XMRig" "$LOG_DIR/xmrig-configure-$ABI-$WITH_TLS.log" cma
   -DWITH_TLS="$WITH_TLS" \
   -DWITH_HTTP=ON \
   -DWITH_HWLOC=OFF \
-  -DWITH_OPENCL=OFF \
+  -DWITH_OP"ENCL=OFF" \
   -DWITH_CUDA=OFF \
   -DBUILD_STATIC=OFF \
   -DUV_INCLUDE_DIR="$UV_INCLUDE" \
@@ -273,26 +375,31 @@ if [[ -z "$BUILT_XMRIG" ]]; then
   exit 1
 fi
 
-echo "==> Built Android miner:"
-echo "    $BUILT_XMRIG"
+log_success "Built Android miner"
+log_detail "Output" "$BUILT_XMRIG"
 if [[ "$SKIP_INSTALL" == "1" ]]; then
-  echo "==> Skipped Android project install because SKIP_INSTALL=1 was set."
+  log_step "Skipped Android project install because SKIP_INSTALL=1 was set"
 else
   cp "$BUILT_XMRIG" "$OUTPUT_BINARY"
   chmod 755 "$OUTPUT_BINARY"
-  echo "==> Installed Android miner:"
-  echo "    $OUTPUT_BINARY"
+  log_success "Installed Android miner"
+  log_detail "Target" "$OUTPUT_BINARY"
 fi
 echo
-echo "Next steps:"
-echo "  1. cd \"$ROOT_DIR\""
-echo "  2. npm run android:sync"
-echo "  3. cd android"
+log_success "Build completed"
 echo
-echo "Build commands:"
-echo "  Standard build:"
-echo "    ./gradlew assembleDebug"
+printf '%sNext steps:%s\n' "$COLOR_WHITE" "$COLOR_RESET"
+echo "  1. Return to the repository root"
+echo "     cd \"$ROOT_DIR\""
+echo "  2. Sync web assets"
+echo "     npm run android:sync"
+echo "  3. Open the Android project"
+echo "     cd android"
 echo
-echo "  Build with bundled native miner:"
-echo "    ./gradlew assembleDebug -PbundleMiner=true"
+printf '%sCommand reference:%s\n' "$COLOR_WHITE" "$COLOR_RESET"
+echo "  Debug APK"
+echo "     ./gradlew assembleDebug"
+echo
+echo "  Debug APK with bundled miner"
+echo "     ./gradlew assembleDebug -PbundleMiner=true"
 echo

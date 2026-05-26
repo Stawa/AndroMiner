@@ -48,7 +48,8 @@ public class ImmersiveModePlugin extends Plugin {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             WindowInsetsController controller = decorView.getWindowInsetsController();
             if (controller != null) {
-                int systemBars = WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars();
+                int systemBars =
+                        WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars();
 
                 if (enabled) {
                     controller.hide(systemBars);

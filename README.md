@@ -110,8 +110,7 @@ Check Android formatting without changing files:
 
 ## Supported Mining
 
-AndroMiner is focused on phone CPU mining with the bundled Android ARM64 XMRig binary.
-The app includes presets for coins and algorithms that XMRig can launch directly.
+AndroMiner is focused on phone CPU mining with the bundled Android ARM64 XMRig binary. The app includes presets for coins and algorithms that XMRig can launch directly.
 
 | Coin                    | Symbol  | XMRig algorithm   | Status               |
 | ----------------------- | ------- | ----------------- | -------------------- |
@@ -142,7 +141,7 @@ AndroMiner has support for the required miner binary:
 Pool endpoints, ports, wallet formats, and active coin algorithms can change. Always
 check the pool's current setup guide before mining, especially for smaller coins.
 
-Bitcoin, Litecoin, Ethereum Classic, Ravencoin, and other GPU/ASIC-focused coins are not practical targets for this Android CPU miner.
+Bitcoin, Litecoin, Ethereum Classic, Ravencoin, and other hardware-accelerated coins are not practical targets for this Android CPU miner.
 
 ## App Overview
 

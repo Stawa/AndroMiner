@@ -3,13 +3,13 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import HashrateRing from '../components/HashrateRing.vue';
 import MaterialIcon from '../components/MaterialIcon.vue';
-import MiningMetric from '../components/MiningMetric.vue';
 import SessionControls from '../components/SessionControls.vue';
 import StatusIndicator from '../components/StatusIndicator.vue';
 import WarningBottomSheet, { type WarningType } from '../components/WarningBottomSheet.vue';
 import { profilePresets } from '../composables/useMiningController';
 import { useSheetDrag } from '../composables/useSheetDrag';
 import type {
+  DeviceTelemetry,
   HistoryPoint,
   MiningApiTelemetry,
   MiningConfig,
@@ -22,6 +22,7 @@ interface MiningSessionViewProps {
   state: MiningState;
   config: MiningConfig;
   stats: MiningStats;
+  device: DeviceTelemetry;
   connected: boolean;
   uptime: string;
   backendMessage: string;
@@ -136,7 +137,37 @@ const formatCompactNumber = (value: number | null): string => {
 };
 
 const formatCpuUsage = (value: number | null | undefined): string =>
-  typeof value === 'number' && Number.isFinite(value) ? `${Math.round(value)}%` : 'Measuring';
+  typeof value === 'number' && Number.isFinite(value) ? `${Math.round(value)}%` : '-';
+
+const cpuHardwareName = computed(() => props.device.cpuName || props.device.model || 'Android CPU');
+const cpuClockLabel = computed(() => props.device.cpuClockLabel || '-');
+const engineLabel = 'Native XMRig';
+
+const affinityLabel = computed(() => {
+  const labels: Record<MiningConfig['affinity'], string> = {
+    auto: 'All cores',
+    little: 'Efficiency cores',
+    big: 'Performance cores',
+    custom: 'Custom affinity'
+  };
+
+  return labels[props.config.affinity];
+});
+
+const priorityLabel = computed(() => {
+  const labels: Record<MiningConfig['priority'], string> = {
+    low: 'Low priority',
+    normal: 'Normal priority',
+    high: 'High priority'
+  };
+
+  return labels[props.config.priority];
+});
+
+const cpuWorkerLabel = computed(
+  () => `${props.config.threadCount}/${props.config.totalDetectedThreads} CPU threads`
+);
+const cpuTuningLabel = computed(() => `${affinityLabel.value} · ${priorityLabel.value}`);
 
 const apiResults = computed(() => asRecord(props.apiTelemetry.results));
 const apiConnection = computed(() => asRecord(props.apiTelemetry.connection));
@@ -430,25 +461,157 @@ const trendIcon = computed(() => {
         </div>
       </div>
 
-      <section class="grid grid-cols-2 gap-2">
-        <MiningMetric label="Accepted" :value="stats.acceptedShares.toLocaleString()" tone="good" />
-        <MiningMetric
-          label="Rejected"
-          :value="stats.rejectedShares.toLocaleString()"
-          :tone="stats.rejectedShares > 0 ? 'danger' : 'normal'"
-        />
-        <MiningMetric label="Miner CPU" :value="formatCpuUsage(stats.minerCpuUsage)" />
-        <MiningMetric
-          label="Temperature"
-          :value="`${Math.round(stats.temperature)} °C`"
-          :tone="thermalTone"
-        />
-        <MiningMetric label="Threads" :value="`${stats.activeThreads} / ${config.threadCount}`" />
-        <MiningMetric
-          label="Battery"
-          :value="`${Math.round(stats.batteryLevel)}%`"
-          :tone="stats.batteryLevel <= batterySafetyLimit ? 'warning' : 'normal'"
-        />
+      <section class="overflow-hidden rounded-2xl border border-app-line bg-app-card">
+        <div class="flex items-center justify-between gap-3 border-b border-app-line px-3 py-2.5">
+          <div class="flex min-w-0 items-center gap-2">
+            <MaterialIcon class="shrink-0 text-app-green" name="memory" :size="18" />
+            <p class="truncate text-[12px] font-semibold uppercase leading-4 text-app-muted">
+              Hardware engine
+            </p>
+          </div>
+          <span
+            class="shrink-0 rounded-full bg-app-green-dim px-2.5 py-1 text-[11px] font-semibold leading-4 text-app-green"
+          >
+            {{ engineLabel }}
+          </span>
+        </div>
+
+        <div class="divide-y divide-app-line">
+          <div class="flex min-w-0 items-center gap-3 px-3 py-3">
+            <span
+              class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-app-elevated text-app-green"
+            >
+              <MaterialIcon name="developer_board" :size="21" />
+            </span>
+            <div class="min-w-0 flex-1">
+              <div class="flex min-w-0 items-center gap-2">
+                <p class="truncate text-[14px] font-semibold leading-5 text-white">
+                  {{ cpuHardwareName }}
+                </p>
+                <span
+                  class="shrink-0 rounded-full bg-app-green-dim px-2 py-0.5 text-[10px] font-semibold uppercase leading-4 text-app-green"
+                >
+                  CPU
+                </span>
+              </div>
+              <p class="mt-0.5 truncate text-[12px] leading-4 text-app-muted">
+                {{ cpuClockLabel }} · {{ cpuWorkerLabel }}
+              </p>
+              <p class="mt-0.5 truncate text-[11px] leading-4 text-app-muted">
+                {{ cpuTuningLabel }}
+              </p>
+            </div>
+            <div class="shrink-0 text-right">
+              <p class="text-[11px] leading-4 text-app-muted">Load</p>
+              <p class="text-[17px] font-semibold leading-6 text-white">
+                {{ formatCpuUsage(stats.minerCpuUsage) }}
+              </p>
+            </div>
+          </div>
+
+          <div class="flex min-w-0 items-center gap-3 px-3 py-3">
+            <span
+              class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-app-elevated"
+              :class="thermalTone === 'warning' ? 'text-app-yellow' : 'text-app-green'"
+            >
+              <MaterialIcon
+                :name="stats.isCharging ? 'battery_charging_full' : 'battery_5_bar'"
+                :size="21"
+              />
+            </span>
+            <div class="min-w-0 flex-1">
+              <div class="flex min-w-0 items-center gap-2">
+                <p class="truncate text-[14px] font-semibold leading-5 text-white">Device power</p>
+                <span
+                  class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase leading-4"
+                  :class="
+                    stats.isCharging
+                      ? 'bg-app-green-dim text-app-green'
+                      : 'bg-app-elevated text-app-muted'
+                  "
+                >
+                  {{ stats.isCharging ? 'Plugged' : 'Battery' }}
+                </span>
+              </div>
+              <p class="mt-0.5 truncate text-[12px] leading-4 text-app-muted">
+                {{ Math.round(stats.temperature) }} °C ·
+                {{ stats.isCharging ? 'Charging' : 'Unplugged' }}
+              </p>
+              <p class="mt-0.5 truncate text-[11px] leading-4 text-app-muted">
+                Thermal limit {{ config.thermalThreshold }} °C
+              </p>
+            </div>
+            <div class="shrink-0 text-right">
+              <p class="text-[11px] leading-4 text-app-muted">Battery</p>
+              <p
+                class="text-[17px] font-semibold leading-6"
+                :class="stats.batteryLevel <= batterySafetyLimit ? 'text-app-yellow' : 'text-white'"
+              >
+                {{ Math.round(stats.batteryLevel) }}%
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="overflow-hidden rounded-2xl border border-app-line bg-app-card">
+        <div class="flex items-center justify-between gap-3 border-b border-app-line px-3 py-2.5">
+          <div class="flex min-w-0 items-center gap-2">
+            <MaterialIcon class="shrink-0 text-app-green" name="task_alt" :size="18" />
+            <p class="truncate text-[12px] font-semibold uppercase leading-4 text-app-muted">
+              Shares
+            </p>
+          </div>
+          <span
+            class="shrink-0 rounded-full bg-app-elevated px-2.5 py-1 text-[11px] font-semibold leading-4 text-app-muted"
+          >
+            {{ networkLatencyLabel }}
+          </span>
+        </div>
+
+        <div class="divide-y divide-app-line">
+          <div class="flex min-w-0 items-center gap-3 px-3 py-3">
+            <span
+              class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-app-elevated text-app-green"
+            >
+              <MaterialIcon name="speed" :size="21" />
+            </span>
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-[14px] font-semibold leading-5 text-white">Difficulty</p>
+              <p class="mt-0.5 truncate text-[12px] leading-4 text-app-muted">
+                Current pool share target
+              </p>
+            </div>
+            <div class="shrink-0 text-right">
+              <p class="text-[11px] leading-4 text-app-muted">Diff</p>
+              <p class="text-[17px] font-semibold leading-6 text-white">
+                {{ currentDifficultyLabel }}
+              </p>
+            </div>
+          </div>
+
+          <div class="flex min-w-0 items-center gap-3 px-3 py-3">
+            <span
+              class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-app-elevated text-app-green"
+            >
+              <MaterialIcon name="done_all" :size="21" />
+            </span>
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-[14px] font-semibold leading-5 text-white">
+                Accepted / rejected
+              </p>
+              <p class="mt-0.5 truncate text-[12px] leading-4 text-app-muted">Pool share results</p>
+            </div>
+            <div class="shrink-0 text-right">
+              <p class="text-[11px] leading-4 text-app-muted">Shares</p>
+              <p class="text-[17px] font-semibold leading-6">
+                <span class="text-app-green">{{ stats.acceptedShares.toLocaleString() }}</span>
+                <span class="px-1.5 text-app-muted">/</span>
+                <span class="text-red-400">{{ stats.rejectedShares.toLocaleString() }}</span>
+              </p>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section class="rounded-2xl border border-app-line bg-black/25 p-3">
@@ -535,6 +698,28 @@ const trendIcon = computed(() => {
           <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
             <span class="text-app-muted">Total hashes</span
             ><strong class="font-medium text-white">{{ totalHashesLabel }}</strong>
+          </div>
+          <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
+            <span class="text-app-muted">Mining engine</span
+            ><strong class="font-medium text-white">{{ engineLabel }}</strong>
+          </div>
+          <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
+            <span class="text-app-muted">CPU hardware</span
+            ><strong class="break-words text-right font-medium text-white">{{
+              cpuHardwareName
+            }}</strong>
+          </div>
+          <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
+            <span class="text-app-muted">CPU clock</span
+            ><strong class="font-medium text-white">{{ cpuClockLabel }}</strong>
+          </div>
+          <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
+            <span class="text-app-muted">CPU workers</span
+            ><strong class="font-medium text-white">{{ cpuWorkerLabel }}</strong>
+          </div>
+          <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
+            <span class="text-app-muted">CPU tuning</span
+            ><strong class="text-right font-medium text-white">{{ cpuTuningLabel }}</strong>
           </div>
           <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
             <span class="text-app-muted">Miner CPU</span
