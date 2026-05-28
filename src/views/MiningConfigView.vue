@@ -58,15 +58,48 @@ const setupSections: Array<{ id: SetupSection; label: string; icon: string }> = 
   { id: 'safety', label: 'Safety', icon: 'health_and_safety' }
 ];
 
+const formatThreadCount = (threads: number): string =>
+  `${threads} ${threads === 1 ? 'thread' : 'threads'}`;
+
+const profileCoreShortLabel = (affinity: CpuAffinity): string => {
+  const labels: Record<CpuAffinity, string> = {
+    auto: 'All cores',
+    little: 'Eco cores',
+    big: 'Fast cores',
+    custom: 'Manual cores'
+  };
+
+  return labels[affinity];
+};
+
+const profileDescriptions: Record<MiningProfile, string> = {
+  battery_saver: 'Cooler phone, slower hashrate',
+  balanced: 'Recommended daily setting',
+  performance: 'Faster mining, more heat',
+  custom: 'Manual thread tuning'
+};
+
+const profileIcons: Record<MiningProfile, string> = {
+  battery_saver: 'battery_saver',
+  balanced: 'balance',
+  performance: 'speed',
+  custom: 'tune'
+};
+
 const profiles = computed(() =>
-  profilePresets.map((preset) => ({
-    id: preset.id,
-    label: preset.label,
-    supportingText:
-      preset.id === 'custom'
-        ? `${props.config.customThreadCount} threads`
-        : `${preset.threads} threads`
-  }))
+  profilePresets.map((preset) => {
+    const threadCount = preset.id === 'custom' ? props.config.customThreadCount : preset.threads;
+    const affinity = preset.id === 'custom' ? props.config.affinity : preset.affinity;
+
+    return {
+      id: preset.id,
+      label: preset.label,
+      supportingText: profileDescriptions[preset.id],
+      icon: profileIcons[preset.id],
+      threadLabel: formatThreadCount(threadCount),
+      coreLabel: profileCoreShortLabel(affinity)
+    };
+  })
 );
 
 const priorityOptions: Array<{ value: CpuPriority; label: string }> = [
@@ -130,12 +163,12 @@ const affinitySelectOptions: ConfigSelectOption[] = affinityOptions.map((option)
   label: option.label,
   supportingText:
     option.value === 'little'
-      ? 'Prefer cooler efficiency cores'
+      ? 'Best for Battery Saver. Uses lower-power cores when Android exposes them; cooler but usually lower H/s.'
       : option.value === 'big'
-        ? 'Prefer performance cores'
+        ? 'Best for speed tests. Uses the fastest cores when available; expect more heat and battery drain.'
         : option.value === 'custom'
-          ? 'Reserved for native miner backend'
-          : 'Let Android and miner decide'
+          ? 'Advanced/manual option for exact core masks. Until masks are exposed here, Android scheduling is used.'
+          : 'Default for beginners and a clean baseline for advanced tuning. Android can move workers across all cores.'
 }));
 
 const donateOverProxySelectOptions: ConfigSelectOption[] = [
@@ -152,14 +185,31 @@ const protocolSelectOptions: ConfigSelectOption[] = protocolOptions.map((option)
 
 const activeSavedProfile = computed(() => savedProfiles.activeProfile);
 
-const engineLabel = 'Native XMRig';
-const hardwareModeLabel = (_mode?: unknown): string => engineLabel;
+const engineLabel = 'XMRig CPU Miner';
+const engineSubtitle = 'Local CPU engine';
+const hardwareModeLabel = (_mode?: unknown): string => 'XMRig CPU';
 const cpuHardwareName = computed(() => props.device.cpuName || props.device.model || 'Android CPU');
 const cpuClockLabel = computed(() => props.device.cpuClockLabel || '-');
 const activeThreadLabel = computed(
   () => `${props.config.threadCount}/${props.config.totalDetectedThreads}`
 );
-const engineAlgorithmLabel = computed(() => props.config.coin.xmrigAlgo || props.config.algorithm);
+const detectedThreadCount = computed(() =>
+  Math.max(
+    1,
+    props.config.totalDetectedThreads || props.device.cpuThreads || props.config.threadCount
+  )
+);
+const activeIntensityThreads = computed(() =>
+  Math.min(detectedThreadCount.value, Math.max(1, props.config.threadCount))
+);
+const intensityPercent = computed(() =>
+  Math.min(100, Math.round((activeIntensityThreads.value / detectedThreadCount.value) * 100))
+);
+const intensityBarStyle = computed(() => ({ width: `${intensityPercent.value}%` }));
+const selectedProfileLabel = computed(
+  () => profilePresets.find((preset) => preset.id === props.config.profile)?.label || 'Custom'
+);
+const selectedCoreShortLabel = computed(() => profileCoreShortLabel(props.config.affinity));
 const engineDescription = computed(
   () => `${cpuHardwareName.value} · ${cpuClockLabel.value} · ${activeThreadLabel.value} threads`
 );
@@ -172,7 +222,7 @@ const profileSummary = (profile: SavedMiningProfile): string =>
 const backendStatus = computed(() => {
   const labels: Record<MinerBackendState, { label: string; icon: string; tone: string }> = {
     checking: { label: 'Checking backend', icon: 'sync', tone: 'text-app-muted' },
-    ready: { label: 'Native miner ready', icon: 'check_circle', tone: 'text-app-green' },
+    ready: { label: 'Miner ready', icon: 'check_circle', tone: 'text-app-green' },
     missing: { label: 'Miner download required', icon: 'download', tone: 'text-app-yellow' },
     downloading: { label: 'Downloading miner', icon: 'downloading', tone: 'text-app-yellow' },
     'web-unavailable': {
@@ -187,14 +237,40 @@ const backendStatus = computed(() => {
 });
 
 const canStartMining = computed(
-  () => props.backendState === 'ready' || props.backendState === 'missing'
+  () =>
+    props.backendState === 'ready' ||
+    props.backendState === 'missing' ||
+    props.backendState === 'error'
 );
 
 const startButtonLabel = computed(() =>
-  props.backendState === 'missing' ? 'Save & Download' : 'Save & Start Mining'
+  props.backendState === 'missing'
+    ? 'Save & Download'
+    : props.backendState === 'error'
+      ? 'Save & Start Again'
+      : 'Save & Start Mining'
 );
 
 const saveButtonLabel = computed(() => (saveFeedbackVisible.value ? 'Saved' : 'Save Changes'));
+const hasTasksetMaskError = computed(() => /taskset|tasket|bad mask/i.test(props.backendMessage));
+const setupNoticeTitle = computed(() => {
+  if (props.backendState === 'error' && hasTasksetMaskError.value) {
+    return 'CPU affinity failed';
+  }
+
+  if (props.backendState === 'error') {
+    return 'Miner needs attention';
+  }
+
+  return backendStatus.value.label;
+});
+const setupNoticeText = computed(() => {
+  if (props.backendState === 'error' && hasTasksetMaskError.value) {
+    return `${props.backendMessage}\n\nPerformance-core pinning was rejected by Android taskset. Use All cores if it repeats, then try Performance cores again after rebuilding with the native launcher fix.`;
+  }
+
+  return props.backendMessage;
+});
 
 const showSaveFeedback = (): void => {
   saveFeedbackVisible.value = true;
@@ -334,7 +410,7 @@ onBeforeUnmount(() => {
             {{ config.coin.logoText }}
           </div>
           <div class="min-w-0 flex-1">
-            <p class="text-[12px] font-semibold uppercase leading-4 text-app-green">Mining setup</p>
+            <p class="text-[12px] font-semibold uppercase leading-4 text-app-green">Mining Setup</p>
             <h2 class="mt-1 truncate text-[22px] font-semibold leading-7 text-white">
               {{ config.coin.symbol }} · {{ config.algorithm }}
             </h2>
@@ -350,12 +426,34 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <p
+        <div
           v-if="backendState !== 'ready'"
-          class="mt-4 rounded-lg border border-app-line bg-app-elevated/70 p-3 text-[12px] leading-[18px] text-app-muted"
+          class="mt-4 rounded-lg border p-3"
+          :class="
+            backendState === 'error'
+              ? 'border-red-200 bg-red-50 text-red-800 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-100'
+              : 'border-app-line bg-app-elevated/70 text-app-muted'
+          "
         >
-          {{ backendMessage }}
-        </p>
+          <div class="flex items-start gap-2">
+            <MaterialIcon
+              class="mt-0.5 shrink-0"
+              :class="
+                backendState === 'error' ? 'text-red-600 dark:text-red-300' : backendStatus.tone
+              "
+              :name="backendState === 'error' ? 'report' : backendStatus.icon"
+              :size="18"
+            />
+            <div class="min-w-0 flex-1">
+              <p class="text-[12px] font-semibold uppercase leading-4">
+                {{ setupNoticeTitle }}
+              </p>
+              <p class="mt-1 whitespace-pre-wrap break-words text-[12px] leading-[18px]">
+                {{ setupNoticeText }}
+              </p>
+            </div>
+          </div>
+        </div>
 
         <div class="mt-4 grid grid-cols-4 gap-1 rounded-full bg-app-elevated p-1">
           <button
@@ -391,7 +489,7 @@ onBeforeUnmount(() => {
       <section class="app-card overflow-hidden">
         <div class="flex min-h-16 items-center justify-between gap-3 px-4 py-3">
           <div class="min-w-0">
-            <p class="text-[15px] font-semibold leading-5 text-white">Saved setups</p>
+            <p class="text-[15px] font-semibold leading-5 text-white">Saved Setups</p>
             <p class="mt-1 text-[12px] leading-[18px] text-app-muted">
               {{ activeSavedProfile?.name || 'Choose or create a setup' }}
             </p>
@@ -492,7 +590,7 @@ onBeforeUnmount(() => {
       <div class="flex min-h-14 items-center gap-3 px-4">
         <MaterialIcon class="text-app-green" name="hub" :size="21" />
         <div class="min-w-0">
-          <h2 class="text-[15px] font-semibold leading-5 text-white">Pool and wallet</h2>
+          <h2 class="text-[15px] font-semibold leading-5 text-white">Pool and Wallet</h2>
           <p class="mt-0.5 text-[12px] leading-4 text-app-muted">{{ config.protocol }}</p>
         </div>
       </div>
@@ -528,9 +626,9 @@ onBeforeUnmount(() => {
         <div class="flex min-h-14 items-center gap-3 px-4">
           <MaterialIcon class="text-app-green" name="memory" :size="21" />
           <div class="min-w-0">
-            <h2 class="text-[15px] font-semibold leading-5 text-white">Mining engine</h2>
+            <h2 class="text-[15px] font-semibold leading-5 text-white">Mining Engine</h2>
             <p class="mt-0.5 text-[12px] leading-4 text-app-muted">
-              {{ hardwareModeLabel(config.hardwareMode || 'cpu') }}
+              {{ engineSubtitle }}
             </p>
           </div>
         </div>
@@ -547,7 +645,7 @@ onBeforeUnmount(() => {
                 <span
                   class="shrink-0 rounded-full bg-app-green-dim px-2 py-0.5 text-[10px] font-semibold uppercase leading-4 text-app-green"
                 >
-                  CPU
+                  Primary
                 </span>
               </div>
               <p class="mt-1 break-words text-[12px] leading-[18px] text-app-muted">
@@ -555,58 +653,103 @@ onBeforeUnmount(() => {
               </p>
             </div>
           </div>
-          <div class="grid grid-cols-2 gap-2">
-            <div class="min-w-0 rounded-lg bg-app-elevated p-3">
-              <p class="truncate text-[10px] font-medium uppercase leading-4 text-app-muted">
-                CPU hardware
-              </p>
-              <p class="mt-1 truncate text-[13px] font-semibold leading-5 text-white">
-                {{ cpuHardwareName }}
-              </p>
-              <p class="truncate text-[11px] leading-4 text-app-muted">{{ cpuClockLabel }}</p>
-            </div>
-            <div class="min-w-0 rounded-lg bg-app-elevated p-3">
-              <p class="truncate text-[10px] font-medium uppercase leading-4 text-app-muted">
-                Runtime
-              </p>
-              <p class="mt-1 truncate text-[13px] font-semibold leading-5 text-white">
-                {{ activeThreadLabel }} threads
-              </p>
-              <p class="truncate text-[11px] leading-4 text-app-muted">
-                {{ engineAlgorithmLabel }}
-              </p>
-            </div>
-          </div>
         </div>
       </section>
 
-      <section class="app-card p-4">
-        <div class="mb-3 flex items-center justify-between gap-3">
-          <div class="min-w-0">
-            <p class="text-[15px] font-semibold leading-5 text-white">Mining intensity</p>
-            <p class="mt-1 text-[12px] leading-[18px] text-app-muted">
-              {{ config.threadCount }} of {{ config.totalDetectedThreads }} CPU threads
-            </p>
+      <section class="app-card overflow-hidden">
+        <div class="flex min-h-14 items-center gap-3 px-4">
+          <MaterialIcon class="text-app-green" name="speed" :size="21" />
+          <div class="min-w-0 flex-1">
+            <h2 class="text-[15px] font-semibold leading-5 text-white">Mining Intensity</h2>
+            <p class="mt-0.5 text-[12px] leading-4 text-app-muted">Workers and Power Profile</p>
           </div>
           <span
-            class="shrink-0 rounded-full bg-app-elevated px-3 py-1 text-[12px] font-semibold text-white"
+            class="shrink-0 rounded-full bg-app-green-dim px-3 py-1 text-[12px] font-semibold text-app-green"
           >
-            {{ config.threadCount }}/{{ config.totalDetectedThreads }}
+            {{ intensityPercent }}%
           </span>
         </div>
-        <div class="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
-          <ProfileChip
-            v-for="profile in profiles"
-            :key="profile.id"
-            :value="profile.id"
-            :label="profile.label"
-            :supporting-text="profile.supportingText"
-            :selected="config.profile === profile.id"
-            @select="emit('profile', $event)"
-          />
+
+        <div class="space-y-3 border-t border-app-line p-4">
+          <div class="w-full rounded-lg border border-app-line bg-app-elevated p-4">
+            <div class="flex items-start justify-between gap-4">
+              <div class="min-w-0">
+                <p class="text-[13px] font-semibold leading-5 tracking-tight text-white">
+                  CPU Allocation
+                </p>
+                <p class="mt-0.5 text-[12px] leading-4 text-app-muted">
+                  Total threads used for mining
+                </p>
+              </div>
+              <div class="shrink-0 text-right">
+                <div class="text-[24px] font-semibold leading-6 text-white tabular-nums">
+                  {{ config.threadCount }}
+                </div>
+                <div class="mt-1 text-[11px] leading-4 text-app-muted">
+                  / {{ detectedThreadCount }} threads
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-5">
+              <div class="mb-2 flex items-center justify-between">
+                <span
+                  class="text-[10px] font-medium uppercase leading-4 tracking-wide text-app-muted"
+                >
+                  CPU Load
+                </span>
+                <span class="text-[11px] font-semibold tabular-nums text-app-green">
+                  {{ intensityPercent }}%
+                </span>
+              </div>
+              <div class="h-2 w-full overflow-hidden rounded-full bg-app-card">
+                <div
+                  class="h-full rounded-full bg-app-green transition-all duration-500 ease-out"
+                  :style="intensityBarStyle"
+                />
+              </div>
+            </div>
+
+            <div class="mt-4 grid grid-cols-3 gap-2">
+              <div class="min-w-0 rounded-lg bg-app-card/70 px-3 py-2.5">
+                <p class="text-[10px] font-medium uppercase leading-4 text-app-muted">Profile</p>
+                <p class="mt-1 truncate text-[12px] font-semibold leading-4 text-white">
+                  {{ selectedProfileLabel }}
+                </p>
+              </div>
+              <div class="min-w-0 rounded-lg bg-app-card/70 px-3 py-2.5">
+                <p class="text-[10px] font-medium uppercase leading-4 text-app-muted">Load</p>
+                <p class="mt-1 text-[12px] font-semibold leading-4 text-app-green tabular-nums">
+                  {{ intensityPercent }}%
+                </p>
+              </div>
+              <div class="min-w-0 rounded-lg bg-app-card/70 px-3 py-2.5">
+                <p class="text-[10px] font-medium uppercase leading-4 text-app-muted">Core</p>
+                <p class="mt-1 truncate text-[12px] font-semibold leading-4 text-white">
+                  {{ selectedCoreShortLabel }}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 gap-2">
+            <ProfileChip
+              v-for="profile in profiles"
+              :key="profile.id"
+              :value="profile.id"
+              :label="profile.label"
+              :supporting-text="profile.supportingText"
+              :icon="profile.icon"
+              :thread-label="profile.threadLabel"
+              :core-label="profile.coreLabel"
+              :selected="config.profile === profile.id"
+              @select="emit('profile', $event)"
+            />
+          </div>
         </div>
+
         <div
-          class="mt-4 grid grid-cols-[52px_1fr_52px] items-center gap-2 rounded-lg bg-app-elevated p-2"
+          class="grid grid-cols-[52px_1fr_52px] items-center gap-2 border-t border-app-line bg-app-elevated/35 p-4"
         >
           <button
             class="ripple grid h-12 w-12 place-items-center rounded-full bg-app-card text-white"
@@ -617,7 +760,7 @@ onBeforeUnmount(() => {
             <MaterialIcon name="remove" :size="22" />
           </button>
           <p class="min-w-0 text-center text-[13px] leading-5 text-app-muted">
-            Threads
+            Worker threads
             <strong class="block text-[20px] leading-6 text-white">{{ config.threadCount }}</strong>
           </p>
           <button
@@ -635,7 +778,7 @@ onBeforeUnmount(() => {
         <div class="flex min-h-14 items-center gap-3 px-4">
           <MaterialIcon class="text-app-green" name="memory" :size="21" />
           <div class="min-w-0">
-            <h2 class="text-[15px] font-semibold leading-5 text-white">CPU settings</h2>
+            <h2 class="text-[15px] font-semibold leading-5 text-white">CPU Settings</h2>
             <p class="mt-0.5 text-[12px] leading-4 text-app-muted">
               Scheduling and runtime options
             </p>
@@ -669,12 +812,6 @@ onBeforeUnmount(() => {
             @update:model-value="handleDonateOverProxyChange"
           />
           <ToggleRow
-            v-model="config.hugePagesEnabled"
-            label="Huge pages"
-            supporting-text="Use if supported by the native miner backend"
-            :disabled="!config.hugePagesSupported"
-          />
-          <ToggleRow
             v-model="config.backgroundMining"
             label="Background mining"
             supporting-text="Keep mining service active in background"
@@ -687,7 +824,7 @@ onBeforeUnmount(() => {
       <div class="flex min-h-14 items-center gap-3 px-4">
         <MaterialIcon class="text-app-green" name="health_and_safety" :size="21" />
         <div class="min-w-0">
-          <h2 class="text-[15px] font-semibold leading-5 text-white">Thermal protection</h2>
+          <h2 class="text-[15px] font-semibold leading-5 text-white">Thermal Protection</h2>
           <p class="mt-0.5 text-[12px] leading-4 text-app-muted">Temperature and pause rules</p>
         </div>
       </div>

@@ -391,6 +391,7 @@ onBeforeUnmount(() => {
           :connected="miner.connected.value"
           :backend-state="miner.backendState.value"
           :backend-message="miner.backendMessage.value"
+          :logs="miner.minerLogs.value"
           :session-history="miner.sessionHistory.value"
           :active-profile="profiles.activeProfile"
           @start="requestStartMining"

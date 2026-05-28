@@ -1,6 +1,11 @@
 import { defineStore } from 'pinia';
 import { getCryptocurrencyById } from '../data/miningCatalog';
-import type { MiningConfig, MiningHardwareMode, SavedMiningProfile } from '../types/mining';
+import type {
+  CpuAffinity,
+  MiningConfig,
+  MiningHardwareMode,
+  SavedMiningProfile
+} from '../types/mining';
 
 const profilesKey = 'androminer-profiles';
 
@@ -13,12 +18,16 @@ interface ProfilesState {
 const normalizeHardwareMode = (value: unknown): MiningHardwareMode =>
   value === 'cpu' ? value : 'cpu';
 
+const normalizeCpuAffinity = (value: unknown): CpuAffinity =>
+  value === 'little' || value === 'big' || value === 'custom' ? value : 'auto';
+
 const cloneConfig = (config: MiningConfig): MiningConfig => {
   const catalogCoin = getCryptocurrencyById(config.coin.id) || config.coin;
 
   return {
     ...config,
     hardwareMode: normalizeHardwareMode(config.hardwareMode),
+    affinity: normalizeCpuAffinity(config.affinity),
     coin: { ...catalogCoin, poolExamples: [...(catalogCoin.poolExamples || [])] }
   };
 };

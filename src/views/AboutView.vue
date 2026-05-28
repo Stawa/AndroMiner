@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
 import SettingGroup from '../components/SettingGroup.vue';
-import MaterialIcon from '../components/MaterialIcon.vue';
+import BrandLogo from '../components/BrandLogo.vue';
 import { useAppVersion } from '../composables/useAppVersion';
 import { useNativeMinerInfo } from '../composables/useNativeMinerInfo';
 import type { DeviceTelemetry } from '../types/mining';
@@ -110,9 +110,9 @@ onMounted(() => {
     <section class="app-card p-4">
       <div class="flex items-center gap-3">
         <div
-          class="grid h-14 w-14 place-items-center rounded-full border-2 border-app-green text-app-green"
+          class="h-14 w-14 shrink-0 overflow-hidden rounded-full border border-app-line bg-app-bg"
         >
-          <MaterialIcon name="power_settings_new" :size="30" />
+          <BrandLogo />
         </div>
         <div>
           <h2 class="text-[20px] font-semibold text-white">AndroMiner</h2>

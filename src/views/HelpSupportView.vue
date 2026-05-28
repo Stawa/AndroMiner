@@ -4,9 +4,9 @@ import SettingGroup from '../components/SettingGroup.vue';
 
 <template>
   <div class="phone-page">
-    <SettingGroup title="Getting started" icon="help">
+    <SettingGroup title="Getting Started" icon="help">
       <div class="space-y-3 border-t border-app-line p-4 text-[13px] leading-5 text-app-muted">
-        <p><strong class="text-white">1.</strong> Choose a coin and profile in Mining setup.</p>
+        <p><strong class="text-white">1.</strong> Choose a coin and profile in Mining Setup.</p>
         <p>
           <strong class="text-white">2.</strong> Enter pool, port, protocol, wallet, worker, and
           password.
@@ -25,7 +25,7 @@ import SettingGroup from '../components/SettingGroup.vue';
       </div>
     </SettingGroup>
 
-    <SettingGroup title="Device detection" icon="memory">
+    <SettingGroup title="Device Detection" icon="memory">
       <div class="space-y-3 border-t border-app-line p-4 text-[13px] leading-5 text-app-muted">
         <p>Battery and charging are read through Capacitor Device on Android when available.</p>
         <p>

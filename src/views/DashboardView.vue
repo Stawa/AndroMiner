@@ -17,6 +17,7 @@ interface DashboardViewProps {
   connected: boolean;
   backendState: MinerBackendState;
   backendMessage: string;
+  logs: string[];
   sessionHistory: MiningSessionHistoryItem[];
   activeProfile?: SavedMiningProfile;
 }
@@ -41,9 +42,18 @@ const walletPreview = computed(() =>
     : props.config.walletAddress
 );
 const profileName = computed(() => props.activeProfile?.name || 'Unsaved setup');
-const canStart = computed(() => props.backendState === 'ready' || props.backendState === 'missing');
+const canStart = computed(
+  () =>
+    props.backendState === 'ready' ||
+    props.backendState === 'missing' ||
+    props.backendState === 'error'
+);
 const primaryActionLabel = computed(() =>
-  props.backendState === 'missing' ? 'Download Miner' : 'Start Mining'
+  props.backendState === 'missing'
+    ? 'Download Miner'
+    : props.backendState === 'error'
+      ? 'Start Again'
+      : 'Start Mining'
 );
 const hasPlaceholderWallet = computed(() =>
   /^YOUR_[A-Z0-9]+_WALLET_ADDRESS$/.test(props.config.walletAddress)
@@ -61,7 +71,7 @@ const connectionStatus = computed(() => {
     { label: string; tone: 'good' | 'warning' | 'danger' | 'muted' }
   > = {
     checking: { label: 'Checking backend', tone: 'warning' },
-    ready: { label: 'Miner ready', tone: 'good' },
+    ready: { label: 'Ready to mine', tone: 'good' },
     missing: { label: 'Download required', tone: 'warning' },
     downloading: { label: 'Downloading miner', tone: 'warning' },
     'web-unavailable': { label: 'Android required', tone: 'warning' },
@@ -87,12 +97,38 @@ const connectionDetail = computed(() => {
     return `${props.config.workerName} · ${props.config.protocol}`;
   }
 
+  if (props.backendState === 'error') {
+    return 'Last error captured';
+  }
+
   if (props.backendState === 'web-unavailable') {
     return 'Use Android app for real mining';
   }
 
   return props.backendMessage;
 });
+const errorMessage = computed(
+  () => props.backendMessage || 'Native miner stopped unexpectedly. Check the latest miner logs.'
+);
+const errorText = computed(() => `${errorMessage.value}\n${props.logs.join('\n')}`);
+const hasTasksetMaskError = computed(() => /taskset|tasket|bad mask/i.test(errorText.value));
+const errorExitCode = computed(() => {
+  const match = errorMessage.value.match(/(?:code|Exit code:)\s*([0-9]+)/i);
+  return match?.[1] || '';
+});
+const errorLastOutput = computed(() => {
+  const match = errorMessage.value.match(/Last output:\s*(.+)$/i);
+  return match?.[1]?.trim() || errorMessage.value;
+});
+const errorTitle = computed(() =>
+  hasTasksetMaskError.value ? 'CPU affinity failed' : 'Miner could not start'
+);
+const errorAdvice = computed(() =>
+  hasTasksetMaskError.value
+    ? 'Performance-core pinning hit Android taskset mask handling. This build now falls back to normal scheduling if taskset rejects the mask; use All cores if this repeats.'
+    : 'Check the last output below, then adjust the pool, wallet, protocol, or CPU settings before starting again.'
+);
+const crashLogs = computed(() => props.logs.slice(-8).reverse());
 
 const deviceReady = computed(
   () =>
@@ -324,7 +360,7 @@ const clearSessionHistory = (): void => {
           </button>
           <button class="ripple min-w-0 flex-1 text-left" type="button" @click="emit('configure')">
             <p class="truncate text-[12px] font-semibold uppercase leading-4 text-app-green">
-              Active setup
+              Active Setup
             </p>
             <h2 class="mt-1 truncate text-[22px] font-semibold leading-7 text-white">
               {{ profileName }}
@@ -358,7 +394,7 @@ const clearSessionHistory = (): void => {
             </div>
             <div class="min-w-0 flex-1">
               <p class="text-[12px] font-semibold uppercase leading-4 text-app-muted">
-                Launch status
+                Launch Status
               </p>
               <h3 class="mt-1 text-[20px] font-semibold leading-6 text-white">
                 {{ launchTitle }}
@@ -369,29 +405,114 @@ const clearSessionHistory = (): void => {
             </div>
           </div>
 
+          <div class="mt-4 rounded-lg border border-app-line/70 bg-app-card px-3 py-3">
+            <div class="flex min-w-0 items-start gap-3">
+              <div
+                class="grid h-9 w-9 shrink-0 place-items-center rounded-full"
+                :class="{
+                  'bg-app-green-dim text-app-green': connectionStatus.tone === 'good',
+                  'bg-app-yellow/15 text-app-yellow': connectionStatus.tone === 'warning',
+                  'bg-red-500/15 text-red-300': connectionStatus.tone === 'danger',
+                  'bg-app-elevated text-app-muted': connectionStatus.tone === 'muted'
+                }"
+              >
+                <MaterialIcon :name="statusIcon" :size="20" />
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                  <StatusIndicator
+                    class="min-w-0"
+                    :connected="connected"
+                    :label="connectionStatus.label"
+                    :tone="connectionStatus.tone"
+                  />
+                  <span
+                    class="rounded-full bg-app-elevated px-2 py-0.5 text-[10px] font-semibold uppercase leading-4 text-app-muted"
+                  >
+                    {{ connected ? 'Live pool' : 'Backend' }}
+                  </span>
+                </div>
+                <p
+                  class="mt-1 whitespace-normal break-words text-[12px] leading-[18px] text-app-muted"
+                >
+                  {{ connectionDetail }}
+                </p>
+              </div>
+            </div>
+          </div>
+
           <div
-            class="mt-4 flex min-h-11 min-w-0 items-center gap-3 rounded-full bg-app-card px-3 py-2"
+            v-if="backendState === 'error'"
+            class="mt-4 overflow-hidden rounded-xl border border-red-200 bg-red-50 text-red-950 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-50"
           >
-            <MaterialIcon
-              class="shrink-0"
-              :class="{
-                'text-app-green': connectionStatus.tone === 'good',
-                'text-app-yellow': connectionStatus.tone === 'warning',
-                'text-red-300': connectionStatus.tone === 'danger',
-                'text-app-muted': connectionStatus.tone === 'muted'
-              }"
-              :name="statusIcon"
-              :size="20"
-            />
-            <StatusIndicator
-              class="min-w-0 shrink-0"
-              :connected="connected"
-              :label="connectionStatus.label"
-              :tone="connectionStatus.tone"
-            />
-            <span class="min-w-0 flex-1 truncate text-right text-[12px] leading-4 text-app-muted">
-              {{ connectionDetail }}
-            </span>
+            <div class="p-3">
+              <div class="flex items-start gap-3">
+                <span
+                  class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-300"
+                >
+                  <MaterialIcon name="report" :size="21" />
+                </span>
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <p
+                      class="text-[13px] font-semibold uppercase leading-4 text-red-700 dark:text-red-200"
+                    >
+                      Last failure
+                    </p>
+                    <span
+                      v-if="errorExitCode"
+                      class="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:bg-red-500/20 dark:text-red-100"
+                    >
+                      Exit {{ errorExitCode }}
+                    </span>
+                  </div>
+                  <h3 class="mt-1 text-[18px] font-semibold leading-6">
+                    {{ errorTitle }}
+                  </h3>
+                  <p
+                    class="mt-1 whitespace-pre-wrap break-words text-[12px] leading-[18px] text-red-800 dark:text-red-100/85"
+                  >
+                    {{ errorLastOutput }}
+                  </p>
+                </div>
+              </div>
+
+              <div
+                class="mt-3 flex items-start gap-2 rounded-lg bg-white/65 p-2.5 text-[12px] leading-[18px] text-red-800 dark:bg-black/20 dark:text-red-100/80"
+              >
+                <MaterialIcon class="mt-0.5 shrink-0" name="tips_and_updates" :size="17" />
+                <p class="min-w-0 break-words">{{ errorAdvice }}</p>
+              </div>
+
+              <button
+                class="ripple mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-full bg-red-600 px-3 text-[13px] font-semibold text-white active:bg-red-700 dark:bg-red-500/85"
+                type="button"
+                @click="emit('configure')"
+              >
+                <MaterialIcon name="tune" :size="18" />
+                Open CPU Settings
+              </button>
+            </div>
+
+            <div v-if="crashLogs.length > 0" class="border-t border-red-200 dark:border-red-400/20">
+              <div
+                class="flex items-center justify-between gap-2 px-3 py-2 text-[11px] font-semibold uppercase text-red-700 dark:text-red-200"
+              >
+                <span>Recent output</span>
+                <span>{{ crashLogs.length }} lines</span>
+              </div>
+              <div
+                class="max-h-40 overflow-y-auto overflow-x-auto bg-black/80 px-3 py-2 font-mono text-[11px] leading-4 dark:bg-black/35"
+              >
+                <p
+                  v-for="(line, index) in crashLogs"
+                  :key="`crash-${index}-${line}`"
+                  class="whitespace-pre-wrap break-words border-b border-white/5 py-1 text-red-100/85 last:border-b-0"
+                >
+                  {{ line }}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 

@@ -233,7 +233,7 @@
   }
 
   .profile-chip {
-    @apply min-h-[56px] rounded-lg border border-transparent bg-app-elevated px-3 py-2 text-center text-app-muted transition-colors duration-150 active:bg-app-line/40;
+    @apply min-h-[86px] rounded-lg border border-transparent bg-app-elevated px-3 py-3 text-app-muted transition-colors duration-150 active:bg-app-line/40;
   }
 
   .profile-chip-selected {

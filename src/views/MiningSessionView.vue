@@ -36,6 +36,8 @@ interface ImmersiveModePlugin {
   exit: () => Promise<{ active: boolean }>;
 }
 
+type LogTone = 'danger' | 'warning' | 'success' | 'muted';
+
 const props = defineProps<MiningSessionViewProps>();
 
 const emit = defineEmits<{
@@ -98,8 +100,41 @@ const batterySafetyLimit = 20;
 const profileLabel = computed(
   () => profilePresets.find((preset) => preset.id === props.config.profile)?.label || 'Profile'
 );
-const latestLogs = computed(() => props.logs.slice(-8).reverse());
-const detailLogs = computed(() => props.logs.slice(-30).reverse());
+
+const classifyLogLine = (line: string): LogTone => {
+  const normalized = line.toLowerCase();
+
+  if (
+    /error|fail|fatal|crash|exception|denied|unauthorized|invalid|refused|timeout|stopped|exit code|signal/.test(
+      normalized
+    )
+  ) {
+    return 'danger';
+  }
+
+  if (/warn|retry|reconnect|paused|throttle|thermal|battery|slow|low memory/.test(normalized)) {
+    return 'warning';
+  }
+
+  if (/accepted|connected|ready|started|new job|speed|hashrate|cpu affinity/.test(normalized)) {
+    return 'success';
+  }
+
+  return 'muted';
+};
+
+const toLogRows = (lines: string[], prefix: string) =>
+  lines.map((line, index) => ({
+    id: `${prefix}-${index}-${line}`,
+    text: line,
+    tone: classifyLogLine(line)
+  }));
+
+const latestLogs = computed(() => toLogRows(props.logs.slice(-12).reverse(), 'latest'));
+const detailLogs = computed(() => toLogRows(props.logs.slice().reverse(), 'detail'));
+const latestLogCountLabel = computed(() =>
+  latestLogs.value.length > 0 ? `${latestLogs.value.length} latest` : 'waiting'
+);
 const telemetrySourceLabel = computed(() =>
   props.apiTelemetry.available ? 'XMRig HTTP API' : 'Log parser'
 );
@@ -107,6 +142,31 @@ const telemetrySourceLabel = computed(() =>
 const telemetryEndpointLabel = computed(() =>
   props.apiTelemetry.port > 0 ? `${props.apiTelemetry.host}:${props.apiTelemetry.port}` : 'Inactive'
 );
+const showingPreparation = computed(
+  () => (props.state === 'starting' || props.state === 'mining') && props.stats.hashrate <= 0
+);
+const preparationTitle = computed(() => {
+  if (props.connected) {
+    return 'Collecting first speed';
+  }
+
+  if (props.state === 'mining') {
+    return 'Waiting for pool work';
+  }
+
+  return 'Preparing miner';
+});
+const preparationDetail = computed(() => {
+  if (props.connected) {
+    return 'Waiting for the first hashrate sample.';
+  }
+
+  if (props.state === 'mining') {
+    return 'Opening the pool connection and waiting for work.';
+  }
+
+  return 'Applying CPU settings and starting XMRig.';
+});
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value)
@@ -139,9 +199,20 @@ const formatCompactNumber = (value: number | null): string => {
 const formatCpuUsage = (value: number | null | undefined): string =>
   typeof value === 'number' && Number.isFinite(value) ? `${Math.round(value)}%` : '-';
 
+const logToneClass = (tone: LogTone): string => {
+  const classes: Record<LogTone, string> = {
+    danger: 'border-red-400/70 bg-red-500/10 text-red-100',
+    warning: 'border-app-yellow/70 bg-app-yellow/10 text-yellow-100',
+    success: 'border-app-green/70 bg-app-green-dim text-green-100',
+    muted: 'border-white/10 text-app-muted'
+  };
+
+  return classes[tone];
+};
+
 const cpuHardwareName = computed(() => props.device.cpuName || props.device.model || 'Android CPU');
 const cpuClockLabel = computed(() => props.device.cpuClockLabel || '-');
-const engineLabel = 'Native XMRig';
+const engineLabel = 'XMRig CPU Miner';
 
 const affinityLabel = computed(() => {
   const labels: Record<MiningConfig['affinity'], string> = {
@@ -351,6 +422,7 @@ const trendLabel = computed(() => {
   const current = props.stats.hashrate;
   const average = averageHashrate.value;
 
+  if (showingPreparation.value) return 'Preparing';
   if (current <= 0) return 'Idle';
   if (baselineHashrates.value.length < 3) return 'Warming up';
   if (average <= 0) return 'Mining';
@@ -364,6 +436,10 @@ const trendLabel = computed(() => {
 });
 
 const trendTone = computed(() => {
+  if (showingPreparation.value) {
+    return 'text-app-yellow';
+  }
+
   if (props.stats.hashrate <= 0 || baselineHashrates.value.length < 3) {
     return 'text-app-muted';
   }
@@ -376,6 +452,10 @@ const trendTone = computed(() => {
 });
 
 const trendIcon = computed(() => {
+  if (showingPreparation.value) {
+    return '•';
+  }
+
   if (props.stats.hashrate <= 0 || baselineHashrates.value.length < 3) {
     return '•';
   }
@@ -421,10 +501,38 @@ const trendIcon = computed(() => {
 
     <main class="flex flex-1 flex-col justify-center gap-4 py-5">
       <HashrateRing
+        v-if="!showingPreparation"
         :value="stats.hashrate"
         :average="averageHashrate"
         :active="state === 'mining' || state === 'starting'"
       />
+      <section
+        v-else
+        class="mx-auto flex w-full max-w-[330px] flex-col items-center px-4 py-2 text-center"
+      >
+        <div class="relative grid h-[168px] w-[168px] place-items-center">
+          <div class="absolute inset-0 rounded-full bg-app-green-dim/30" />
+          <div
+            class="absolute inset-3 rounded-full border border-app-green/20 border-t-app-green/80 animate-spin"
+          />
+          <div class="absolute inset-8 rounded-full border border-app-line/70" />
+          <div
+            class="relative grid h-[94px] w-[94px] place-items-center rounded-full bg-app-card text-app-green shadow-[0_12px_28px_rgb(25_128_88/0.16)]"
+          >
+            <MaterialIcon name="precision_manufacturing" :size="38" />
+          </div>
+        </div>
+
+        <p class="mt-2 text-[11px] font-semibold uppercase leading-4 text-app-green">
+          Session Startup
+        </p>
+        <h2 class="mt-1 text-[24px] font-semibold leading-7 text-white">
+          {{ preparationTitle }}
+        </h2>
+        <p class="mt-2 max-w-[260px] text-[13px] leading-[19px] text-app-muted">
+          {{ preparationDetail }}
+        </p>
+      </section>
 
       <div class="mb-6 text-center">
         <p class="text-[30px] font-semibold tracking-tight text-white">
@@ -623,22 +731,23 @@ const trendIcon = computed(() => {
           <span
             class="shrink-0 rounded-full bg-white/5 px-2 py-1 text-[10px] uppercase text-app-muted"
           >
-            latest
+            {{ latestLogCountLabel }}
           </span>
         </div>
 
         <div
-          class="max-h-36 overflow-y-auto rounded-xl bg-black/30 px-3 py-2 font-mono text-[11px] leading-4"
+          class="max-h-56 overflow-y-auto overflow-x-auto rounded-xl bg-black/35 p-2 font-mono text-[11px] leading-[17px]"
         >
-          <p v-if="latestLogs.length === 0" class="break-words text-app-muted">
+          <p v-if="latestLogs.length === 0" class="whitespace-pre-wrap break-words text-app-muted">
             {{ backendMessage || 'Waiting for miner output...' }}
           </p>
           <p
-            v-for="(line, index) in latestLogs"
-            :key="`latest-${index}-${line}`"
-            class="break-words border-b border-white/5 py-1 text-app-muted last:border-b-0"
+            v-for="line in latestLogs"
+            :key="line.id"
+            class="mb-1 whitespace-pre-wrap break-words rounded border-l-2 px-2 py-1 last:mb-0"
+            :class="logToneClass(line.tone)"
           >
-            {{ line }}
+            {{ line.text }}
           </p>
         </div>
       </section>
@@ -700,7 +809,7 @@ const trendIcon = computed(() => {
             ><strong class="font-medium text-white">{{ totalHashesLabel }}</strong>
           </div>
           <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
-            <span class="text-app-muted">Mining engine</span
+            <span class="text-app-muted">Mining Engine</span
             ><strong class="font-medium text-white">{{ engineLabel }}</strong>
           </div>
           <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
@@ -781,17 +890,21 @@ const trendIcon = computed(() => {
               <strong class="font-medium text-white">{{ logs.length }} lines</strong>
             </div>
             <div
-              class="max-h-52 overflow-y-auto rounded-xl bg-black/30 px-3 py-2 font-mono text-[11px] leading-4"
+              class="max-h-[48vh] overflow-y-auto overflow-x-auto rounded-xl bg-black/35 p-2 font-mono text-[11px] leading-[17px]"
             >
-              <p v-if="detailLogs.length === 0" class="break-words text-app-muted">
+              <p
+                v-if="detailLogs.length === 0"
+                class="whitespace-pre-wrap break-words text-app-muted"
+              >
                 {{ backendMessage || 'Waiting for miner output...' }}
               </p>
               <p
-                v-for="(line, index) in detailLogs"
-                :key="`detail-${index}-${line}`"
-                class="break-words border-b border-white/5 py-1 text-app-muted last:border-b-0"
+                v-for="line in detailLogs"
+                :key="line.id"
+                class="mb-1 whitespace-pre-wrap break-words rounded border-l-2 px-2 py-1 last:mb-0"
+                :class="logToneClass(line.tone)"
               >
-                {{ line }}
+                {{ line.text }}
               </p>
             </div>
           </div>

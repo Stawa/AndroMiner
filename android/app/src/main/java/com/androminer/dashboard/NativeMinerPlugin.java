@@ -69,6 +69,7 @@ public class NativeMinerPlugin extends Plugin {
     private static final int MAX_LOG_LINES = 80;
     private static final String PREFS_NAME = "androminer_native_miner";
     private static final String PREF_MINER_VARIANT = "miner_variant";
+    private static final double PERFORMANCE_CORE_FREQ_RATIO = 0.90D;
 
     private static class ApiTelemetry {
 
@@ -85,6 +86,80 @@ public class NativeMinerPlugin extends Plugin {
         JSObject resultsJson;
         JSObject connectionJson;
         JSArray threadHashrates = new JSArray();
+    }
+
+    private static class CpuAffinityPlan {
+
+        final String mode;
+        final long mask;
+        final List<Integer> cores;
+        final int threadCount;
+
+        CpuAffinityPlan(String mode, long mask, List<Integer> cores, int threadCount) {
+            this.mode = mode;
+            this.mask = mask;
+            this.cores = cores;
+            this.threadCount = threadCount;
+        }
+
+        static CpuAffinityPlan none(String mode) {
+            return new CpuAffinityPlan(mode, 0, new ArrayList<>(), 0);
+        }
+
+        boolean hasMask() {
+            return mask > 0 && !cores.isEmpty();
+        }
+
+        String tasksetMask() {
+            return Long.toHexString(mask);
+        }
+
+        String displayMaskHex() {
+            return "0x" + Long.toHexString(mask);
+        }
+
+        String describe() {
+            if (!hasMask()) {
+                if ("custom".equals(mode)) {
+                    return "custom affinity is not configured; using Android scheduler";
+                }
+
+                return "Android scheduler";
+            }
+
+            String label = "big".equals(mode) ? "performance cores" : "efficiency cores";
+            return label
+                    + " "
+                    + formatCoreList()
+                    + " (mask "
+                    + displayMaskHex()
+                    + ", "
+                    + threadCount
+                    + " threads)";
+        }
+
+        private String formatCoreList() {
+            StringBuilder builder = new StringBuilder();
+            for (int index = 0; index < cores.size(); index += 1) {
+                if (index > 0) {
+                    builder.append(",");
+                }
+                builder.append(cores.get(index));
+            }
+
+            return builder.toString();
+        }
+    }
+
+    private static class CpuCoreInfo {
+
+        final int index;
+        final long maxFrequencyKhz;
+
+        CpuCoreInfo(int index, long maxFrequencyKhz) {
+            this.index = index;
+            this.maxFrequencyKhz = maxFrequencyKhz;
+        }
     }
 
     private final ExecutorService outputExecutor = Executors.newSingleThreadExecutor();
@@ -194,6 +269,14 @@ public class NativeMinerPlugin extends Plugin {
 
         JSObject config = call.getObject("config", new JSObject());
         String hardwareMode = normalizeHardwareMode(config.getString("hardwareMode", "cpu"));
+        int requestedThreads =
+                bounded(
+                        config.getInteger(
+                                "threadCount", Runtime.getRuntime().availableProcessors()),
+                        1,
+                        Math.max(1, Runtime.getRuntime().availableProcessors()));
+        CpuAffinityPlan affinityPlan =
+                resolveCpuAffinity(config.getString("affinity", "auto"), requestedThreads);
 
         apiPort = findAvailableApiPort();
         apiToken = "androminer-" + UUID.randomUUID();
@@ -214,7 +297,8 @@ public class NativeMinerPlugin extends Plugin {
                 pidFile.delete();
             }
 
-            ProcessBuilder builder = new ProcessBuilder(buildShellLaunchCommand(command, pidFile));
+            ProcessBuilder builder =
+                    new ProcessBuilder(buildShellLaunchCommand(command, pidFile, affinityPlan));
             builder.redirectErrorStream(true);
             builder.directory(binary.getParentFile());
             minerProcess = builder.start();
@@ -229,8 +313,7 @@ public class NativeMinerPlugin extends Plugin {
             resetCpuUsageSampling();
             acceptedShares = 0;
             rejectedShares = 0;
-            activeThreads =
-                    config.getInteger("threadCount", Runtime.getRuntime().availableProcessors());
+            activeThreads = requestedThreads;
             activeHardwareMode = hardwareMode;
             lastMessage = "Native miner process started.";
             lastFailureReason = "";
@@ -240,6 +323,7 @@ public class NativeMinerPlugin extends Plugin {
             appendLog(lastMessage);
             appendLog("Pool endpoint: " + poolEndpoint);
             appendLog("XMRig API: http://" + API_HOST + ":" + apiPort + "/2/summary");
+            appendLog("CPU affinity: " + affinityPlan.describe());
             appendLog(
                     "Hardware mode: "
                             + formatHardwareMode(hardwareMode)
@@ -293,7 +377,11 @@ public class NativeMinerPlugin extends Plugin {
         String walletAddress = config.getString("walletAddress", "");
         String workerName = config.getString("workerName", "android-phone");
         String password = config.getString("password", "x");
-        int threadCount = Math.max(1, config.getInteger("threadCount", 1));
+        int threadCount =
+                bounded(
+                        config.getInteger("threadCount", 1),
+                        1,
+                        Math.max(1, Runtime.getRuntime().availableProcessors()));
         int donateLevel = bounded(config.getInteger("donateLevel", 0), 0, 99);
         int donateOverProxy = bounded(config.getInteger("donateOverProxy", 1), 0, 2);
         String priority = config.getString("priority", "low");
@@ -405,14 +493,34 @@ public class NativeMinerPlugin extends Plugin {
         return host.matches(".*:[0-9]+$");
     }
 
-    private List<String> buildShellLaunchCommand(List<String> command, File pidFile) {
+    private List<String> buildShellLaunchCommand(
+            List<String> command, File pidFile, CpuAffinityPlan affinityPlan) {
         List<String> shellCommand = new ArrayList<>();
         StringBuilder script = new StringBuilder();
-        script.append("echo $$ > ").append(shellQuote(pidFile.getAbsolutePath())).append("; exec");
+        script.append("echo $$ > ").append(shellQuote(pidFile.getAbsolutePath())).append("; ");
 
-        for (String part : command) {
-            script.append(" ").append(shellQuote(part));
+        if (affinityPlan != null && affinityPlan.hasMask()) {
+            List<String> tasksetProbe = new ArrayList<>();
+            tasksetProbe.add("taskset");
+            tasksetProbe.add(affinityPlan.tasksetMask());
+            tasksetProbe.add("/system/bin/sh");
+            tasksetProbe.add("-c");
+            tasksetProbe.add(":");
+
+            List<String> tasksetCommand = new ArrayList<>();
+            tasksetCommand.add("taskset");
+            tasksetCommand.add(affinityPlan.tasksetMask());
+            tasksetCommand.addAll(command);
+
+            script.append("if command -v taskset >/dev/null 2>&1 &&");
+            appendShellArguments(script, tasksetProbe);
+            script.append(" >/dev/null 2>&1; then exec");
+            appendShellArguments(script, tasksetCommand);
+            script.append("; else echo 'CPU affinity unavailable; using Android scheduler'; fi; ");
         }
+
+        script.append("exec");
+        appendShellArguments(script, command);
 
         shellCommand.add("/system/bin/sh");
         shellCommand.add("-c");
@@ -420,8 +528,150 @@ public class NativeMinerPlugin extends Plugin {
         return shellCommand;
     }
 
+    private void appendShellArguments(StringBuilder script, List<String> arguments) {
+        for (String part : arguments) {
+            script.append(" ").append(shellQuote(part));
+        }
+    }
+
     private String shellQuote(String value) {
         return "'" + value.replace("'", "'\\''") + "'";
+    }
+
+    private CpuAffinityPlan resolveCpuAffinity(String affinity, int threadCount) {
+        String normalized = normalizeCpuAffinity(affinity);
+        if (!normalized.equals("big") && !normalized.equals("little")) {
+            return CpuAffinityPlan.none(normalized);
+        }
+
+        int cpuCount = Math.max(1, Runtime.getRuntime().availableProcessors());
+        List<CpuCoreInfo> cores = readCpuCoreInfo(cpuCount);
+        List<Integer> selectedCores = selectCoresByFrequency(normalized, cores);
+        if (selectedCores.isEmpty()) {
+            selectedCores = selectCoresByIndex(normalized, cpuCount);
+        }
+
+        long mask = createCpuMask(selectedCores);
+        if (mask <= 0) {
+            return CpuAffinityPlan.none(normalized);
+        }
+
+        return new CpuAffinityPlan(normalized, mask, selectedCores, threadCount);
+    }
+
+    private String normalizeCpuAffinity(String affinity) {
+        if (affinity == null) {
+            return "auto";
+        }
+
+        String normalized = affinity.trim().toLowerCase(Locale.US);
+        if (normalized.equals("little")
+                || normalized.equals("big")
+                || normalized.equals("custom")) {
+            return normalized;
+        }
+
+        return "auto";
+    }
+
+    private List<CpuCoreInfo> readCpuCoreInfo(int cpuCount) {
+        List<CpuCoreInfo> cores = new ArrayList<>();
+        for (int index = 0; index < cpuCount; index += 1) {
+            cores.add(new CpuCoreInfo(index, readCpuMaxFrequencyKhz(index)));
+        }
+
+        return cores;
+    }
+
+    private long readCpuMaxFrequencyKhz(int cpuIndex) {
+        File cpuDirectory = new File("/sys/devices/system/cpu/cpu" + cpuIndex);
+        File[] candidates = {
+            new File(cpuDirectory, "cpufreq/cpuinfo_max_freq"),
+            new File(cpuDirectory, "cpufreq/scaling_max_freq"),
+            new File(cpuDirectory, "cpufreq/scaling_cur_freq")
+        };
+
+        long best = -1;
+        for (File candidate : candidates) {
+            Long value = readLong(candidate);
+            if (value != null && value > best) {
+                best = value;
+            }
+        }
+
+        return best;
+    }
+
+    private Long readLong(File file) {
+        String raw = readFirstLine(file);
+        if (raw == null) {
+            return null;
+        }
+
+        try {
+            return Long.parseLong(raw.trim());
+        } catch (NumberFormatException exception) {
+            return null;
+        }
+    }
+
+    private String readFirstLine(File file) {
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            return reader.readLine();
+        } catch (IOException exception) {
+            return null;
+        }
+    }
+
+    private List<Integer> selectCoresByFrequency(String affinity, List<CpuCoreInfo> cores) {
+        List<Integer> selected = new ArrayList<>();
+        long fastestKhz = 0;
+        for (CpuCoreInfo core : cores) {
+            fastestKhz = Math.max(fastestKhz, core.maxFrequencyKhz);
+        }
+
+        if (fastestKhz <= 0) {
+            return selected;
+        }
+
+        double performanceThreshold = fastestKhz * PERFORMANCE_CORE_FREQ_RATIO;
+        for (CpuCoreInfo core : cores) {
+            if (core.maxFrequencyKhz <= 0) {
+                continue;
+            }
+
+            boolean isPerformanceCore = core.maxFrequencyKhz >= performanceThreshold;
+            if ((affinity.equals("big") && isPerformanceCore)
+                    || (affinity.equals("little") && !isPerformanceCore)) {
+                selected.add(core.index);
+            }
+        }
+
+        return selected;
+    }
+
+    private List<Integer> selectCoresByIndex(String affinity, int cpuCount) {
+        List<Integer> selected = new ArrayList<>();
+        int splitIndex = Math.max(1, cpuCount / 2);
+        for (int index = 0; index < cpuCount; index += 1) {
+            if ((affinity.equals("big") && index >= splitIndex)
+                    || (affinity.equals("little") && index < splitIndex)) {
+                selected.add(index);
+            }
+        }
+
+        return selected;
+    }
+
+    private long createCpuMask(List<Integer> cores) {
+        long mask = 0;
+        for (int core : cores) {
+            if (core >= 0 && core < Long.SIZE - 1) {
+                mask |= 1L << core;
+            }
+        }
+
+        return mask;
     }
 
     private int readPidFile(File pidFile) {
@@ -1130,6 +1380,8 @@ public class NativeMinerPlugin extends Plugin {
                 || normalizedLine.contains("failure")
                 || normalizedLine.contains("invalid")
                 || normalizedLine.contains("unauthorized")
+                || normalizedLine.contains("bad mask")
+                || normalizedLine.contains("taskset")
                 || normalizedLine.contains("connection refused")
                 || normalizedLine.contains("connect error")
                 || normalizedLine.contains("dns error")

@@ -52,7 +52,7 @@ const closeSheet = (): void => {
   <div class="config-field">
     <span class="config-label">{{ label }}</span>
     <button
-      class="ripple flex min-h-14 w-full min-w-0 items-center gap-3 rounded-lg border border-app-line bg-app-elevated/80 px-4 text-left text-white active:bg-app-line/40"
+      class="ripple flex min-h-16 w-full min-w-0 items-center gap-3 rounded-lg border border-app-line bg-app-elevated/80 px-4 py-2 text-left text-white active:bg-app-line/40"
       type="button"
       :aria-expanded="open"
       @click="open = true"
@@ -68,7 +68,7 @@ const closeSheet = (): void => {
         <span class="block truncate text-[16px] leading-6">{{ selectedOption?.label }}</span>
         <span
           v-if="selectedOption?.supportingText"
-          class="mt-0.5 block truncate text-[12px] leading-4 text-app-muted"
+          class="mt-0.5 block whitespace-normal break-words text-[12px] leading-[17px] text-app-muted"
           >{{ selectedOption.supportingText }}</span
         >
       </span>
@@ -113,7 +113,7 @@ const closeSheet = (): void => {
           <button
             v-for="option in options"
             :key="option.value"
-            class="ripple flex min-h-14 w-full items-center gap-3 rounded-lg px-3 py-2 text-left active:bg-app-elevated"
+            class="ripple flex min-h-16 w-full items-center gap-3 rounded-lg px-3 py-2 text-left active:bg-app-elevated"
             :class="{
               'bg-app-green-dim': option.value === modelValue,
               'opacity-45': option.disabled
@@ -131,13 +131,13 @@ const closeSheet = (): void => {
             </span>
             <span class="min-w-0 flex-1">
               <span
-                class="block truncate text-[15px] font-medium leading-5"
+                class="block break-words text-[15px] font-medium leading-5"
                 :class="option.value === modelValue ? 'text-app-green' : 'text-white'"
                 >{{ option.label }}</span
               >
               <span
                 v-if="option.supportingText"
-                class="mt-0.5 block truncate text-[12px] leading-[18px] text-app-muted"
+                class="mt-0.5 block whitespace-normal break-words text-[12px] leading-[18px] text-app-muted"
                 >{{ option.supportingText }}</span
               >
             </span>

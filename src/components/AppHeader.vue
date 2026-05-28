@@ -20,7 +20,7 @@ const emit = defineEmits<{
 
 const titles: Record<AppTab, string> = {
   dashboard: 'AndroMiner',
-  mining: 'Mining setup',
+  mining: 'Mining Setup',
   statistics: 'Insights',
   settings: 'Settings',
   profiles: 'Profiles',
@@ -41,7 +41,7 @@ const dashboardStatus = computed(() => {
 
   const labels: Record<MinerBackendState, { label: string; dot: string; text: string }> = {
     checking: { label: 'Checking backend', dot: 'bg-app-yellow', text: 'text-app-muted' },
-    ready: { label: 'Miner ready', dot: 'bg-app-green', text: 'text-app-muted' },
+    ready: { label: 'Ready to mine', dot: 'bg-app-green', text: 'text-app-muted' },
     missing: { label: 'Miner download required', dot: 'bg-app-yellow', text: 'text-app-muted' },
     downloading: { label: 'Downloading miner', dot: 'bg-app-yellow', text: 'text-app-muted' },
     'web-unavailable': {

@@ -72,9 +72,7 @@ const threadLabel = computed(
             <p class="truncate text-[10px] font-medium uppercase leading-4 text-app-muted">
               Engine
             </p>
-            <p class="mt-0.5 truncate text-[13px] font-semibold leading-5 text-white">
-              Native XMRig
-            </p>
+            <p class="mt-0.5 truncate text-[13px] font-semibold leading-5 text-white">XMRig CPU</p>
           </div>
           <div class="min-w-0 rounded-lg bg-app-elevated px-3 py-2">
             <p class="truncate text-[10px] font-medium uppercase leading-4 text-app-muted">Cores</p>
@@ -117,7 +115,7 @@ const threadLabel = computed(
             type="button"
             @click="emit('cancel')"
           >
-            Review
+            Cancel
           </button>
           <button
             class="ripple min-h-14 rounded-xl bg-app-green px-3 text-[15px] font-semibold text-white shadow-[0_8px_18px_rgb(25_128_88/0.22)]"

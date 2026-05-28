@@ -477,7 +477,7 @@ const {
         <div class="flex min-h-14 items-center gap-3 px-4">
           <MaterialIcon class="text-app-green" name="tune" :size="21" />
           <div class="min-w-0">
-            <h3 class="text-[15px] font-semibold leading-5 text-white">Active setup baseline</h3>
+            <h3 class="text-[15px] font-semibold leading-5 text-white">Active Setup Baseline</h3>
             <p class="mt-0.5 text-[12px] leading-4 text-app-muted">
               Settings used for the next saved comparison
             </p>

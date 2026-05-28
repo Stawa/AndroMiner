@@ -15,6 +15,8 @@ XMRIG_REF="${XMRIG_REF:-master}"
 LIBUV_REF="${LIBUV_REF:-v1.48.0}"
 OPENSSL_REF="${OPENSSL_REF:-openssl-4.0.0}"
 WITH_TLS="${WITH_TLS:-ON}"
+CPU_TUNE="${CPU_TUNE:-}"
+THIN_LTO="${THIN_LTO:-0}"
 QUIET="${QUIET:-ON}"
 JOBS="${JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)}"
 SKIP_INSTALL="${SKIP_INSTALL:-0}"
@@ -352,21 +354,53 @@ log_detail "TLS" "$WITH_TLS"
 log_detail "Backend" "CPU"
 log_detail "HTTP API" "Enabled"
 log_detail "hwloc" "Disabled"
+if [[ -n "$CPU_TUNE" ]]; then
+  log_detail "CPU tune" "$CPU_TUNE"
+else
+  log_detail "CPU tune" "Generic ARM64"
+fi
+if [[ "$THIN_LTO" == "1" ]]; then
+  log_detail "Thin LTO" "Enabled"
+else
+  log_detail "Thin LTO" "Disabled"
+fi
 rm -rf "$BUILD_DIR/xmrig-$ABI"
-run_logged "Configuring XMRig" "$LOG_DIR/xmrig-configure-$ABI-$WITH_TLS.log" cmake -G Ninja -S "$SRC_DIR/xmrig" -B "$BUILD_DIR/xmrig-$ABI" \
-  -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
-  -DANDROID_ABI="$ABI" \
-  -DANDROID_PLATFORM="$ANDROID_PLATFORM" \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DWITH_TLS="$WITH_TLS" \
-  -DWITH_HTTP=ON \
-  -DWITH_HWLOC=OFF \
-  -DWITH_OP"ENCL=OFF" \
-  -DWITH_CUDA=OFF \
-  -DBUILD_STATIC=OFF \
-  -DUV_INCLUDE_DIR="$UV_INCLUDE" \
-  -DUV_LIBRARY="$UV_LIBRARY" \
-  "${OPENSSL_CMAKE_ARGS[@]}"
+XMRIG_EXTRA_FLAGS=()
+if [[ -n "$CPU_TUNE" ]]; then
+  XMRIG_EXTRA_FLAGS+=("-mtune=$CPU_TUNE")
+fi
+if [[ "$THIN_LTO" == "1" ]]; then
+  XMRIG_EXTRA_FLAGS+=("-flto=thin")
+fi
+XMRIG_CMAKE_ARGS=(
+  -G Ninja
+  -S "$SRC_DIR/xmrig"
+  -B "$BUILD_DIR/xmrig-$ABI"
+  -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN"
+  -DANDROID_ABI="$ABI"
+  -DANDROID_PLATFORM="$ANDROID_PLATFORM"
+  -DCMAKE_BUILD_TYPE=Release
+  -DWITH_TLS="$WITH_TLS"
+  -DWITH_HTTP=ON
+  -DWITH_HWLOC=OFF
+  -DWITH_OP"ENCL=OFF"
+  -DWITH_CUDA=OFF
+  -DBUILD_STATIC=OFF
+  -DUV_INCLUDE_DIR="$UV_INCLUDE"
+  -DUV_LIBRARY="$UV_LIBRARY"
+)
+if (( ${#XMRIG_EXTRA_FLAGS[@]} > 0 )); then
+  XMRIG_EXTRA_FLAG_TEXT="${XMRIG_EXTRA_FLAGS[*]}"
+  XMRIG_CMAKE_ARGS+=(
+    "-DCMAKE_C_FLAGS=$XMRIG_EXTRA_FLAG_TEXT"
+    "-DCMAKE_CXX_FLAGS=$XMRIG_EXTRA_FLAG_TEXT"
+  )
+fi
+if [[ "$THIN_LTO" == "1" ]]; then
+  XMRIG_CMAKE_ARGS+=("-DCMAKE_EXE_LINKER_FLAGS=-flto=thin -Wl,--gc-sections")
+fi
+XMRIG_CMAKE_ARGS+=("${OPENSSL_CMAKE_ARGS[@]}")
+run_logged "Configuring XMRig" "$LOG_DIR/xmrig-configure-$ABI-$WITH_TLS.log" cmake "${XMRIG_CMAKE_ARGS[@]}"
 run_logged "Building XMRig" "$LOG_DIR/xmrig-build-$ABI-$WITH_TLS.log" cmake --build "$BUILD_DIR/xmrig-$ABI" --parallel "$JOBS"
 
 BUILT_XMRIG="$(find "$BUILD_DIR/xmrig-$ABI" -type f \( -name xmrig -o -name xmrig-notls \) -perm -111 | head -n 1)"

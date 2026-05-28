@@ -4,7 +4,9 @@ param(
   [string]$XmrigRef = "master",
   [string]$LibuvRef = "v1.48.0",
   [string]$OpenSslRef = "openssl-4.0.0",
+  [string]$CpuTune = $env:XMRIG_CPU_TUNE,
   [switch]$NoTls,
+  [switch]$ThinLto,
   [int]$Jobs = [Environment]::ProcessorCount,
   [switch]$SkipInstall,
   [switch]$ShowBuildOutput
@@ -20,6 +22,7 @@ $BuildDir = Join-Path $WorkDir "build"
 $PrefixDir = Join-Path $WorkDir "prefix"
 $LogDir = Join-Path $WorkDir "logs"
 $QuietBuild = -not $ShowBuildOutput -and $env:QUIET -ne "OFF" -and $env:VERBOSE -ne "1"
+$EnableThinLto = $ThinLto -or $env:XMRIG_THIN_LTO -eq "1"
 
 function Write-BuildHeader {
   Write-Host ""
@@ -644,9 +647,26 @@ Write-BuildDetail "TLS" $TlsValue
 Write-BuildDetail "Backend" "CPU"
 Write-BuildDetail "HTTP API" "Enabled"
 Write-BuildDetail "hwloc" "Disabled"
+$CpuTuneLabel = if ([string]::IsNullOrWhiteSpace($CpuTune)) { "Generic ARM64" } else { $CpuTune }
+Write-BuildDetail "CPU tune" $CpuTuneLabel
+Write-BuildDetail "Thin LTO" $(if ($EnableThinLto) { "Enabled" } else { "Disabled" })
 if (Test-Path (Join-Path $XmrigBuild "CMakeCache.txt")) {
   Remove-Item -Recurse -Force $XmrigBuild
 }
+$XmrigExtraFlags = @()
+if (-not [string]::IsNullOrWhiteSpace($CpuTune)) {
+  $XmrigExtraFlags += "-mtune=$CpuTune"
+}
+if ($EnableThinLto) {
+  $XmrigExtraFlags += "-flto=thin"
+}
+$XmrigExtraFlagText = $XmrigExtraFlags -join " "
+$XmrigExtraLinkerFlags = @()
+if ($EnableThinLto) {
+  $XmrigExtraLinkerFlags += "-flto=thin"
+  $XmrigExtraLinkerFlags += "-Wl,--gc-sections"
+}
+$XmrigExtraLinkerFlagText = $XmrigExtraLinkerFlags -join " "
 $XmrigCmakeArgs = @(
   "-G", $CmakeGenerator,
   "-S", $XmrigSrc,
@@ -663,7 +683,15 @@ $XmrigCmakeArgs = @(
   "-DBUILD_STATIC=OFF",
   "-DUV_INCLUDE_DIR=$UvInclude",
   "-DUV_LIBRARY=$UvLibrary"
-) + $OpenSslCmakeArgs
+)
+if (-not [string]::IsNullOrWhiteSpace($XmrigExtraFlagText)) {
+  $XmrigCmakeArgs += "-DCMAKE_C_FLAGS=$XmrigExtraFlagText"
+  $XmrigCmakeArgs += "-DCMAKE_CXX_FLAGS=$XmrigExtraFlagText"
+}
+if (-not [string]::IsNullOrWhiteSpace($XmrigExtraLinkerFlagText)) {
+  $XmrigCmakeArgs += "-DCMAKE_EXE_LINKER_FLAGS=$XmrigExtraLinkerFlagText"
+}
+$XmrigCmakeArgs += $OpenSslCmakeArgs
 Invoke-NativeLogged "Configuring XMRig" (Join-Path $LogDir "xmrig-configure-$Abi-$TlsValue.log") "cmake" $XmrigCmakeArgs
 Invoke-NativeLogged "Building XMRig" (Join-Path $LogDir "xmrig-build-$Abi-$TlsValue.log") "cmake" @("--build", $XmrigBuild, "--parallel", "$Jobs")
 

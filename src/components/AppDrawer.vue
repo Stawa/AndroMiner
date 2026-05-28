@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useAppVersion } from '../composables/useAppVersion';
+import BrandLogo from './BrandLogo.vue';
 import MaterialIcon from './MaterialIcon.vue';
 import type { AppTab } from './BottomNav.vue';
 
@@ -27,7 +28,7 @@ const emit = defineEmits<{
 
 const primaryItems: DrawerItem[] = [
   { label: 'Dashboard', icon: 'space_dashboard', tab: 'dashboard' },
-  { label: 'Mining setup', icon: 'handyman', tab: 'mining' },
+  { label: 'Mining Setup', icon: 'handyman', tab: 'mining' },
   { label: 'Insights', icon: 'insights', tab: 'statistics' },
   { label: 'Settings', icon: 'settings', tab: 'settings' }
 ];
@@ -145,10 +146,8 @@ onBeforeUnmount(() => {
     @click.stop
   >
     <div class="flex items-center gap-3 border-b border-app-line pb-4">
-      <div
-        class="grid h-12 w-12 place-items-center rounded-xl border border-app-green/40 bg-app-green-dim text-app-green"
-      >
-        <MaterialIcon name="power_settings_new" :size="27" />
+      <div class="h-12 w-12 rounded-xl">
+        <BrandLogo />
       </div>
       <div class="min-w-0 flex-1">
         <p class="truncate text-[17px] font-semibold leading-6 text-white">AndroMiner</p>

@@ -135,6 +135,7 @@ export const profilePresets: ProfilePreset[] = [
     label: 'Battery Saver',
     description: 'Cooler CPU use for longer unplugged sessions',
     threads: 1,
+    affinity: 'little',
     thermalLimit: 62,
     priority: 'low'
   },
@@ -143,6 +144,7 @@ export const profilePresets: ProfilePreset[] = [
     label: 'Balanced',
     description: 'Recommended for everyday Android mining',
     threads: 2,
+    affinity: 'auto',
     thermalLimit: 72,
     priority: 'low'
   },
@@ -151,6 +153,7 @@ export const profilePresets: ProfilePreset[] = [
     label: 'Performance',
     description: 'Higher output with tighter thermal monitoring',
     threads: 4,
+    affinity: 'big',
     thermalLimit: 78,
     priority: 'normal'
   },
@@ -159,6 +162,7 @@ export const profilePresets: ProfilePreset[] = [
     label: 'Custom',
     description: 'Manual CPU and safety configuration',
     threads: 2,
+    affinity: 'auto',
     thermalLimit: 72,
     priority: 'low'
   }
@@ -182,7 +186,10 @@ const bounded = (value: number, min: number, max: number): number =>
 
 const normalizeHardwareMode = (_value: unknown): MiningHardwareMode => 'cpu';
 
-const hardwareModeLabel = (_mode: MiningHardwareMode): string => 'Native XMRig';
+const normalizeCpuAffinity = (value: unknown): MiningConfig['affinity'] =>
+  value === 'little' || value === 'big' || value === 'custom' ? value : 'auto';
+
+const hardwareModeLabel = (_mode: MiningHardwareMode): string => 'XMRig CPU';
 
 const formatUptime = (totalSeconds: number): string => {
   const hours = Math.floor(totalSeconds / 3600);
@@ -221,6 +228,7 @@ const emptyDownloadProgress = (): Required<NativeMinerDownloadProgress> => ({
 const cloneConfig = (config: MiningConfig): MiningConfig => ({
   ...config,
   hardwareMode: normalizeHardwareMode(config.hardwareMode),
+  affinity: normalizeCpuAffinity(config.affinity),
   coin: {
     ...(getCryptocurrencyById(config.coin.id) || config.coin),
     poolExamples: [...((getCryptocurrencyById(config.coin.id) || config.coin).poolExamples || [])]
@@ -233,6 +241,7 @@ export const useMiningController = () => {
   const connected = ref(false);
   const backendState = ref<MinerBackendState>('checking');
   const backendMessage = ref('Checking native miner backend...');
+  const lastBackendError = ref('');
   const downloadProgress = ref<Required<NativeMinerDownloadProgress>>(emptyDownloadProgress());
   const minerLogs = ref<string[]>([]);
   const config = reactive<MiningConfig>(cloneConfig(initialConfig));
@@ -297,17 +306,33 @@ export const useMiningController = () => {
     }
   ];
 
+  const formatNativeFailureMessage = (status: NativeMinerStatus): string => {
+    const exitCode =
+      typeof status.exitCode === 'number' && Number.isFinite(status.exitCode)
+        ? ` Exit code: ${status.exitCode}.`
+        : '';
+    const reason = status.failureReason || status.message || 'No miner error was reported.';
+
+    return `Native miner stopped unexpectedly.${exitCode} ${reason}`;
+  };
+
+  const setBackendError = (message: string): void => {
+    lastBackendError.value = message;
+    backendState.value = 'error';
+    backendMessage.value = message;
+  };
+
   const setBackendStatus = (status: NativeMinerStatus): void => {
     const wasActive = state.value === 'mining' || state.value === 'starting';
     const stoppedUnexpectedly = status.available && !status.running && wasActive;
-
-    connected.value = status.available && status.running;
-    backendState.value = status.available ? (stoppedUnexpectedly ? 'error' : 'ready') : 'missing';
-    backendMessage.value =
+    const unexpectedExit = Boolean(status.unexpectedExit || stoppedUnexpectedly);
+    const nextMessage =
       status.message ||
       (status.available
         ? 'Native miner backend is ready.'
         : 'Native miner download is required before the first mining session.');
+
+    connected.value = status.available && status.running;
     minerLogs.value = Array.isArray(status.logs) ? status.logs : minerLogs.value;
     apiTelemetry.value = status.apiTelemetry || {
       ...apiTelemetry.value,
@@ -318,18 +343,37 @@ export const useMiningController = () => {
         : 'XMRig API telemetry is inactive.'
     };
 
-    if (stoppedUnexpectedly) {
-      const exitCode = typeof status.exitCode === 'number' ? ` Exit code: ${status.exitCode}.` : '';
-      const reason = status.failureReason || status.message || 'No miner error was reported.';
-      backendMessage.value = `Native miner stopped unexpectedly.${exitCode} ${reason}`;
-      recordSession();
-      resetActiveSession();
+    if (unexpectedExit && !status.running) {
+      setBackendError(formatNativeFailureMessage(status));
+      if (stoppedUnexpectedly) {
+        recordSession();
+        resetActiveSession();
+      } else if (state.value !== 'idle') {
+        state.value = 'idle';
+      }
       return;
     }
 
     if (status.running) {
+      lastBackendError.value = '';
+      backendState.value = 'ready';
+      backendMessage.value = nextMessage;
       state.value = state.value === 'paused' ? 'paused' : 'mining';
-    } else if (state.value !== 'idle') {
+      return;
+    }
+
+    if (!status.available) {
+      lastBackendError.value = '';
+      backendState.value = 'missing';
+      backendMessage.value = nextMessage;
+    } else if (backendState.value === 'error' && lastBackendError.value) {
+      backendMessage.value = lastBackendError.value;
+    } else {
+      backendState.value = 'ready';
+      backendMessage.value = nextMessage;
+    }
+
+    if (state.value !== 'idle') {
       state.value = 'idle';
     }
   };
@@ -497,6 +541,7 @@ export const useMiningController = () => {
     stats.minerCpuUsage = null;
     apiTelemetry.value = defaultApiTelemetry();
     minerLogs.value = [];
+    lastBackendError.value = '';
     sessionStartedAt = Date.now();
     sessionStartingAcceptedShares = stats.acceptedShares;
     sessionStartingRejectedShares = stats.rejectedShares;
@@ -520,9 +565,7 @@ export const useMiningController = () => {
       state.value = status.running ? 'mining' : 'idle';
     } catch (error) {
       state.value = 'idle';
-      backendState.value = 'error';
-      backendMessage.value =
-        error instanceof Error ? error.message : 'Native miner failed to start.';
+      setBackendError(error instanceof Error ? error.message : 'Native miner failed to start.');
     }
   };
 
@@ -620,6 +663,7 @@ export const useMiningController = () => {
     config.profile = profile;
     config.threadCount = Math.min(config.totalDetectedThreads, preset.threads);
     config.customThreadCount = config.threadCount;
+    config.affinity = preset.affinity;
     config.thermalThreshold = preset.thermalLimit;
     config.priority = preset.priority;
   };

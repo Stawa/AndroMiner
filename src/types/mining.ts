@@ -145,6 +145,7 @@ export interface ProfilePreset {
   label: string;
   description: string;
   threads: number;
+  affinity: CpuAffinity;
   thermalLimit: number;
   priority: CpuPriority;
 }
