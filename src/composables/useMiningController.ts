@@ -252,6 +252,7 @@ export const useMiningController = () => {
   let sessionStartingRejectedShares = 0;
   let sessionHashrateTotal = 0;
   let sessionHashrateSamples = 0;
+  let nativeUptimeBaseline: number | null = 0;
   let externalBatteryLevel: number | null = null;
   let externalCharging = false;
   let externalTemperature: number | null = null;
@@ -291,6 +292,7 @@ export const useMiningController = () => {
     sessionStartedAt = 0;
     sessionHashrateTotal = 0;
     sessionHashrateSamples = 0;
+    nativeUptimeBaseline = 0;
   };
 
   const pushHistory = (series: HistoryPoint[], value: number): HistoryPoint[] => [
@@ -357,6 +359,18 @@ export const useMiningController = () => {
       return;
     }
 
+    if (state.value === 'paused') {
+      lastBackendError.value = '';
+      backendState.value = status.available ? 'ready' : 'missing';
+      backendMessage.value = status.available ? 'Miner paused.' : nextMessage;
+      connected.value = false;
+      stats.hashrate = 0;
+      stats.minerCpuUsage = null;
+      stats.cpuUsage = 0;
+      stats.activeThreads = 0;
+      return;
+    }
+
     if (!status.available) {
       lastBackendError.value = '';
       backendState.value = 'missing';
@@ -402,12 +416,21 @@ export const useMiningController = () => {
     stats.acceptedShares = Number(nativeStats.acceptedShares ?? stats.acceptedShares);
     stats.rejectedShares = Number(nativeStats.rejectedShares ?? stats.rejectedShares);
     stats.activeThreads = Number(nativeStats.activeThreads ?? stats.activeThreads);
-    const nativeUptimeSeconds = Number(nativeStats.uptimeSeconds ?? stats.uptimeSeconds);
-    if ((state.value === 'mining' || state.value === 'starting') && nativeUptimeSeconds > 0) {
-      if (sessionStartedAt <= 0) {
-        sessionStartedAt = Date.now() - nativeUptimeSeconds * 1000;
+
+    if (state.value === 'paused') {
+      return;
+    }
+
+    const nativeUptimeSeconds = Number(nativeStats.uptimeSeconds ?? 0);
+    if (state.value === 'mining' || state.value === 'starting') {
+      if (nativeUptimeBaseline === null) {
+        nativeUptimeBaseline = Math.max(0, nativeUptimeSeconds);
       }
-      stats.uptimeSeconds = Math.max(stats.uptimeSeconds, nativeUptimeSeconds);
+
+      const adjustedNativeUptime = Math.max(0, nativeUptimeSeconds - nativeUptimeBaseline);
+      const localUptime =
+        sessionStartedAt > 0 ? Math.max(0, Math.floor((Date.now() - sessionStartedAt) / 1000)) : 0;
+      stats.uptimeSeconds = Math.max(stats.uptimeSeconds, adjustedNativeUptime, localUptime);
     } else {
       stats.uptimeSeconds = nativeUptimeSeconds;
     }
@@ -506,7 +529,7 @@ export const useMiningController = () => {
   };
 
   const startMining = async (): Promise<void> => {
-    if (state.value !== 'idle') {
+    if (state.value !== 'idle' && state.value !== 'paused') {
       return;
     }
 
@@ -538,6 +561,7 @@ export const useMiningController = () => {
     minerLogs.value = [];
     lastBackendError.value = '';
     sessionStartedAt = Date.now();
+    nativeUptimeBaseline = null;
     sessionStartingAcceptedShares = stats.acceptedShares;
     sessionStartingRejectedShares = stats.rejectedShares;
     sessionHashrateTotal = 0;
@@ -621,17 +645,22 @@ export const useMiningController = () => {
     }
 
     if (state.value === 'paused') {
-      state.value = 'idle';
       await startMining();
       return;
     }
 
     try {
-      await NativeMiner.pause();
       state.value = 'paused';
       connected.value = false;
-      stats.activeThreads = config.threadCount;
+      stats.hashrate = 0;
+      stats.minerCpuUsage = null;
+      stats.cpuUsage = 0;
+      stats.activeThreads = 0;
+      backendMessage.value = 'Pausing native miner...';
+      await NativeMiner.pause();
+      backendMessage.value = 'Miner paused.';
     } catch {
+      state.value = 'mining';
       backendState.value = 'error';
       backendMessage.value = 'Native miner pause request failed.';
     }

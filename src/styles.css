@@ -256,6 +256,10 @@
     @apply flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-1 rounded-lg border border-app-line bg-app-card px-2 text-[13px] font-medium leading-5 text-app-on active:bg-app-elevated;
   }
 
+  .session-action:disabled {
+    @apply cursor-wait opacity-70 active:bg-app-card;
+  }
+
   .config-field {
     @apply block min-w-0 space-y-2;
   }

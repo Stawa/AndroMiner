@@ -38,6 +38,7 @@ interface ImmersiveModePlugin {
 }
 
 type LogTone = 'danger' | 'warning' | 'success' | 'muted';
+type PendingSessionAction = 'pause' | 'resume' | 'stop' | null;
 
 const props = defineProps<MiningSessionViewProps>();
 const settings = useSettingsStore();
@@ -54,8 +55,10 @@ const fullscreenActive = ref(false);
 const fullscreenBusy = ref(false);
 const profilePickerOpen = ref(false);
 const warningType = ref<WarningType | null>(null);
+const pendingSessionAction = ref<PendingSessionAction>(null);
 const ImmersiveMode = registerPlugin<ImmersiveModePlugin>('ImmersiveMode');
 const liteSessionMode = computed(() => settings.performance.liteSessionMode);
+let pendingSessionActionTimeout = 0;
 
 const recentHashrates = computed(() =>
   props.hashrateHistory
@@ -435,7 +438,7 @@ const dismissWarning = (): void => {
 
 const resumeFromWarning = (): void => {
   warningType.value = null;
-  emit('resume');
+  requestPauseResume();
 };
 
 const lowerPerformance = (): void => {
@@ -462,6 +465,53 @@ const selectProfile = (profile: MiningProfile): void => {
   closeProfilePicker();
 };
 
+const clearPendingSessionAction = (): void => {
+  if (pendingSessionActionTimeout) {
+    window.clearTimeout(pendingSessionActionTimeout);
+    pendingSessionActionTimeout = 0;
+  }
+
+  pendingSessionAction.value = null;
+};
+
+const setPendingSessionAction = (action: Exclude<PendingSessionAction, null>): void => {
+  pendingSessionAction.value = action;
+
+  if (pendingSessionActionTimeout) {
+    window.clearTimeout(pendingSessionActionTimeout);
+  }
+
+  pendingSessionActionTimeout = window.setTimeout(() => {
+    clearPendingSessionAction();
+  }, 9000);
+};
+
+const requestPauseResume = (): void => {
+  if (pendingSessionAction.value) {
+    return;
+  }
+
+  if (props.state === 'paused') {
+    setPendingSessionAction('resume');
+    emit('resume');
+    return;
+  }
+
+  setPendingSessionAction('pause');
+  emit('pause');
+};
+
+const requestStop = (): void => {
+  if (pendingSessionAction.value) {
+    return;
+  }
+
+  setPendingSessionAction('stop');
+  closeDetails();
+  closeProfilePicker();
+  emit('stop');
+};
+
 watch(
   () => [props.stats.temperature, props.stats.batteryLevel, props.state] as const,
   ([temperature, batteryLevel, state]) => {
@@ -471,13 +521,26 @@ watch(
 
     if (temperature >= props.config.thermalThreshold) {
       warningType.value = 'thermal';
-      emit('pause');
+      requestPauseResume();
       return;
     }
 
     if (batteryLevel <= batterySafetyLimit) {
       warningType.value = 'battery';
-      emit('pause');
+      requestPauseResume();
+    }
+  }
+);
+
+watch(
+  () => props.state,
+  (state) => {
+    if (
+      (pendingSessionAction.value === 'pause' && state === 'paused') ||
+      (pendingSessionAction.value === 'resume' && state === 'mining') ||
+      (pendingSessionAction.value === 'stop' && state === 'idle')
+    ) {
+      clearPendingSessionAction();
     }
   }
 );
@@ -488,6 +551,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('fullscreenchange', syncBrowserFullscreenState);
+  clearPendingSessionAction();
   void exitFullscreenMode();
 });
 
@@ -574,7 +638,7 @@ const trendTone = computed(() =>
               connected ? 'bg-app-green-dim text-app-green' : 'bg-app-elevated text-app-muted'
             "
           >
-            <MaterialIcon :name="connected ? 'lan' : 'lan_disconnect'" :size="24" />
+            <MaterialIcon :name="connected ? 'lan' : 'link_off'" :size="24" />
           </span>
         </div>
         <div class="mt-4 grid grid-cols-3 gap-2">
@@ -947,8 +1011,10 @@ const trendTone = computed(() =>
     <SessionControls
       :state="state"
       :profile-label="profileLabel"
-      @pause="emit('pause')"
-      @stop="emit('stop')"
+      :pending-action="pendingSessionAction"
+      :animations-enabled="settings.performance.animationsEnabled"
+      @pause="requestPauseResume"
+      @stop="requestStop"
       @profile="openProfilePicker"
     />
 
