@@ -6,6 +6,7 @@ import { Share } from '@capacitor/share';
 import AppDrawer from './components/AppDrawer.vue';
 import AppHeader from './components/AppHeader.vue';
 import BottomNav, { type AppTab } from './components/BottomNav.vue';
+import MaterialIcon from './components/MaterialIcon.vue';
 import MinerDownloadWarningSheet from './components/MinerDownloadWarningSheet.vue';
 import PhoneMiningRiskView from './components/PhoneMiningRiskView.vue';
 import StartMiningWarningSheet from './components/StartMiningWarningSheet.vue';
@@ -35,6 +36,11 @@ const systemCheckComplete = ref(false);
 const phoneRiskWarningAccepted = ref(localStorage.getItem(phoneRiskWarningKey) === 'true');
 const minerDownloadWarningOpen = ref(false);
 const startWarningOpen = ref(false);
+const updateBanner = ref({
+  visible: false,
+  title: '',
+  message: ''
+});
 const miner = useMiningController();
 const settings = useSettingsStore();
 const profiles = useProfilesStore();
@@ -44,6 +50,7 @@ useTheme();
 const sessionActive = computed(() => miner.state.value !== 'idle');
 const configAutosaveReady = ref(false);
 let configAutosaveHandle = 0;
+let lastNotifiedUpdateVersion = '';
 const updateCheckIntervalMs = 10 * 60 * 1000;
 
 interface MiningNotificationPlugin {
@@ -131,12 +138,41 @@ const flushConfigAutosave = (): void => {
   autosaveCurrentConfig();
 };
 
+const hideUpdateBanner = (): void => {
+  updateBanner.value.visible = false;
+};
+
+const showUpdateBanner = (version: string): void => {
+  updateBanner.value = {
+    visible: true,
+    title: 'Update available',
+    message: `Version ${version} is ready to download.`
+  };
+};
+
+const notifyForAvailableUpdate = (): void => {
+  if (
+    !settings.updates.autoUpdate ||
+    updater.status.value !== 'ready' ||
+    !updater.availableVersion.value
+  ) {
+    return;
+  }
+
+  if (lastNotifiedUpdateVersion === updater.availableVersion.value) {
+    return;
+  }
+
+  lastNotifiedUpdateVersion = updater.availableVersion.value;
+  showUpdateBanner(updater.availableVersion.value);
+};
+
 const runAutoUpdateCheck = (minIntervalMs = 0): void => {
   if (!settings.updates.autoUpdate) {
     return;
   }
 
-  void updater.checkForUpdates({ minIntervalMs });
+  void updater.checkForUpdates({ minIntervalMs }).then(notifyForAvailableUpdate);
 };
 
 const checkUpdatesWhenVisible = (): void => {
@@ -157,6 +193,11 @@ const navigateToStatistics = (): void => {
 
 const navigateToProfiles = (): void => {
   activeTab.value = 'profiles';
+};
+
+const openUpdateSettings = (): void => {
+  activeTab.value = 'settings';
+  hideUpdateBanner();
 };
 
 const completeSystemCheck = (): void => {
@@ -276,6 +317,19 @@ watch(
   { deep: true }
 );
 
+watch(
+  () => settings.updates.autoUpdate,
+  (enabled) => {
+    if (!enabled) {
+      hideUpdateBanner();
+      return;
+    }
+
+    lastNotifiedUpdateVersion = '';
+    runAutoUpdateCheck();
+  }
+);
+
 watch(() => miner.config, scheduleConfigAutosave, { deep: true });
 
 watch(
@@ -364,6 +418,49 @@ onBeforeUnmount(() => {
         @back="activeTab = 'dashboard'"
         @notifications="activeTab = 'settings'"
       />
+
+      <Transition name="banner">
+        <div
+          v-if="systemCheckComplete && !sessionActive && updateBanner.visible"
+          class="mx-auto w-full max-w-[440px] px-4 pt-2"
+          role="status"
+          aria-live="polite"
+        >
+          <div
+            class="flex min-h-14 items-center gap-3 rounded-lg border border-app-line bg-app-card px-3 py-2 text-app-on shadow-sm"
+          >
+            <span
+              class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-app-elevated text-app-green"
+            >
+              <MaterialIcon name="new_releases" :size="20" filled />
+            </span>
+            <span class="min-w-0 flex-1">
+              <span class="block truncate text-[13px] font-semibold leading-5 text-white">
+                {{ updateBanner.title }}
+              </span>
+              <span class="block truncate text-[12px] leading-4 text-app-muted">
+                {{ updateBanner.message }}
+              </span>
+            </span>
+            <button
+              class="ripple grid h-10 min-h-10 w-10 shrink-0 place-items-center rounded-full text-app-green active:bg-app-green-dim"
+              type="button"
+              aria-label="View update"
+              @click="openUpdateSettings"
+            >
+              <MaterialIcon name="arrow_forward" :size="20" />
+            </button>
+            <button
+              class="ripple grid h-10 min-h-10 w-10 shrink-0 place-items-center rounded-full text-app-muted active:bg-app-elevated"
+              type="button"
+              aria-label="Dismiss update notification"
+              @click="hideUpdateBanner"
+            >
+              <MaterialIcon name="close" :size="20" />
+            </button>
+          </div>
+        </div>
+      </Transition>
 
       <MiningSessionView
         v-if="sessionActive"

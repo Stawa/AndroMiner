@@ -348,35 +348,79 @@ const clearSessionHistory = (): void => {
   <div class="phone-page">
     <section class="app-card overflow-hidden">
       <div class="p-4">
-        <div class="flex items-start gap-3">
-          <button
-            class="ripple grid h-14 w-14 shrink-0 place-items-center rounded-lg text-[24px] font-bold text-white shadow-sm"
-            :class="config.coin.logoClass"
-            type="button"
-            aria-label="Edit mining setup"
-            @click="emit('configure')"
-          >
-            {{ config.coin.logoText }}
-          </button>
-          <button class="ripple min-w-0 flex-1 text-left" type="button" @click="emit('configure')">
-            <p class="truncate text-[12px] font-semibold uppercase leading-4 text-app-green">
-              Active Setup
-            </p>
-            <h2 class="mt-1 truncate text-[22px] font-semibold leading-7 text-white">
-              {{ profileName }}
-            </h2>
-            <p class="truncate text-[13px] leading-5 text-app-muted">
-              {{ config.coin.name }} · {{ config.algorithm }}
-            </p>
-          </button>
-          <button
-            class="ripple grid h-11 w-11 shrink-0 place-items-center rounded-full text-app-muted active:bg-app-elevated"
-            type="button"
-            aria-label="Open profiles"
-            @click="emit('profiles')"
-          >
-            <MaterialIcon name="folder_managed" :size="22" />
-          </button>
+        <div class="rounded-lg border border-app-line bg-app-elevated/70 p-3">
+          <div class="flex items-start gap-3">
+            <button
+              class="ripple grid h-14 w-14 shrink-0 place-items-center rounded-lg text-[24px] font-bold text-white shadow-sm"
+              :class="config.coin.logoClass"
+              type="button"
+              aria-label="Edit mining setup"
+              @click="emit('configure')"
+            >
+              {{ config.coin.logoText }}
+            </button>
+            <button
+              class="ripple min-w-0 flex-1 rounded-md px-1 text-left active:bg-app-card/70"
+              type="button"
+              @click="emit('configure')"
+            >
+              <span class="flex min-w-0 items-center gap-2">
+                <span class="truncate text-[11px] font-semibold uppercase leading-4 text-app-muted">
+                  Active Setup
+                </span>
+                <span
+                  class="shrink-0 rounded-full bg-app-card px-2 py-0.5 text-[10px] font-semibold uppercase leading-4 text-app-muted"
+                >
+                  {{ setupReady ? 'Ready' : 'Review' }}
+                </span>
+              </span>
+              <h2 class="mt-1 truncate text-[22px] font-semibold leading-7 text-white">
+                {{ profileName }}
+              </h2>
+              <p class="mt-0.5 truncate text-[13px] leading-5 text-app-muted">
+                {{ config.coin.name }} on {{ config.algorithm }}
+              </p>
+            </button>
+            <button
+              class="ripple grid h-11 w-11 shrink-0 place-items-center rounded-full bg-app-card text-app-muted active:bg-app-elevated"
+              type="button"
+              aria-label="Open profiles"
+              @click="emit('profiles')"
+            >
+              <MaterialIcon name="folder_managed" :size="22" />
+            </button>
+          </div>
+
+          <div class="mt-3 grid grid-cols-2 gap-2">
+            <button
+              class="ripple min-w-0 rounded-lg bg-app-card px-2.5 py-2 text-left active:bg-app-elevated"
+              type="button"
+              @click="emit('configure')"
+            >
+              <span
+                class="block truncate text-[10px] font-semibold uppercase leading-4 text-app-muted"
+              >
+                Threads
+              </span>
+              <span class="mt-0.5 block truncate text-[13px] font-semibold leading-5 text-white">
+                {{ config.threadCount }}/{{ config.totalDetectedThreads }}
+              </span>
+            </button>
+            <button
+              class="ripple min-w-0 rounded-lg bg-app-card px-2.5 py-2 text-left active:bg-app-elevated"
+              type="button"
+              @click="emit('configure')"
+            >
+              <span
+                class="block truncate text-[10px] font-semibold uppercase leading-4 text-app-muted"
+              >
+                Pool
+              </span>
+              <span class="mt-0.5 block truncate text-[13px] font-semibold leading-5 text-white">
+                {{ config.protocol }}
+              </span>
+            </button>
+          </div>
         </div>
 
         <div class="mt-4 rounded-lg bg-app-elevated p-4">

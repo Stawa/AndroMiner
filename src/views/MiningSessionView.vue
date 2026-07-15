@@ -8,6 +8,7 @@ import StatusIndicator from '../components/StatusIndicator.vue';
 import WarningBottomSheet, { type WarningType } from '../components/WarningBottomSheet.vue';
 import { profilePresets } from '../composables/useMiningController';
 import { useSheetDrag } from '../composables/useSheetDrag';
+import { useSettingsStore } from '../stores/settings';
 import type {
   DeviceTelemetry,
   HistoryPoint,
@@ -39,6 +40,7 @@ interface ImmersiveModePlugin {
 type LogTone = 'danger' | 'warning' | 'success' | 'muted';
 
 const props = defineProps<MiningSessionViewProps>();
+const settings = useSettingsStore();
 
 const emit = defineEmits<{
   pause: [];
@@ -53,6 +55,7 @@ const fullscreenBusy = ref(false);
 const profilePickerOpen = ref(false);
 const warningType = ref<WarningType | null>(null);
 const ImmersiveMode = registerPlugin<ImmersiveModePlugin>('ImmersiveMode');
+const liteSessionMode = computed(() => settings.performance.liteSessionMode);
 
 const recentHashrates = computed(() =>
   props.hashrateHistory
@@ -196,14 +199,26 @@ const formatCompactNumber = (value: number | null): string => {
   }).format(value);
 };
 
+const formatSpeedLabel = (value: number): string => {
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(2)} MH/s`;
+  }
+
+  if (value >= 1_000) {
+    return `${(value / 1_000).toFixed(2)} KH/s`;
+  }
+
+  return `${value.toFixed(1)} H/s`;
+};
+
 const formatCpuUsage = (value: number | null | undefined): string =>
   typeof value === 'number' && Number.isFinite(value) ? `${Math.round(value)}%` : '-';
 
 const logToneClass = (tone: LogTone): string => {
   const classes: Record<LogTone, string> = {
-    danger: 'border-red-400/70 bg-red-500/10 text-red-100',
-    warning: 'border-app-yellow/70 bg-app-yellow/10 text-yellow-100',
-    success: 'border-app-green/70 bg-app-green-dim text-green-100',
+    danger: 'border-red-400/70 bg-red-500/10 text-red-700 dark:text-red-100',
+    warning: 'border-app-yellow/70 bg-app-yellow/10 text-amber-800 dark:text-yellow-100',
+    success: 'border-app-green/70 bg-app-green-dim text-app-green',
     muted: 'border-white/10 text-app-muted'
   };
 
@@ -242,6 +257,64 @@ const cpuTuningLabel = computed(() => `${affinityLabel.value} · ${priorityLabel
 
 const apiResults = computed(() => asRecord(props.apiTelemetry.results));
 const apiConnection = computed(() => asRecord(props.apiTelemetry.connection));
+const powerDrawLabel = computed(() =>
+  typeof props.device.powerDrawW === 'number' && Number.isFinite(props.device.powerDrawW)
+    ? `${props.device.powerDrawW.toFixed(2)} W`
+    : 'Unavailable'
+);
+const powerDrawDetail = computed(() => {
+  if (
+    typeof props.device.batteryCurrentMa === 'number' &&
+    Number.isFinite(props.device.batteryCurrentMa) &&
+    typeof props.device.batteryVoltageV === 'number' &&
+    Number.isFinite(props.device.batteryVoltageV)
+  ) {
+    return `${Math.round(props.device.batteryCurrentMa)} mA · ${props.device.batteryVoltageV.toFixed(
+      2
+    )} V`;
+  }
+
+  return 'Sensor not exposed';
+});
+const frequencyMhzLabel = computed(() =>
+  typeof props.device.cpuClockGhz === 'number' && Number.isFinite(props.device.cpuClockGhz)
+    ? `${Math.round(props.device.cpuClockGhz * 1000).toLocaleString()} MHz`
+    : 'Unknown'
+);
+const sessionMetricCards = computed(() => [
+  {
+    id: 'latency',
+    icon: 'speed',
+    label: 'Network latency',
+    value: networkLatencyLabel.value,
+    detail: props.apiTelemetry.available ? 'XMRig API ping' : 'Pool ping fallback',
+    tone: networkLatencyLabel.value === 'Unknown' ? 'text-app-muted' : 'text-white'
+  },
+  {
+    id: 'power',
+    icon: 'bolt',
+    label: 'Power draw',
+    value: powerDrawLabel.value,
+    detail: powerDrawDetail.value,
+    tone: props.device.powerDrawW ? 'text-white' : 'text-app-muted'
+  },
+  {
+    id: 'frequency',
+    icon: 'memory_alt',
+    label: 'Frequency',
+    value: frequencyMhzLabel.value,
+    detail: 'Current CPU clock',
+    tone: 'text-white'
+  },
+  {
+    id: 'cpu',
+    icon: 'monitor_heart',
+    label: 'Miner CPU',
+    value: formatCpuUsage(props.stats.minerCpuUsage),
+    detail: `${props.stats.activeThreads || props.config.threadCount} active threads`,
+    tone: props.stats.minerCpuUsage === null ? 'text-app-muted' : 'text-white'
+  }
+]);
 const currentDifficultyLabel = computed(() =>
   formatCompactNumber(
     firstPositiveNumber(
@@ -418,54 +491,13 @@ onBeforeUnmount(() => {
   void exitFullscreenMode();
 });
 
-const trendLabel = computed(() => {
-  const current = props.stats.hashrate;
-  const average = averageHashrate.value;
-
-  if (showingPreparation.value) return 'Preparing';
-  if (current <= 0) return 'Idle';
-  if (baselineHashrates.value.length < 3) return 'Warming up';
-  if (average <= 0) return 'Mining';
-
-  const tolerance = Math.max(1, average * 0.08);
-
-  if (current > average + tolerance) return 'Above average';
-  if (current < average - tolerance) return 'Below average';
-
-  return 'Near average';
-});
-
-const trendTone = computed(() => {
-  if (showingPreparation.value) {
-    return 'text-app-yellow';
-  }
-
-  if (props.stats.hashrate <= 0 || baselineHashrates.value.length < 3) {
-    return 'text-app-muted';
-  }
-
-  return trendLabel.value === 'Above average'
-    ? 'text-app-green'
-    : trendLabel.value === 'Below average'
-      ? 'text-yellow-400'
-      : 'text-app-muted';
-});
-
-const trendIcon = computed(() => {
-  if (showingPreparation.value) {
-    return '•';
-  }
-
-  if (props.stats.hashrate <= 0 || baselineHashrates.value.length < 3) {
-    return '•';
-  }
-
-  return trendLabel.value === 'Above average'
-    ? '↗'
-    : trendLabel.value === 'Below average'
-      ? '↘'
-      : '•';
-});
+const highestHashrate = computed(() => Math.max(0, props.stats.hashrate, ...recentHashrates.value));
+const highestSpeedLabel = computed(() =>
+  highestHashrate.value > 0 ? formatSpeedLabel(highestHashrate.value) : 'Waiting'
+);
+const trendTone = computed(() =>
+  showingPreparation.value || highestHashrate.value <= 0 ? 'text-app-muted' : 'text-app-green'
+);
 </script>
 
 <template>
@@ -486,8 +518,36 @@ const trendIcon = computed(() => {
         </p>
         <StatusIndicator :connected="connected" />
       </div>
+    </header>
+
+    <section
+      class="mt-3 grid grid-cols-[1fr_48px] gap-2 rounded-xl border border-app-line bg-app-card p-1.5"
+      aria-label="Session display controls"
+    >
+      <div class="grid min-w-0 grid-cols-2 gap-1 rounded-lg bg-app-elevated p-1">
+        <button
+          class="ripple flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-md px-2 text-[12px] font-semibold transition-colors"
+          :class="!liteSessionMode ? 'bg-app-card text-app-green shadow-sm' : 'text-app-muted'"
+          type="button"
+          :aria-pressed="!liteSessionMode"
+          @click="settings.performance.liteSessionMode = false"
+        >
+          <MaterialIcon name="view_agenda" :size="18" />
+          <span class="truncate">Full</span>
+        </button>
+        <button
+          class="ripple flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-md px-2 text-[12px] font-semibold transition-colors"
+          :class="liteSessionMode ? 'bg-app-card text-app-green shadow-sm' : 'text-app-muted'"
+          type="button"
+          :aria-pressed="liteSessionMode"
+          @click="settings.performance.liteSessionMode = true"
+        >
+          <MaterialIcon name="view_compact" :size="18" />
+          <span class="truncate">Lite</span>
+        </button>
+      </div>
       <button
-        class="top-icon-button"
+        class="ripple grid min-h-12 w-12 place-items-center rounded-lg bg-app-elevated text-app-muted transition-colors active:bg-app-line/40"
         :class="{ 'bg-app-green-dim text-app-green': fullscreenActive }"
         type="button"
         :aria-label="fullscreenActive ? 'Exit fullscreen' : 'Enter fullscreen'"
@@ -495,11 +555,120 @@ const trendIcon = computed(() => {
         :disabled="fullscreenBusy"
         @click="toggleFullscreen"
       >
-        <MaterialIcon :name="fullscreenActive ? 'fullscreen_exit' : 'fullscreen'" :size="23" />
+        <MaterialIcon :name="fullscreenActive ? 'fullscreen_exit' : 'fullscreen'" :size="22" />
       </button>
-    </header>
+    </section>
 
-    <main class="flex flex-1 flex-col justify-center gap-4 py-5">
+    <main v-if="liteSessionMode" class="flex flex-1 flex-col justify-center gap-4 py-5">
+      <section class="rounded-xl border border-app-line bg-app-card p-4">
+        <div class="flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <p class="text-[11px] font-semibold uppercase leading-4 text-app-muted">Hashrate</p>
+            <h2 class="mt-1 text-[34px] font-semibold leading-9 text-white tabular-nums">
+              {{ formatSpeedLabel(stats.hashrate) }}
+            </h2>
+          </div>
+          <span
+            class="grid h-12 w-12 shrink-0 place-items-center rounded-full"
+            :class="
+              connected ? 'bg-app-green-dim text-app-green' : 'bg-app-elevated text-app-muted'
+            "
+          >
+            <MaterialIcon :name="connected ? 'lan' : 'lan_disconnect'" :size="24" />
+          </span>
+        </div>
+        <div class="mt-4 grid grid-cols-3 gap-2">
+          <div class="min-w-0 rounded-lg bg-app-elevated px-3 py-2">
+            <p class="text-[10px] font-semibold uppercase leading-4 text-app-muted">Uptime</p>
+            <p class="mt-1 truncate text-[13px] font-semibold leading-5 text-white">{{ uptime }}</p>
+          </div>
+          <div class="min-w-0 rounded-lg bg-app-elevated px-3 py-2">
+            <p class="text-[10px] font-semibold uppercase leading-4 text-app-muted">Avg</p>
+            <p class="mt-1 truncate text-[13px] font-semibold leading-5 text-white">
+              {{ formatSpeedLabel(averageHashrate) }}
+            </p>
+          </div>
+          <div class="min-w-0 rounded-lg bg-app-elevated px-3 py-2">
+            <p class="text-[10px] font-semibold uppercase leading-4 text-app-muted">Peak</p>
+            <p class="mt-1 truncate text-[13px] font-semibold leading-5 text-white">
+              {{ highestSpeedLabel }}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="grid grid-cols-2 gap-2">
+        <div class="min-w-0 rounded-xl border border-app-line bg-app-card p-3">
+          <p class="text-[10px] font-semibold uppercase leading-4 text-app-muted">CPU clock</p>
+          <p class="mt-1 truncate text-[19px] font-semibold leading-6 text-white">
+            {{ frequencyMhzLabel }}
+          </p>
+          <p class="mt-1 truncate text-[11px] leading-4 text-app-muted">
+            {{ formatCpuUsage(stats.minerCpuUsage) }} miner CPU
+          </p>
+        </div>
+        <div class="min-w-0 rounded-xl border border-app-line bg-app-card p-3">
+          <p class="text-[10px] font-semibold uppercase leading-4 text-app-muted">Shares</p>
+          <p class="mt-1 truncate text-[19px] font-semibold leading-6">
+            <span class="text-app-green">{{ stats.acceptedShares.toLocaleString() }}</span>
+            <span class="px-1 text-app-muted">/</span>
+            <span class="text-red-400">{{ stats.rejectedShares.toLocaleString() }}</span>
+          </p>
+          <p class="mt-1 truncate text-[11px] leading-4 text-app-muted">
+            {{ networkLatencyLabel }} pool ping
+          </p>
+        </div>
+        <div class="min-w-0 rounded-xl border border-app-line bg-app-card p-3">
+          <p class="text-[10px] font-semibold uppercase leading-4 text-app-muted">Thermal</p>
+          <p
+            class="mt-1 truncate text-[19px] font-semibold leading-6"
+            :class="thermalTone === 'warning' ? 'text-app-yellow' : 'text-white'"
+          >
+            {{ Math.round(stats.temperature) }} °C
+          </p>
+          <p class="mt-1 truncate text-[11px] leading-4 text-app-muted">
+            Limit {{ config.thermalThreshold }} °C
+          </p>
+        </div>
+        <div class="min-w-0 rounded-xl border border-app-line bg-app-card p-3">
+          <p class="text-[10px] font-semibold uppercase leading-4 text-app-muted">Battery</p>
+          <p
+            class="mt-1 truncate text-[19px] font-semibold leading-6"
+            :class="stats.batteryLevel <= batterySafetyLimit ? 'text-app-yellow' : 'text-white'"
+          >
+            {{ Math.round(stats.batteryLevel) }}%
+          </p>
+          <p class="mt-1 truncate text-[11px] leading-4 text-app-muted">
+            {{ stats.isCharging ? 'Charging' : 'Unplugged' }}
+          </p>
+        </div>
+      </section>
+
+      <section class="rounded-xl border border-app-line bg-app-card p-3">
+        <div class="flex min-w-0 items-center gap-3">
+          <span
+            class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-app-elevated text-app-green"
+          >
+            <MaterialIcon name="memory" :size="21" />
+          </span>
+          <div class="min-w-0 flex-1">
+            <p class="truncate text-[14px] font-semibold leading-5 text-white">
+              {{ cpuWorkerLabel }}
+            </p>
+            <p class="mt-0.5 truncate text-[12px] leading-4 text-app-muted">
+              {{ cpuTuningLabel }}
+            </p>
+          </div>
+          <span
+            class="shrink-0 rounded-full bg-app-elevated px-2.5 py-1 text-[11px] font-semibold text-app-muted"
+          >
+            Lite
+          </span>
+        </div>
+      </section>
+    </main>
+
+    <main v-else class="flex flex-1 flex-col justify-center gap-4 py-5">
       <HashrateRing
         v-if="!showingPreparation"
         :value="stats.hashrate"
@@ -547,12 +716,9 @@ const trendIcon = computed(() => {
         >
           <!-- trend -->
           <div class="flex items-center gap-1 rounded-full px-3 py-1" :class="trendTone">
-            <span class="text-sm">
-              {{ trendIcon }}
-            </span>
-
             <span class="text-[12px] font-medium">
-              {{ trendLabel }}
+              Peak
+              <span class="ml-1 text-white">{{ highestSpeedLabel }}</span>
             </span>
           </div>
 
@@ -568,6 +734,31 @@ const trendIcon = computed(() => {
           </div>
         </div>
       </div>
+
+      <section class="grid grid-cols-2 gap-2">
+        <div
+          v-for="metric in sessionMetricCards"
+          :key="metric.id"
+          class="min-w-0 rounded-xl border border-app-line bg-app-card p-3"
+        >
+          <div class="mb-3 flex items-center justify-between gap-2">
+            <span
+              class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-app-elevated text-app-green"
+            >
+              <MaterialIcon :name="metric.icon" :size="20" />
+            </span>
+            <span class="truncate text-[10px] font-semibold uppercase leading-4 text-app-muted">
+              {{ metric.label }}
+            </span>
+          </div>
+          <p class="truncate text-[18px] font-semibold leading-6" :class="metric.tone">
+            {{ metric.value }}
+          </p>
+          <p class="mt-1 truncate text-[11px] leading-4 text-app-muted">
+            {{ metric.detail }}
+          </p>
+        </div>
+      </section>
 
       <section class="overflow-hidden rounded-2xl border border-app-line bg-app-card">
         <div class="flex items-center justify-between gap-3 border-b border-app-line px-3 py-2.5">
@@ -722,21 +913,21 @@ const trendIcon = computed(() => {
         </div>
       </section>
 
-      <section class="rounded-2xl border border-app-line bg-black/25 p-3">
+      <section class="rounded-2xl border border-app-line bg-app-card p-3">
         <div class="mb-2 flex items-center justify-between gap-3">
           <div class="flex min-w-0 items-center gap-2">
             <MaterialIcon name="terminal" :size="18" class="shrink-0 text-app-green" />
             <p class="truncate text-[13px] font-semibold text-white">Miner logs</p>
           </div>
           <span
-            class="shrink-0 rounded-full bg-white/5 px-2 py-1 text-[10px] uppercase text-app-muted"
+            class="shrink-0 rounded-full bg-app-elevated px-2 py-1 text-[10px] uppercase text-app-muted"
           >
             {{ latestLogCountLabel }}
           </span>
         </div>
 
         <div
-          class="max-h-56 overflow-y-auto overflow-x-auto rounded-xl bg-black/35 p-2 font-mono text-[11px] leading-[17px]"
+          class="max-h-56 overflow-y-auto overflow-x-auto rounded-xl border border-app-line bg-app-elevated/70 p-2 font-mono text-[11px] leading-[17px]"
         >
           <p v-if="latestLogs.length === 0" class="whitespace-pre-wrap break-words text-app-muted">
             {{ backendMessage || 'Waiting for miner output...' }}
@@ -820,7 +1011,7 @@ const trendIcon = computed(() => {
           </div>
           <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
             <span class="text-app-muted">CPU clock</span
-            ><strong class="font-medium text-white">{{ cpuClockLabel }}</strong>
+            ><strong class="font-medium text-white">{{ frequencyMhzLabel }}</strong>
           </div>
           <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
             <span class="text-app-muted">CPU workers</span
@@ -835,6 +1026,14 @@ const trendIcon = computed(() => {
             ><strong class="font-medium text-white">{{
               formatCpuUsage(stats.minerCpuUsage)
             }}</strong>
+          </div>
+          <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
+            <span class="text-app-muted">Power draw</span
+            ><strong
+              class="font-medium"
+              :class="device.powerDrawW ? 'text-white' : 'text-app-muted'"
+              >{{ powerDrawLabel }}</strong
+            >
           </div>
           <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
             <span class="text-app-muted">Network latency</span
@@ -890,7 +1089,7 @@ const trendIcon = computed(() => {
               <strong class="font-medium text-white">{{ logs.length }} lines</strong>
             </div>
             <div
-              class="max-h-[48vh] overflow-y-auto overflow-x-auto rounded-xl bg-black/35 p-2 font-mono text-[11px] leading-[17px]"
+              class="max-h-[48vh] overflow-y-auto overflow-x-auto rounded-xl border border-app-line bg-app-elevated/70 p-2 font-mono text-[11px] leading-[17px]"
             >
               <p
                 v-if="detailLogs.length === 0"

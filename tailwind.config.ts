@@ -6,7 +6,16 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif']
+        sans: [
+          'Manrope',
+          'Inter',
+          'Segoe UI Variable',
+          'Segoe UI',
+          'Roboto',
+          'ui-sans-serif',
+          'system-ui',
+          'sans-serif'
+        ]
       },
       colors: {
         app: {
@@ -21,28 +30,28 @@ export default {
           yellow: 'rgb(var(--color-app-yellow) / <alpha-value>)'
         },
         surface: {
-          bg: '#f8faf7',
-          nav: '#fffffb',
+          bg: '#f7f9fa',
+          nav: '#ffffff',
           card: '#ffffff',
-          elevated: '#eef3ee',
-          line: '#dfe5dc',
-          on: '#171d19',
-          muted: '#647067'
+          elevated: '#f1f5f8',
+          line: '#dae2e9',
+          on: '#111820',
+          muted: '#535f6c'
         },
         dark: {
-          bg: '#111411',
-          nav: '#181c18',
-          card: '#1b1f1b',
-          elevated: '#242a24',
-          line: '#30372f',
-          on: '#e7ece5',
-          muted: '#aab4a8'
+          bg: '#0a0d11',
+          nav: '#12171c',
+          card: '#12171c',
+          elevated: '#1a2128',
+          line: '#2b353e',
+          on: '#f4f9f6',
+          muted: '#a5b1bc'
         },
         primary: {
-          DEFAULT: '#286b4f',
-          container: '#d3f7df',
-          dark: '#8dd8b2',
-          'dark-container': '#123726'
+          DEFAULT: '#2a6084',
+          container: '#e2ebf1',
+          dark: '#77b9d9',
+          'dark-container': '#193544'
         },
         graphite: {
           50: '#f7f8fb',
@@ -58,9 +67,9 @@ export default {
           950: '#05070d'
         },
         volt: {
-          300: '#79ffe1',
-          400: '#38f8c5',
-          500: '#10d9a8'
+          300: '#9bd7f0',
+          400: '#77b9d9',
+          500: '#3f8fb8'
         },
         plasma: {
           400: '#8b5cf6',

@@ -61,12 +61,7 @@ interface NativeMinerPlugin {
 export type MinerBinaryVariant = 'tls' | 'notls';
 
 export type MinerBackendState =
-  | 'checking'
-  | 'ready'
-  | 'missing'
-  | 'downloading'
-  | 'web-unavailable'
-  | 'error';
+  'checking' | 'ready' | 'missing' | 'downloading' | 'web-unavailable' | 'error';
 
 const NativeMiner = registerPlugin<NativeMinerPlugin>('NativeMiner');
 const maxHistoryPoints = 26;

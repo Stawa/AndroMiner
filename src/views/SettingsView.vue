@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import MaterialIcon from '../components/MaterialIcon.vue';
 import ToggleRow from '../components/ToggleRow.vue';
 import { useGitHubReleaseUpdater } from '../composables/useGitHubReleaseUpdater';
@@ -144,17 +144,6 @@ const openGitHubRelease = (): void => {
 onMounted(() => {
   void refreshCurrentVersion();
 });
-
-watch(
-  () => settings.updates.autoUpdate,
-  (enabled) => {
-    if (!enabled) {
-      return;
-    }
-
-    void runUpdateCheck();
-  }
-);
 </script>
 
 <template>
@@ -420,6 +409,12 @@ watch(
             icon="animation"
             label="Animations"
             supporting-text="Enable smooth screen, sheet, and control transitions"
+          />
+          <ToggleRow
+            v-model="settings.performance.liteSessionMode"
+            icon="view_compact"
+            label="Lite mining screen"
+            supporting-text="Use a simpler live session screen with fewer panels"
           />
         </div>
       </section>

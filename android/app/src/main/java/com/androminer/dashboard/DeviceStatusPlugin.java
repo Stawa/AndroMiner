@@ -32,9 +32,15 @@ public class DeviceStatusPlugin extends Plugin {
         TemperatureReading temperature = getBestPhoneTemperature(batteryIntent);
         HardwareInfo cpu = getCpuHardwareInfo();
         HardwareInfo gpu = getGpuHardwareInfo();
+        PowerReading power = getPowerReading(batteryIntent);
 
         result.put("batteryLevel", getBatteryLevel(batteryIntent));
         result.put("isCharging", isCharging(batteryIntent));
+        if (power != null) {
+            result.put("batteryCurrentMa", power.currentMa);
+            result.put("batteryVoltageV", power.voltageV);
+            result.put("powerDrawW", power.powerW);
+        }
         result.put("cpuThreads", Runtime.getRuntime().availableProcessors());
         result.put("cpuName", cpu.name);
         result.put("cpuClockGhz", cpu.clockValue);
@@ -77,6 +83,32 @@ public class DeviceStatusPlugin extends Plugin {
         return status == BatteryManager.BATTERY_STATUS_CHARGING
                 || status == BatteryManager.BATTERY_STATUS_FULL
                 || plugged != 0;
+    }
+
+    private PowerReading getPowerReading(Intent batteryIntent) {
+        BatteryManager batteryManager =
+                (BatteryManager) getContext().getSystemService(Context.BATTERY_SERVICE);
+        if (batteryManager == null || batteryIntent == null) {
+            return null;
+        }
+
+        long currentMicroamps =
+                batteryManager.getLongProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW);
+        int voltageMillivolts = batteryIntent.getIntExtra(BatteryManager.EXTRA_VOLTAGE, -1);
+
+        if (currentMicroamps == Long.MIN_VALUE || currentMicroamps == 0 || voltageMillivolts <= 0) {
+            return null;
+        }
+
+        double currentMa = Math.abs(currentMicroamps) / 1000.0;
+        double voltageV = voltageMillivolts / 1000.0;
+        double powerW = currentMa * voltageV / 1000.0;
+
+        if (!Double.isFinite(powerW) || powerW <= 0) {
+            return null;
+        }
+
+        return new PowerReading(currentMa, voltageV, powerW);
     }
 
     private Double getBatteryTemperatureC(Intent batteryIntent) {
@@ -399,13 +431,14 @@ public class DeviceStatusPlugin extends Plugin {
                 continue;
             }
 
-            bestKhz =
-                    Math.max(
-                            bestKhz,
-                            readBestFrequencyKhz(
-                                    new File(cpuEntry, "cpufreq/cpuinfo_max_freq"),
-                                    new File(cpuEntry, "cpufreq/scaling_max_freq"),
-                                    new File(cpuEntry, "cpufreq/scaling_cur_freq")));
+            long currentKhz =
+                    readFirstFrequencyKhz(new File(cpuEntry, "cpufreq/scaling_cur_freq"));
+            long fallbackKhz =
+                    readBestFrequencyKhz(
+                            new File(cpuEntry, "cpufreq/cpuinfo_cur_freq"),
+                            new File(cpuEntry, "cpufreq/scaling_max_freq"),
+                            new File(cpuEntry, "cpufreq/cpuinfo_max_freq"));
+            bestKhz = Math.max(bestKhz, currentKhz > 0 ? currentKhz : fallbackKhz);
         }
 
         return bestKhz > 0 ? bestKhz / 1_000_000.0 : null;
@@ -489,6 +522,19 @@ public class DeviceStatusPlugin extends Plugin {
         }
 
         return best;
+    }
+
+    private long readFirstFrequencyKhz(File... files) {
+        for (File file : files) {
+            Long raw = readLong(file);
+            if (raw == null || raw <= 0) {
+                continue;
+            }
+
+            return raw > 10_000_000L ? raw / 1000L : raw;
+        }
+
+        return -1;
     }
 
     private long readBestRawFrequency(File... files) {
@@ -637,6 +683,18 @@ public class DeviceStatusPlugin extends Plugin {
             this.name = name;
             this.clockValue = clockValue;
             this.clockLabel = clockLabel;
+        }
+    }
+
+    private static class PowerReading {
+        final double currentMa;
+        final double voltageV;
+        final double powerW;
+
+        PowerReading(double currentMa, double voltageV, double powerW) {
+            this.currentMa = currentMa;
+            this.voltageV = voltageV;
+            this.powerW = powerW;
         }
     }
 }

@@ -8,6 +8,7 @@ import ToggleRow from '../components/ToggleRow.vue';
 import { profilePresets, type MinerBackendState } from '../composables/useMiningController';
 import { cryptocurrencies } from '../data/miningCatalog';
 import { useProfilesStore } from '../stores/profiles';
+import { useSettingsStore } from '../stores/settings';
 import type {
   CpuAffinity,
   CpuPriority,
@@ -49,6 +50,7 @@ const profileNameDraft = ref('');
 const setupSection = ref<SetupSection>('setup');
 const saveFeedbackVisible = ref(false);
 const savedProfiles = useProfilesStore();
+const settings = useSettingsStore();
 let saveFeedbackTimer = 0;
 
 const setupSections: Array<{ id: SetupSection; label: string; icon: string }> = [
@@ -815,6 +817,12 @@ onBeforeUnmount(() => {
             v-model="config.backgroundMining"
             label="Background mining"
             supporting-text="Keep mining service active in background"
+          />
+          <ToggleRow
+            v-model="settings.performance.liteSessionMode"
+            icon="view_compact"
+            label="Lite mining screen"
+            supporting-text="Show fewer live panels after the miner starts"
           />
         </div>
       </section>

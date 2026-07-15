@@ -20,6 +20,7 @@ export interface PerformanceSettings {
   backgroundThrottle: boolean;
   adaptiveIntensity: boolean;
   animationsEnabled: boolean;
+  liteSessionMode: boolean;
 }
 
 export interface UpdateSettings {
@@ -55,7 +56,8 @@ const defaultSettings = (): SettingsState => ({
     preferLittleCores: true,
     backgroundThrottle: true,
     adaptiveIntensity: true,
-    animationsEnabled: true
+    animationsEnabled: true,
+    liteSessionMode: false
   },
   updates: {
     autoUpdate: true

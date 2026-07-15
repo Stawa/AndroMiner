@@ -22,6 +22,9 @@ interface NativeDeviceStatus {
   gpuName?: string;
   gpuClockMhz?: number | null;
   gpuClockLabel?: string;
+  batteryCurrentMa?: number | null;
+  batteryVoltageV?: number | null;
+  powerDrawW?: number | null;
   temperatureC?: number;
   temperatureSource?: DeviceTelemetry['thermalSource'];
   temperatureSensor?: string;
@@ -83,6 +86,7 @@ const estimateThermalStatus = (
 
 export const useDeviceTelemetry = () => {
   let refreshHandle = 0;
+  const refreshIntervalMs = 3000;
 
   const device = reactive<DeviceTelemetry>({
     platform: 'web',
@@ -99,6 +103,9 @@ export const useDeviceTelemetry = () => {
     gpuName: 'Android GPU',
     gpuClockMhz: null,
     gpuClockLabel: '-',
+    batteryCurrentMa: null,
+    batteryVoltageV: null,
+    powerDrawW: null,
     deviceMemoryGb: getDeviceMemory(),
     temperatureC: null,
     thermalStatus: 'unknown',
@@ -144,6 +151,18 @@ export const useDeviceTelemetry = () => {
       device.gpuClockMhz =
         typeof nativeStatus?.gpuClockMhz === 'number' ? nativeStatus.gpuClockMhz : null;
       device.gpuClockLabel = nativeStatus?.gpuClockLabel || '-';
+      device.batteryCurrentMa =
+        typeof nativeStatus?.batteryCurrentMa === 'number'
+          ? Number(nativeStatus.batteryCurrentMa.toFixed(0))
+          : null;
+      device.batteryVoltageV =
+        typeof nativeStatus?.batteryVoltageV === 'number'
+          ? Number(nativeStatus.batteryVoltageV.toFixed(2))
+          : null;
+      device.powerDrawW =
+        typeof nativeStatus?.powerDrawW === 'number'
+          ? Number(nativeStatus.powerDrawW.toFixed(2))
+          : null;
       device.deviceMemoryGb = getDeviceMemory();
       device.batteryLevel = nativeLevel ?? capacitorLevel ?? webLevel ?? device.batteryLevel;
       device.isCharging = nativeStatus?.isCharging ?? Boolean(capacitorCharging || webCharging);
@@ -167,6 +186,9 @@ export const useDeviceTelemetry = () => {
       device.gpuName = 'Android GPU';
       device.gpuClockMhz = null;
       device.gpuClockLabel = '-';
+      device.batteryCurrentMa = null;
+      device.batteryVoltageV = null;
+      device.powerDrawW = null;
       device.deviceMemoryGb = getDeviceMemory();
       device.temperatureC = null;
       device.thermalStatus = 'unavailable';
@@ -179,7 +201,7 @@ export const useDeviceTelemetry = () => {
     void refresh();
     refreshHandle = window.setInterval(() => {
       void refresh();
-    }, 10000);
+    }, refreshIntervalMs);
 
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {

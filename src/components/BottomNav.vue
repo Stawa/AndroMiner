@@ -2,13 +2,7 @@
 import MaterialIcon from './MaterialIcon.vue';
 
 export type AppTab =
-  | 'dashboard'
-  | 'mining'
-  | 'statistics'
-  | 'settings'
-  | 'profiles'
-  | 'help'
-  | 'about';
+  'dashboard' | 'mining' | 'statistics' | 'settings' | 'profiles' | 'help' | 'about';
 
 interface NavItem {
   id: AppTab;

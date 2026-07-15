@@ -174,6 +174,9 @@ export interface DeviceTelemetry {
   gpuName: string;
   gpuClockMhz: number | null;
   gpuClockLabel: string;
+  batteryCurrentMa: number | null;
+  batteryVoltageV: number | null;
+  powerDrawW: number | null;
   deviceMemoryGb: number | null;
   temperatureC: number | null;
   thermalStatus: 'unknown' | 'cool' | 'normal' | 'warm' | 'hot' | 'unavailable';

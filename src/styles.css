@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -45,7 +47,8 @@
       ),
       rgb(var(--color-app-bg));
     color: rgb(var(--color-app-on));
-    font-family: Roboto, Inter, ui-sans-serif, system-ui, sans-serif;
+    font-family:
+      Manrope, Inter, 'Segoe UI Variable', 'Segoe UI', Roboto, ui-sans-serif, system-ui, sans-serif;
     overscroll-behavior-y: none;
   }
 
@@ -213,7 +216,7 @@
   }
 
   .peer:checked + .md-switch {
-    @apply border-app-green bg-app-green-dim shadow-[0_2px_8px_rgb(25_128_88/0.18)];
+    @apply border-app-green bg-app-green-dim shadow-[0_2px_8px_rgb(42_96_132/0.18)];
   }
 
   .peer:checked + .md-switch .md-switch-thumb {
@@ -395,6 +398,20 @@
   .dialog-leave-to {
     opacity: 0;
     transform: translate(-50%, -48%) scale(0.96);
+  }
+
+  .banner-enter-active,
+  .banner-leave-active {
+    transition:
+      opacity 180ms ease,
+      transform 220ms cubic-bezier(0.2, 0, 0, 1);
+    will-change: opacity, transform;
+  }
+
+  .banner-enter-from,
+  .banner-leave-to {
+    opacity: 0;
+    transform: translate3d(0, -8px, 0);
   }
 
   .motion-reduced *,
