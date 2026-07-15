@@ -23,8 +23,9 @@
     "@capacitor/filesystem": "^8.1.2",
     "@capacitor/preferences": "^8.0.1",
     "@capacitor/share": "^8.0.1",
+    "@tailwindcss/postcss": "^4.3.2",
     "chart.js": "^4.5.1",
-    "material-symbols": "^0.44.12",
+    "material-symbols": "^0.45.8",
     "pinia": "^4.0.1",
     "vue": "^3.5.39",
     "vue-chartjs": "^5.3.4"
@@ -37,8 +38,8 @@
     "postcss": "^8.5.19",
     "prettier": "^3.9.5",
     "tailwindcss": "^4.3.2",
-    "typescript": "^5.9.2",
-    "vite": "^6.4.3",
+    "typescript": "^6.0.3",
+    "vite": "^8.1.4",
     "vue-tsc": "^3.3.7"
   }
 }

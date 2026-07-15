@@ -13,6 +13,9 @@
     "noUnusedParameters": true,
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "Bundler",
+    "paths": {
+      "pinia": ["./node_modules/pinia/dist/pinia.d.ts"]
+    },
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
