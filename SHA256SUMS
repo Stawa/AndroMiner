@@ -1,0 +1,3 @@
+71c12696e3761f5769e537c5e9752c5acb3296a02c7bfad2c7ad6d4cc174b305  lib/arm64-v8a/libxmrig.so
+71c12696e3761f5769e537c5e9752c5acb3296a02c7bfad2c7ad6d4cc174b305  lib/arm64-v8a/tls/libxmrig.so
+b9b95726262d836208c4dff1aabc335021d02d2da3ba85997dbd07c752c03ed0  lib/arm64-v8a/notls/libxmrig.so
