@@ -12,11 +12,13 @@ withDefaults(defineProps<MiningMetricProps>(), {
 
 <template>
   <article class="min-w-0 rounded-xl bg-app-card p-3 text-center">
-    <p class="truncate text-[11px] font-medium uppercase leading-4 text-app-muted">{{ label }}</p>
+    <p class="truncate text-[0.75rem] font-medium uppercase leading-4 text-app-muted">
+      {{ label }}
+    </p>
     <p
-      class="mt-1 break-words text-[20px] font-semibold leading-6"
+      class="mt-1 break-words text-[1.25rem] font-semibold leading-6"
       :class="{
-        'text-white': tone === 'normal',
+        'text-app-on': tone === 'normal',
         'text-app-green': tone === 'good',
         'text-app-yellow': tone === 'warning',
         'text-red-400': tone === 'danger'

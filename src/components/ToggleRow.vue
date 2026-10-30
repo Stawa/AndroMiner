@@ -30,10 +30,12 @@ const handleChange = (event: Event): void => {
       <MaterialIcon :name="icon" :size="22" />
     </span>
     <span class="min-w-0 flex-1">
-      <span class="block text-[15px] font-medium leading-5 text-white">{{ label }}</span>
-      <span v-if="supportingText" class="mt-1 block text-[12px] leading-[18px] text-app-muted">{{
-        supportingText
-      }}</span>
+      <span class="block text-sm font-medium leading-5 text-app-on">{{ label }}</span>
+      <span
+        v-if="supportingText"
+        class="mt-1 block text-[0.75rem] leading-[1.125rem] text-app-muted"
+        >{{ supportingText }}</span
+      >
     </span>
     <input
       class="peer sr-only"

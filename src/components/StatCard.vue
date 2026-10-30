@@ -19,7 +19,7 @@ withDefaults(defineProps<StatCardProps>(), {
 <template>
   <article class="stat-card">
     <div class="mb-3 flex items-start justify-between gap-2">
-      <p class="min-w-0 text-[12px] font-medium leading-4 text-app-muted">{{ label }}</p>
+      <p class="min-w-0 text-[0.75rem] font-medium leading-4 text-app-muted">{{ label }}</p>
       <MaterialIcon
         v-if="icon"
         :name="icon"
@@ -31,8 +31,8 @@ withDefaults(defineProps<StatCardProps>(), {
         }"
       />
     </div>
-    <p class="break-words text-[24px] font-semibold leading-7 text-white">{{ value }}</p>
-    <p v-if="supportingText" class="mt-1 text-[12px] leading-[18px] text-app-muted">
+    <p class="break-words text-[1.5rem] font-semibold leading-7 text-app-on">{{ value }}</p>
+    <p v-if="supportingText" class="mt-1 text-[0.75rem] leading-[1.125rem] text-app-muted">
       {{ supportingText }}
     </p>
   </article>

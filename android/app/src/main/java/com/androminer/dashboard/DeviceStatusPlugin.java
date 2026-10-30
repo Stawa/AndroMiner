@@ -57,19 +57,43 @@ public class DeviceStatusPlugin extends Plugin {
         call.resolve(result);
     }
 
-    private double getBatteryLevel(Intent batteryIntent) {
+    private Double getBatteryLevel(Intent batteryIntent) {
         if (batteryIntent == null) {
-            return 1.0;
+            return null;
         }
 
         int level = batteryIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
         int scale = batteryIntent.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
 
         if (level < 0 || scale <= 0) {
-            return 1.0;
+            return null;
         }
 
         return (double) level / (double) scale;
+    }
+
+    static String safetyViolation(
+            Context context, JSObject config, int batteryFloor, boolean chargingOnly) {
+        DeviceStatusPlugin reader = new DeviceStatusPlugin();
+        Intent battery =
+                context.registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+        TemperatureReading reading = reader.getBestPhoneTemperature(battery);
+        Double level = reader.getBatteryLevel(battery);
+        PowerManager power = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+        int severity =
+                Build.VERSION.SDK_INT >= 29 && power != null ? power.getCurrentThermalStatus() : 0;
+        if (config.optBoolean("autoPauseScreenOff", false)
+                && power != null
+                && !power.isInteractive()) return "Mining paused when the screen turned off.";
+        return MiningSafety.violation(
+                reading == null ? null : reading.valueC,
+                reader.getBatteryTemperatureC(battery),
+                level == null ? null : level * 100,
+                reader.isCharging(battery),
+                severity,
+                Math.max(20, Math.min(85, config.getInteger("thermalThreshold", 42))),
+                Math.max(10, Math.min(60, batteryFloor)),
+                chargingOnly);
     }
 
     private boolean isCharging(Intent batteryIntent) {
@@ -185,7 +209,7 @@ public class DeviceStatusPlugin extends Plugin {
     }
 
     private SensorClass classifySensor(String type) {
-        String normalized = type.toLowerCase();
+        String normalized = type.toLowerCase(Locale.ROOT);
         if (normalized.contains("battery")
                 || normalized.contains("batt")
                 || normalized.contains("bms")
@@ -431,8 +455,7 @@ public class DeviceStatusPlugin extends Plugin {
                 continue;
             }
 
-            long currentKhz =
-                    readFirstFrequencyKhz(new File(cpuEntry, "cpufreq/scaling_cur_freq"));
+            long currentKhz = readFirstFrequencyKhz(new File(cpuEntry, "cpufreq/scaling_cur_freq"));
             long fallbackKhz =
                     readBestFrequencyKhz(
                             new File(cpuEntry, "cpufreq/cpuinfo_cur_freq"),

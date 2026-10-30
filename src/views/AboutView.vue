@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import { formatSensor } from '../utils/miningTelemetry';
 import { computed, onMounted } from 'vue';
-import SettingGroup from '../components/SettingGroup.vue';
+
 import BrandLogo from '../components/BrandLogo.vue';
 import { useAppVersion } from '../composables/useAppVersion';
 import { useNativeMinerInfo } from '../composables/useNativeMinerInfo';
@@ -23,11 +24,11 @@ const androidPermissions = [
   },
   {
     name: 'ACCESS_NETWORK_STATE',
-    detail: 'Checks whether network connectivity is available before mining.'
+    detail: 'Allows access to network connectivity information.'
   },
   {
     name: 'WAKE_LOCK',
-    detail: 'Keeps the device awake during active mining sessions.'
+    detail: 'Declared permission; no wake lock is acquired by this build.'
   },
   {
     name: 'POST_NOTIFICATIONS',
@@ -35,19 +36,20 @@ const androidPermissions = [
   },
   {
     name: 'FOREGROUND_SERVICE',
-    detail: 'Allows long-running mining work to continue as a foreground task.'
+    detail: 'Keeps native protection and the Stop notification active during a user-started run.'
   },
   {
-    name: 'FOREGROUND_SERVICE_DATA_SYNC',
-    detail: 'Declares the foreground service type used by the Android build.'
+    name: 'FOREGROUND_SERVICE_SPECIAL_USE',
+    detail:
+      'Declares user-initiated CPU mining and continuous device protection on Android 14 and later.'
   },
   {
     name: 'REQUEST_IGNORE_BATTERY_OPTIMIZATIONS',
-    detail: 'Lets the app ask Android to reduce battery restrictions.'
+    detail: 'Android may ask once to allow the app to run without battery optimization.'
   },
   {
     name: 'VIBRATE',
-    detail: 'Supports notification or warning feedback.'
+    detail: 'Declared for notification support; no direct vibration control is exposed.'
   }
 ];
 
@@ -106,97 +108,81 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="phone-page">
-    <section class="app-card p-4">
-      <div class="flex items-center gap-3">
-        <div
-          class="h-14 w-14 shrink-0 overflow-hidden rounded-full border border-app-line bg-app-bg"
-        >
-          <BrandLogo />
-        </div>
-        <div>
-          <h2 class="text-[20px] font-semibold text-white">AndroMiner</h2>
-          <p class="text-[13px] text-app-muted">{{ versionLabel }}</p>
-        </div>
+  <div class="app-page phone-page redesign-page about-page md:grid md:grid-cols-2 md:items-stretch">
+    <header class="screen-heading">
+      <h1>About AndroMiner</h1>
+      <p>{{ versionLabel }}</p>
+    </header>
+    <section class="brand-banner">
+      <div class="brand-logo"><BrandLogo /></div>
+      <div>
+        <strong>AndroMiner</strong>
+        <p>Local CPU mining with XMRig.</p>
       </div>
     </section>
-
-    <SettingGroup title="Detected Android device" icon="phone_android">
-      <div class="divide-y divide-app-line border-t border-app-line">
-        <div class="flex min-h-12 items-center justify-between gap-3 px-4 py-2 text-[14px]">
-          <span class="text-app-muted">Model</span
-          ><strong class="text-right font-medium text-white">{{ device.model }}</strong>
+    <section class="surface">
+      <h3 class="section-title">Your device</h3>
+      <dl class="definition-list">
+        <div>
+          <dt>Model</dt>
+          <dd>{{ device.model }}</dd>
         </div>
-        <div class="flex min-h-12 items-center justify-between gap-3 px-4 py-2 text-[14px]">
-          <span class="text-app-muted">Platform</span
-          ><strong class="text-right font-medium text-white">{{ device.platform }}</strong>
+        <div>
+          <dt>Platform</dt>
+          <dd>{{ device.operatingSystem }} {{ device.osVersion }}</dd>
         </div>
-        <div class="flex min-h-12 items-center justify-between gap-3 px-4 py-2 text-[14px]">
-          <span class="text-app-muted">OS</span
-          ><strong class="text-right font-medium text-white"
-            >{{ device.operatingSystem }} {{ device.osVersion }}</strong
-          >
+        <div>
+          <dt>CPU</dt>
+          <dd>{{ device.cpuName }}</dd>
         </div>
-        <div class="flex min-h-12 items-center justify-between gap-3 px-4 py-2 text-[14px]">
-          <span class="text-app-muted">CPU threads</span
-          ><strong class="text-right font-medium text-white">{{ device.cpuThreads }}</strong>
+        <div>
+          <dt>Threads</dt>
+          <dd>{{ device.cpuThreads }}</dd>
         </div>
-        <div class="flex min-h-12 items-center justify-between gap-3 px-4 py-2 text-[14px]">
-          <span class="text-app-muted">CPU</span
-          ><strong class="text-right font-medium text-white"
-            >{{ device.cpuName }} · {{ device.cpuClockLabel }}</strong
-          >
+        <div>
+          <dt>Memory</dt>
+          <dd>
+            {{ device.deviceMemoryGb === null ? 'Unavailable' : device.deviceMemoryGb + ' GB' }}
+          </dd>
         </div>
-        <div class="flex min-h-12 items-center justify-between gap-3 px-4 py-2 text-[14px]">
-          <span class="text-app-muted">Battery</span
-          ><strong class="text-right font-medium text-white"
-            >{{ Math.round(device.batteryLevel) }}% ·
-            {{ device.isCharging ? 'Charging' : 'Unplugged' }}</strong
-          >
+        <div>
+          <dt>Clock</dt>
+          <dd>{{ device.cpuClockLabel }}</dd>
         </div>
-        <div class="flex min-h-12 items-center justify-between gap-3 px-4 py-2 text-[14px]">
-          <span class="text-app-muted">Temperature</span
-          ><strong class="text-right font-medium text-white">{{
-            device.temperatureC === null ? 'Unavailable' : `${Math.round(device.temperatureC)} °C`
-          }}</strong>
+        <div>
+          <dt>Battery</dt>
+          <dd>{{ formatSensor(device.batteryLevel, '%') }}</dd>
         </div>
-        <div class="flex min-h-12 items-center justify-between gap-3 px-4 py-2 text-[14px]">
-          <span class="text-app-muted">Thermal source</span
-          ><strong class="text-right font-medium text-white">{{
-            device.thermalSensorName
-              ? `${device.thermalSource} · ${device.thermalSensorName}`
-              : device.thermalSource
-          }}</strong>
+        <div>
+          <dt>Temperature</dt>
+          <dd>{{ formatSensor(device.temperatureC, ' °C') }} · {{ device.thermalSource }}</dd>
         </div>
+      </dl>
+    </section>
+    <details class="surface" open>
+      <summary>Installed mining engine</summary>
+      <dl class="definition-list">
+        <div v-for="row in minerDetails" :key="row.label">
+          <dt>{{ row.label }}</dt>
+          <dd>{{ row.value }}</dd>
+        </div>
+      </dl>
+    </details>
+    <details class="surface">
+      <summary>Android permissions</summary>
+      <div v-for="permission in androidPermissions" :key="permission.name" class="permission-row">
+        <strong>{{ permission.name }}</strong>
+        <p class="section-copy">{{ permission.detail }}</p>
       </div>
-    </SettingGroup>
-
-    <SettingGroup title="Android permissions" icon="admin_panel_settings">
-      <div class="divide-y divide-app-line border-t border-app-line">
-        <div
-          v-for="permission in androidPermissions"
-          :key="permission.name"
-          class="px-4 py-3 text-[13px] leading-5"
-        >
-          <p class="font-semibold text-white">{{ permission.name }}</p>
-          <p class="mt-1 text-app-muted">{{ permission.detail }}</p>
-        </div>
+    </details>
+    <div class="notice">
+      <div>
+        <strong>Experimental phone mining</strong>
+        <p>
+          Performance depends on your hardware, algorithm, and Android restrictions. Long runs can
+          heat the phone and wear the battery. There is no earnings estimate or guaranteed profit.
+        </p>
       </div>
-    </SettingGroup>
-
-    <SettingGroup title="Miner binary" icon="memory">
-      <div class="divide-y divide-app-line border-t border-app-line">
-        <div
-          v-for="item in minerDetails"
-          :key="item.label"
-          class="flex min-h-12 items-start justify-between gap-3 px-4 py-3 text-[14px]"
-        >
-          <span class="shrink-0 text-app-muted">{{ item.label }}</span>
-          <strong class="min-w-0 break-words text-right font-medium text-white">{{
-            item.value
-          }}</strong>
-        </div>
-      </div>
-    </SettingGroup>
+    </div>
   </div>
 </template>

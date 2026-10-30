@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, useId } from 'vue';
 import MaterialIcon from './MaterialIcon.vue';
 
 interface ConfigInputProps {
@@ -10,6 +10,7 @@ interface ConfigInputProps {
   supportingText?: string;
   suffix?: string;
   revealable?: boolean;
+  error?: string;
 }
 
 withDefaults(defineProps<ConfigInputProps>(), {
@@ -30,6 +31,7 @@ const handleInput = (event: Event): void => {
 };
 
 const visible = ref(false);
+const hintId = useId();
 </script>
 
 <template>
@@ -39,15 +41,21 @@ const visible = ref(false);
       <input
         class="config-input"
         :class="{ 'pr-16': suffix || revealable }"
+        :aria-label="label"
+        :aria-invalid="Boolean(error)"
+        :aria-describedby="supportingText || error ? hintId : undefined"
         :value="modelValue"
         :type="revealable && visible ? 'text' : type"
         :inputmode="inputmode"
         autocomplete="off"
+        autocapitalize="none"
+        :spellcheck="false"
+        enterkeyhint="done"
         @input="handleInput"
       />
       <span
         v-if="suffix"
-        class="absolute inset-y-0 right-4 flex items-center text-[13px] text-app-muted"
+        class="absolute inset-y-0 right-4 flex items-center text-[0.8125rem] text-app-muted"
         >{{ suffix }}</span
       >
       <button
@@ -60,8 +68,12 @@ const visible = ref(false);
         <MaterialIcon :name="visible ? 'visibility_off' : 'visibility'" :size="21" />
       </button>
     </span>
-    <span v-if="supportingText" class="mt-1 block text-[12px] leading-[18px] text-app-muted">{{
-      supportingText
-    }}</span>
+    <span v-if="error" :id="hintId" class="field-error">{{ error }}</span>
+    <span
+      v-else-if="supportingText"
+      :id="hintId"
+      class="mt-1 block text-[0.75rem] leading-[1.125rem] text-app-muted"
+      >{{ supportingText }}</span
+    >
   </label>
 </template>

@@ -3,10 +3,12 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import ConfigInput from '../components/ConfigInput.vue';
 import ConfigSelect from '../components/ConfigSelect.vue';
 import MaterialIcon from '../components/MaterialIcon.vue';
+import SavedSetupPicker from '../components/SavedSetupPicker.vue';
 import ProfileChip from '../components/ProfileChip.vue';
 import ToggleRow from '../components/ToggleRow.vue';
 import { profilePresets, type MinerBackendState } from '../composables/useMiningController';
 import { cryptocurrencies } from '../data/miningCatalog';
+import { validateMiningSetup } from '../utils/configValidation';
 import { useProfilesStore } from '../stores/profiles';
 import { useSettingsStore } from '../stores/settings';
 import type {
@@ -21,6 +23,7 @@ import type {
 
 interface MiningConfigViewProps {
   config: MiningConfig;
+  locked?: boolean;
   device: DeviceTelemetry;
   backendState: MinerBackendState;
   backendMessage: string;
@@ -32,6 +35,8 @@ interface ConfigSelectOption {
   supportingText?: string;
   iconText?: string;
   iconClass?: string;
+  coinSymbol?: string;
+  coinName?: string;
   disabled?: boolean;
 }
 
@@ -49,6 +54,8 @@ const emit = defineEmits<{
 const profileNameDraft = ref('');
 const setupSection = ref<SetupSection>('setup');
 const saveFeedbackVisible = ref(false);
+const validationVisible = ref(false);
+const errors = computed(() => validateMiningSetup(props.config));
 const savedProfiles = useProfilesStore();
 const settings = useSettingsStore();
 let saveFeedbackTimer = 0;
@@ -76,7 +83,7 @@ const profileCoreShortLabel = (affinity: CpuAffinity): string => {
 
 const profileDescriptions: Record<MiningProfile, string> = {
   battery_saver: 'Cooler phone, slower hashrate',
-  balanced: 'Recommended daily setting',
+  balanced: 'A moderate starting point',
   performance: 'Faster mining, more heat',
   custom: 'Manual thread tuning'
 };
@@ -143,8 +150,8 @@ const coinOptions = computed<ConfigSelectOption[]>(() =>
       coin.supportStatus === 'bundled'
         ? `${coin.algorithm} / ${coin.xmrigAlgo}`
         : `${coin.algorithm} · ${coin.supportNote || 'Custom miner required'}`,
-    iconText: coin.logoText,
-    iconClass: coin.logoClass,
+    coinSymbol: coin.symbol,
+    coinName: coin.name,
     disabled: coin.supportStatus !== 'bundled'
   }))
 );
@@ -186,10 +193,6 @@ const protocolSelectOptions: ConfigSelectOption[] = protocolOptions.map((option)
 }));
 
 const activeSavedProfile = computed(() => savedProfiles.activeProfile);
-
-const engineLabel = 'XMRig CPU Miner';
-const engineSubtitle = 'Local CPU engine';
-const hardwareModeLabel = (_mode?: unknown): string => 'XMRig CPU';
 const cpuHardwareName = computed(() => props.device.cpuName || props.device.model || 'Android CPU');
 const cpuClockLabel = computed(() => props.device.cpuClockLabel || '-');
 const activeThreadLabel = computed(
@@ -201,25 +204,12 @@ const detectedThreadCount = computed(() =>
     props.config.totalDetectedThreads || props.device.cpuThreads || props.config.threadCount
   )
 );
-const activeIntensityThreads = computed(() =>
-  Math.min(detectedThreadCount.value, Math.max(1, props.config.threadCount))
-);
-const intensityPercent = computed(() =>
-  Math.min(100, Math.round((activeIntensityThreads.value / detectedThreadCount.value) * 100))
-);
-const intensityBarStyle = computed(() => ({ width: `${intensityPercent.value}%` }));
 const selectedProfileLabel = computed(
   () => profilePresets.find((preset) => preset.id === props.config.profile)?.label || 'Custom'
 );
-const selectedCoreShortLabel = computed(() => profileCoreShortLabel(props.config.affinity));
 const engineDescription = computed(
   () => `${cpuHardwareName.value} · ${cpuClockLabel.value} · ${activeThreadLabel.value} threads`
 );
-
-const profileSummary = (profile: SavedMiningProfile): string =>
-  `${profile.config.coin.symbol} · ${hardwareModeLabel(
-    profile.config.hardwareMode || 'cpu'
-  )} · ${profile.config.threadCount} threads · ${profile.config.poolUrl}:${profile.config.poolPort}`;
 
 const backendStatus = computed(() => {
   const labels: Record<MinerBackendState, { label: string; icon: string; tone: string }> = {
@@ -253,7 +243,9 @@ const startButtonLabel = computed(() =>
       : 'Save & Start Mining'
 );
 
-const saveButtonLabel = computed(() => (saveFeedbackVisible.value ? 'Saved' : 'Save Changes'));
+const saveButtonLabel = computed(() =>
+  savedProfiles.storageError ? 'Retry save' : saveFeedbackVisible.value ? 'Saved' : 'Save changes'
+);
 const hasTasksetMaskError = computed(() => /taskset|tasket|bad mask/i.test(props.backendMessage));
 const setupNoticeTitle = computed(() => {
   if (props.backendState === 'error' && hasTasksetMaskError.value) {
@@ -268,7 +260,7 @@ const setupNoticeTitle = computed(() => {
 });
 const setupNoticeText = computed(() => {
   if (props.backendState === 'error' && hasTasksetMaskError.value) {
-    return `${props.backendMessage}\n\nPerformance-core pinning was rejected by Android taskset. Use All cores if it repeats, then try Performance cores again after rebuilding with the native launcher fix.`;
+    return `${props.backendMessage}\n\nChoose All cores and retry. This device may not allow CPU core pinning.`;
   }
 
   return props.backendMessage;
@@ -301,6 +293,11 @@ const saveCurrentSetup = (): void => {
 };
 
 const saveAndStartMining = (): void => {
+  validationVisible.value = true;
+  if (Object.values(errors.value).some(Boolean)) {
+    setupSection.value = errors.value.wallet ? 'setup' : 'pool';
+    return;
+  }
   saveCurrentSetup();
   emit('start');
 };
@@ -401,340 +398,151 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="phone-page">
-    <section class="app-card overflow-hidden">
-      <div class="p-4">
-        <div class="flex items-start gap-3">
-          <div
-            class="grid h-14 w-14 shrink-0 place-items-center rounded-lg text-[24px] font-bold text-white shadow-sm"
-            :class="config.coin.logoClass"
-          >
-            {{ config.coin.logoText }}
-          </div>
-          <div class="min-w-0 flex-1">
-            <p class="text-[12px] font-semibold uppercase leading-4 text-app-green">Mining Setup</p>
-            <h2 class="mt-1 truncate text-[22px] font-semibold leading-7 text-white">
-              {{ config.coin.symbol }} · {{ config.algorithm }}
-            </h2>
-            <p class="truncate text-[13px] leading-5 text-app-muted">
-              {{ activeSavedProfile?.name || 'Unsaved setup' }}
-            </p>
-          </div>
-          <div
-            class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-app-elevated"
-            :class="backendStatus.tone"
-          >
-            <MaterialIcon :name="backendStatus.icon" :size="22" />
-          </div>
-        </div>
-
-        <div
-          v-if="backendState !== 'ready'"
-          class="mt-4 rounded-lg border p-3"
-          :class="
-            backendState === 'error'
-              ? 'border-red-200 bg-red-50 text-red-800 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-100'
-              : 'border-app-line bg-app-elevated/70 text-app-muted'
-          "
-        >
-          <div class="flex items-start gap-2">
-            <MaterialIcon
-              class="mt-0.5 shrink-0"
-              :class="
-                backendState === 'error' ? 'text-red-600 dark:text-red-300' : backendStatus.tone
-              "
-              :name="backendState === 'error' ? 'report' : backendStatus.icon"
-              :size="18"
+  <div class="app-page phone-page config-page">
+    <header class="screen-heading">
+      <h1>Mining setup</h1>
+      <p>Wallet, pool connection, CPU settings, and device protection.</p>
+    </header>
+    <div v-if="backendState !== 'ready'" class="notice">
+      <MaterialIcon :name="backendStatus.icon" :size="20" />
+      <div>
+        <strong>{{ setupNoticeTitle }}</strong>
+        <p>{{ setupNoticeText }}</p>
+      </div>
+    </div>
+    <div class="setup-tabs" role="group" aria-label="Setup sections">
+      <button
+        v-for="section in setupSections"
+        :key="section.id"
+        :aria-pressed="setupSection === section.id"
+        @click="setupSection = section.id"
+      >
+        {{ section.label }}
+      </button>
+    </div>
+    <div v-if="locked" class="notice">
+      <p>A run is active. Stop it from the dashboard before editing this setup.</p>
+    </div>
+    <fieldset :disabled="locked" class="config-fields">
+      <section
+        v-if="setupSection === 'setup'"
+        class="config-section-grid grid min-w-0 gap-layout content-start md:grid-cols-2 items-stretch"
+      >
+        <section class="surface setup-identity-fields">
+          <div>
+            <h3 class="section-title">Mining currency</h3>
+            <ConfigSelect
+              :model-value="config.coin.id"
+              label="Coin"
+              :options="coinOptions"
+              :supporting-text="`Algorithm: ${config.algorithm}`"
+              @update:model-value="handleCoinChange"
             />
-            <div class="min-w-0 flex-1">
-              <p class="text-[12px] font-semibold uppercase leading-4">
-                {{ setupNoticeTitle }}
-              </p>
-              <p class="mt-1 whitespace-pre-wrap break-words text-[12px] leading-[18px]">
-                {{ setupNoticeText }}
-              </p>
-            </div>
           </div>
-        </div>
-
-        <div class="mt-4 grid grid-cols-4 gap-1 rounded-full bg-app-elevated p-1">
-          <button
-            v-for="section in setupSections"
-            :key="section.id"
-            class="ripple flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 rounded-full px-1 text-[11px] font-medium leading-4 transition-colors"
-            :class="
-              setupSection === section.id
-                ? 'bg-app-card text-app-green shadow-[0_1px_2px_rgb(15_23_42/0.08)]'
-                : 'text-app-muted'
-            "
-            type="button"
-            @click="setupSection = section.id"
-          >
-            <MaterialIcon :name="section.icon" :size="18" :filled="setupSection === section.id" />
-            <span class="truncate">{{ section.label }}</span>
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <section v-if="setupSection === 'setup'" class="space-y-3">
-      <section class="app-card p-4">
-        <ConfigSelect
-          :model-value="config.coin.id"
-          label="Coin"
-          :options="coinOptions"
-          :supporting-text="`Algorithm: ${config.algorithm}`"
-          @update:model-value="handleCoinChange"
+          <div>
+            <h3 class="section-title">Your wallet & worker</h3>
+            <ConfigInput
+              v-model="config.walletAddress"
+              :error="validationVisible ? errors.wallet : ''"
+              :label="config.coin.symbol + ' wallet address'"
+              supporting-text="Use an address for the selected coin; your pool may accept a username."
+            /><ConfigInput v-model="config.workerName" label="Worker name" />
+          </div>
+        </section>
+        <SavedSetupPicker
+          v-model:name="profileNameDraft"
+          :profiles="savedProfiles.profiles"
+          :active-id="savedProfiles.activeProfileId"
+          @apply="applySavedProfile"
+          @create="addSavedProfile"
+          @rename="renameActiveProfile"
+          @duplicate="duplicateActiveProfile"
+          @delete="deleteActiveProfile"
         />
       </section>
 
-      <section class="app-card overflow-hidden">
-        <div class="flex min-h-16 items-center justify-between gap-3 px-4 py-3">
+      <section v-else-if="setupSection === 'pool'" class="app-card overflow-hidden">
+        <div class="flex min-h-14 items-center gap-3 px-4">
+          <MaterialIcon class="text-app-green" name="hub" :size="21" />
           <div class="min-w-0">
-            <p class="text-[15px] font-semibold leading-5 text-white">Saved Setups</p>
-            <p class="mt-1 text-[12px] leading-[18px] text-app-muted">
-              {{ activeSavedProfile?.name || 'Choose or create a setup' }}
-            </p>
+            <h2 class="text-[0.9375rem] font-semibold leading-5 text-app-on">Pool connection</h2>
+            <p class="mt-0.5 text-[0.75rem] leading-4 text-app-muted">{{ config.protocol }}</p>
           </div>
-          <button
-            class="ripple grid h-12 w-12 shrink-0 place-items-center rounded-full bg-app-green-dim text-app-green"
-            type="button"
-            aria-label="Add profile"
-            @click="addSavedProfile"
-          >
-            <MaterialIcon name="add" :size="24" />
-          </button>
         </div>
-
-        <div
-          v-if="savedProfiles.profiles.length === 0"
-          class="border-t border-app-line px-4 py-6 text-[13px] leading-5 text-app-muted"
-        >
-          No saved setups yet. Create one from your current mining settings.
-        </div>
-
-        <div v-else class="divide-y divide-app-line border-t border-app-line">
-          <button
-            v-for="profile in savedProfiles.profiles"
-            :key="profile.id"
-            class="ripple flex min-h-[76px] w-full items-center gap-3 px-4 py-3 text-left active:bg-app-elevated"
-            :class="
-              profile.id === savedProfiles.activeProfileId
-                ? 'bg-app-green-dim/80 text-white'
-                : 'bg-transparent text-app-muted'
-            "
-            type="button"
-            @click="applySavedProfile(profile)"
-          >
-            <span
-              class="grid h-10 w-10 shrink-0 place-items-center rounded-full text-[18px] font-bold text-white"
-              :class="profile.config.coin.logoClass"
-            >
-              {{ profile.config.coin.logoText }}
-            </span>
-            <span class="min-w-0 flex-1">
-              <span class="block truncate text-[15px] font-semibold leading-5 text-white">{{
-                profile.name
-              }}</span>
-              <span class="mt-0.5 block truncate text-[12px] leading-[18px] text-app-muted">{{
-                profileSummary(profile)
-              }}</span>
-            </span>
-            <span
-              v-if="profile.id === savedProfiles.activeProfileId"
-              class="shrink-0 rounded-full bg-app-card px-2 py-1 text-[11px] font-semibold text-app-green"
-            >
-              Active
-            </span>
-          </button>
-        </div>
-
-        <div
-          v-if="activeSavedProfile"
-          class="space-y-3 border-t border-app-line bg-app-elevated/35 p-4"
-        >
+        <div class="pool-field-grid grid min-w-0 gap-4 md:grid-cols-2 border-t border-app-line p-4">
+          <div class="grid grid-cols-[1fr_96px] gap-2">
+            <ConfigInput
+              v-model="config.poolUrl"
+              label="Pool URL"
+              inputmode="url"
+              :error="validationVisible ? errors.pool : ''"
+            />
+            <ConfigInput
+              v-model="config.poolPort"
+              label="Port"
+              type="number"
+              inputmode="numeric"
+              :error="validationVisible ? errors.port : ''"
+            />
+          </div>
           <ConfigInput
-            v-model="profileNameDraft"
-            label="Selected setup name"
-            supporting-text="Rename this setup. Use the bottom bar to save mining changes."
+            v-model="config.password"
+            label="Password"
+            type="password"
+            supporting-text="Leave blank if your pool does not require one"
+            revealable
           />
-          <div class="grid grid-cols-[1fr_48px_48px] gap-2">
-            <button
-              class="ripple flex min-h-12 items-center justify-center gap-2 rounded-lg bg-app-green-dim px-3 text-[13px] font-semibold text-app-green"
-              type="button"
-              @click="renameActiveProfile"
-            >
-              <MaterialIcon name="edit" :size="20" />
-              Rename
-            </button>
-            <button
-              class="ripple grid min-h-12 place-items-center rounded-lg bg-app-card text-white"
-              type="button"
-              aria-label="Copy selected setup"
-              @click="duplicateActiveProfile"
-            >
-              <MaterialIcon name="content_copy" :size="20" />
-            </button>
-            <button
-              class="ripple grid min-h-12 place-items-center rounded-lg bg-app-card text-red-300"
-              type="button"
-              aria-label="Delete selected setup"
-              @click="deleteActiveProfile"
-            >
-              <MaterialIcon name="delete" :size="20" />
-            </button>
-          </div>
-        </div>
-      </section>
-    </section>
-
-    <section v-else-if="setupSection === 'pool'" class="app-card overflow-hidden">
-      <div class="flex min-h-14 items-center gap-3 px-4">
-        <MaterialIcon class="text-app-green" name="hub" :size="21" />
-        <div class="min-w-0">
-          <h2 class="text-[15px] font-semibold leading-5 text-white">Pool and Wallet</h2>
-          <p class="mt-0.5 text-[12px] leading-4 text-app-muted">{{ config.protocol }}</p>
-        </div>
-      </div>
-      <div class="space-y-3 border-t border-app-line p-4">
-        <div class="grid grid-cols-[1fr_96px] gap-2">
-          <ConfigInput v-model="config.poolUrl" label="Pool URL" inputmode="url" />
-          <ConfigInput v-model="config.poolPort" label="Port" type="number" inputmode="numeric" />
-        </div>
-        <ConfigInput
-          v-model="config.walletAddress"
-          :label="`${config.coin.name} / ${config.coin.symbol} wallet`"
-          supporting-text="Wallet address or username for this cryptocurrency"
-        />
-        <ConfigInput v-model="config.workerName" label="Worker name" />
-        <ConfigInput
-          v-model="config.password"
-          label="Password"
-          type="password"
-          supporting-text="Leave blank if your pool does not require one"
-          revealable
-        />
-        <ConfigSelect
-          :model-value="config.protocol"
-          label="Protocol"
-          :options="protocolSelectOptions"
-          @update:model-value="handleProtocolChange"
-        />
-      </div>
-    </section>
-
-    <section v-else-if="setupSection === 'performance'" class="space-y-3">
-      <section class="app-card overflow-hidden">
-        <div class="flex min-h-14 items-center gap-3 px-4">
-          <MaterialIcon class="text-app-green" name="memory" :size="21" />
-          <div class="min-w-0">
-            <h2 class="text-[15px] font-semibold leading-5 text-white">Mining Engine</h2>
-            <p class="mt-0.5 text-[12px] leading-4 text-app-muted">
-              {{ engineSubtitle }}
-            </p>
-          </div>
-        </div>
-        <div class="space-y-3 border-t border-app-line p-4">
-          <div class="flex items-start gap-3">
-            <span class="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-app-green-dim">
-              <MaterialIcon class="text-app-green" name="developer_board" :size="24" />
-            </span>
-            <div class="min-w-0 flex-1">
-              <div class="flex min-w-0 items-center gap-2">
-                <p class="truncate text-[15px] font-semibold leading-5 text-white">
-                  {{ engineLabel }}
-                </p>
-                <span
-                  class="shrink-0 rounded-full bg-app-green-dim px-2 py-0.5 text-[10px] font-semibold uppercase leading-4 text-app-green"
-                >
-                  Primary
-                </span>
-              </div>
-              <p class="mt-1 break-words text-[12px] leading-[18px] text-app-muted">
-                {{ engineDescription }}
-              </p>
-            </div>
-          </div>
+          <ConfigSelect
+            :model-value="config.protocol"
+            label="Protocol"
+            :options="protocolSelectOptions"
+            @update:model-value="handleProtocolChange"
+          />
         </div>
       </section>
 
-      <section class="app-card overflow-hidden">
-        <div class="flex min-h-14 items-center gap-3 px-4">
-          <MaterialIcon class="text-app-green" name="speed" :size="21" />
-          <div class="min-w-0 flex-1">
-            <h2 class="text-[15px] font-semibold leading-5 text-white">Mining Intensity</h2>
-            <p class="mt-0.5 text-[12px] leading-4 text-app-muted">Workers and Power Profile</p>
+      <section
+        v-else-if="setupSection === 'performance'"
+        class="config-section-grid performance-grid grid min-w-0 gap-layout content-start md:grid-cols-2 items-stretch"
+      >
+        <section class="surface">
+          <div class="section-heading">
+            <h3>CPU allocation</h3>
+            <span class="supporting-label"
+              >{{ config.threadCount }} / {{ detectedThreadCount }} THREADS</span
+            >
           </div>
-          <span
-            class="shrink-0 rounded-full bg-app-green-dim px-3 py-1 text-[12px] font-semibold text-app-green"
-          >
-            {{ intensityPercent }}%
-          </span>
-        </div>
-
-        <div class="space-y-3 border-t border-app-line p-4">
-          <div class="w-full rounded-lg border border-app-line bg-app-elevated p-4">
-            <div class="flex items-start justify-between gap-4">
-              <div class="min-w-0">
-                <p class="text-[13px] font-semibold leading-5 tracking-tight text-white">
-                  CPU Allocation
-                </p>
-                <p class="mt-0.5 text-[12px] leading-4 text-app-muted">
-                  Total threads used for mining
-                </p>
-              </div>
-              <div class="shrink-0 text-right">
-                <div class="text-[24px] font-semibold leading-6 text-white tabular-nums">
-                  {{ config.threadCount }}
-                </div>
-                <div class="mt-1 text-[11px] leading-4 text-app-muted">
-                  / {{ detectedThreadCount }} threads
-                </div>
-              </div>
+          <p class="section-copy">
+            {{ engineDescription }}. A lower thread count leaves more room for Android and usually
+            reduces heat.
+          </p>
+          <div class="thread-stepper">
+            <button
+              class="outline-button"
+              aria-label="Decrease thread count"
+              :disabled="config.threadCount <= 1"
+              @click="adjustThreads(-1)"
+            >
+              <MaterialIcon name="remove" :size="20" />
+            </button>
+            <div>
+              <strong>{{ config.threadCount }}</strong
+              ><small>worker threads</small>
             </div>
-
-            <div class="mt-5">
-              <div class="mb-2 flex items-center justify-between">
-                <span
-                  class="text-[10px] font-medium uppercase leading-4 tracking-wide text-app-muted"
-                >
-                  CPU Load
-                </span>
-                <span class="text-[11px] font-semibold tabular-nums text-app-green">
-                  {{ intensityPercent }}%
-                </span>
-              </div>
-              <div class="h-2 w-full overflow-hidden rounded-full bg-app-card">
-                <div
-                  class="h-full rounded-full bg-app-green transition-all duration-500 ease-out"
-                  :style="intensityBarStyle"
-                />
-              </div>
-            </div>
-
-            <div class="mt-4 grid grid-cols-3 gap-2">
-              <div class="min-w-0 rounded-lg bg-app-card/70 px-3 py-2.5">
-                <p class="text-[10px] font-medium uppercase leading-4 text-app-muted">Profile</p>
-                <p class="mt-1 truncate text-[12px] font-semibold leading-4 text-white">
-                  {{ selectedProfileLabel }}
-                </p>
-              </div>
-              <div class="min-w-0 rounded-lg bg-app-card/70 px-3 py-2.5">
-                <p class="text-[10px] font-medium uppercase leading-4 text-app-muted">Load</p>
-                <p class="mt-1 text-[12px] font-semibold leading-4 text-app-green tabular-nums">
-                  {{ intensityPercent }}%
-                </p>
-              </div>
-              <div class="min-w-0 rounded-lg bg-app-card/70 px-3 py-2.5">
-                <p class="text-[10px] font-medium uppercase leading-4 text-app-muted">Core</p>
-                <p class="mt-1 truncate text-[12px] font-semibold leading-4 text-white">
-                  {{ selectedCoreShortLabel }}
-                </p>
-              </div>
-            </div>
+            <button
+              class="outline-button"
+              aria-label="Increase thread count"
+              :disabled="config.threadCount >= detectedThreadCount"
+              @click="adjustThreads(1)"
+            >
+              <MaterialIcon name="add" :size="20" />
+            </button>
           </div>
-
-          <div class="grid grid-cols-1 gap-2">
+          <div class="section-heading">
+            <h3>Power profile</h3>
+            <span class="supporting-label">{{ selectedProfileLabel }}</span>
+          </div>
+          <div class="profile-options">
             <ProfileChip
               v-for="profile in profiles"
               :key="profile.id"
@@ -748,144 +556,123 @@ onBeforeUnmount(() => {
               @select="emit('profile', $event)"
             />
           </div>
-        </div>
-
-        <div
-          class="grid grid-cols-[52px_1fr_52px] items-center gap-2 border-t border-app-line bg-app-elevated/35 p-4"
-        >
-          <button
-            class="ripple grid h-12 w-12 place-items-center rounded-full bg-app-card text-white"
-            type="button"
-            aria-label="Decrease thread count"
-            @click="adjustThreads(-1)"
-          >
-            <MaterialIcon name="remove" :size="22" />
-          </button>
-          <p class="min-w-0 text-center text-[13px] leading-5 text-app-muted">
-            Worker threads
-            <strong class="block text-[20px] leading-6 text-white">{{ config.threadCount }}</strong>
-          </p>
-          <button
-            class="ripple grid h-12 w-12 place-items-center rounded-full bg-app-card text-white"
-            type="button"
-            aria-label="Increase thread count"
-            @click="adjustThreads(1)"
-          >
-            <MaterialIcon name="add" :size="22" />
-          </button>
-        </div>
-      </section>
-
-      <section class="app-card overflow-hidden">
-        <div class="flex min-h-14 items-center gap-3 px-4">
-          <MaterialIcon class="text-app-green" name="memory" :size="21" />
-          <div class="min-w-0">
-            <h2 class="text-[15px] font-semibold leading-5 text-white">CPU Settings</h2>
-            <p class="mt-0.5 text-[12px] leading-4 text-app-muted">
-              Scheduling and runtime options
-            </p>
-          </div>
-        </div>
-        <div class="space-y-3 border-t border-app-line p-4">
+        </section>
+        <section class="surface">
+          <h3 class="section-title">CPU scheduling</h3>
           <ConfigSelect
             :model-value="config.priority"
-            label="CPU priority"
+            label="Priority"
             :options="prioritySelectOptions"
             @update:model-value="handlePriorityChange"
-          />
-          <ConfigSelect
+          /><ConfigSelect
             :model-value="config.affinity"
-            label="Affinity"
+            label="Core selection"
             :options="affinitySelectOptions"
             @update:model-value="handleAffinityChange"
+          /><ToggleRow
+            v-model="config.backgroundMining"
+            label="Allow background mining"
+            supporting-text="Keep the native protection service and Stop notification active when the app is hidden"
+          /><ToggleRow
+            v-model="settings.performance.liteSessionMode"
+            label="Lite session view"
+            supporting-text="Hide secondary panels during a run"
           />
+        </section>
+        <details class="surface">
+          <summary>XMRig donation options</summary>
+          <p class="section-copy">
+            These values are passed to XMRig; the installed binary controls its donation behavior.
+          </p>
           <ConfigInput
             v-model="config.donateLevel"
-            label="XMRig donate level"
+            label="Donation level"
             type="number"
             inputmode="numeric"
             suffix="%"
-            supporting-text="Developer donation percentage passed to XMRig"
-          />
-          <ConfigSelect
+          /><ConfigSelect
             :model-value="String(config.donateOverProxy)"
             label="Donate over proxy"
             :options="donateOverProxySelectOptions"
             @update:model-value="handleDonateOverProxyChange"
           />
+        </details>
+      </section>
+
+      <section v-else class="app-card overflow-hidden">
+        <div class="flex min-h-14 items-center gap-3 px-4">
+          <MaterialIcon class="text-app-green" name="health_and_safety" :size="21" />
+          <div class="min-w-0">
+            <h2 class="text-[0.9375rem] font-semibold leading-5 text-app-on">Device protection</h2>
+            <p class="mt-0.5 text-[0.75rem] leading-4 text-app-muted">
+              Temperature and pause rules
+            </p>
+          </div>
+        </div>
+        <div class="space-y-3 border-t border-app-line p-4">
+          <p class="section-copy">
+            The selected device sensor controls this limit. A separate battery reading of 45 °C or
+            Android severe thermal throttling always stops mining. If temperature or battery
+            readings are unavailable, mining cannot start.
+          </p>
+          <div class="rounded-lg bg-app-elevated p-3">
+            <div class="mb-2 flex items-center justify-between gap-3">
+              <span class="text-[0.875rem] leading-5 text-app-muted">Temperature limit</span>
+              <strong class="text-[0.9375rem] text-app-on">{{ config.thermalThreshold }} °C</strong>
+            </div>
+            <input
+              v-model.number="config.thermalThreshold"
+              aria-label="Temperature limit"
+              class="android-slider"
+              type="range"
+              min="20"
+              max="85"
+              step="1"
+            />
+            <p class="section-copy">
+              Current {{ device.thermalSource === 'battery' ? 'battery' : 'device' }} sensor:
+              {{ device.temperatureC === null ? 'Unavailable' : device.temperatureC + ' °C' }}. A
+              battery reading is not CPU temperature.
+            </p>
+            <div class="mt-1 flex justify-between text-caption text-app-muted" aria-hidden="true">
+              <span>20 °C</span><span>85 °C</span>
+            </div>
+          </div>
           <ToggleRow
-            v-model="config.backgroundMining"
-            label="Background mining"
-            supporting-text="Keep mining service active in background"
+            v-model="config.autoPauseScreenOff"
+            label="Pause when app is hidden"
+            supporting-text="Pause on app backgrounding, including screen lock"
           />
           <ToggleRow
-            v-model="settings.performance.liteSessionMode"
-            icon="view_compact"
-            label="Lite mining screen"
-            supporting-text="Show fewer live panels after the miner starts"
+            v-model="config.autoPauseOnBattery"
+            label="Require external power for this setup"
+            supporting-text="Pause when unplugged; the charging-only rule in Settings also applies"
           />
         </div>
       </section>
-    </section>
 
-    <section v-else class="app-card overflow-hidden">
-      <div class="flex min-h-14 items-center gap-3 px-4">
-        <MaterialIcon class="text-app-green" name="health_and_safety" :size="21" />
-        <div class="min-w-0">
-          <h2 class="text-[15px] font-semibold leading-5 text-white">Thermal Protection</h2>
-          <p class="mt-0.5 text-[12px] leading-4 text-app-muted">Temperature and pause rules</p>
+      <section class="setup-action-bar">
+        <div class="grid">
+          <button
+            class="outline-button"
+            type="button"
+            :aria-label="saveButtonLabel"
+            @click="saveCurrentSetup"
+          >
+            <MaterialIcon :name="saveFeedbackVisible ? 'check_circle' : 'save'" :size="21" />
+            <span role="status">{{ saveButtonLabel }}</span>
+          </button>
+          <button
+            class="primary-button"
+            type="button"
+            :disabled="!canStartMining"
+            @click="saveAndStartMining"
+          >
+            <MaterialIcon name="play_arrow" :size="22" filled />
+            <span>{{ startButtonLabel }}</span>
+          </button>
         </div>
-      </div>
-      <div class="space-y-3 border-t border-app-line p-4">
-        <div class="rounded-lg bg-app-elevated p-3">
-          <div class="mb-2 flex items-center justify-between gap-3">
-            <span class="text-[14px] leading-5 text-app-muted">Temperature limit</span>
-            <strong class="text-[15px] text-white">{{ config.thermalThreshold }} °C</strong>
-          </div>
-          <input
-            v-model.number="config.thermalThreshold"
-            class="android-slider"
-            type="range"
-            min="55"
-            max="85"
-            step="1"
-          />
-        </div>
-        <ToggleRow
-          v-model="config.autoPauseScreenOff"
-          label="Auto-pause on screen off"
-          supporting-text="Pause mining when the display turns off"
-        />
-        <ToggleRow
-          v-model="config.autoPauseOnBattery"
-          label="Auto-pause on battery"
-          supporting-text="Pause if unplugged and battery safety is active"
-        />
-      </div>
-    </section>
-
-    <section
-      class="bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-30 rounded-xl border border-app-line/80 bg-app-card/95 p-1.5 shadow-[0_8px_18px_rgb(0_0_0/0.14)] backdrop-blur"
-    >
-      <div class="grid grid-cols-[minmax(0,0.86fr)_minmax(0,1.14fr)] gap-1.5">
-        <button
-          class="ripple flex min-h-14 min-w-0 items-center justify-center gap-2 rounded-lg bg-app-elevated px-3 text-[13px] font-semibold text-app-on active:bg-app-line/40"
-          type="button"
-          @click="saveCurrentSetup"
-        >
-          <MaterialIcon :name="saveFeedbackVisible ? 'check_circle' : 'save'" :size="21" />
-          <span class="truncate">{{ saveButtonLabel }}</span>
-        </button>
-        <button
-          class="ripple flex min-h-14 min-w-0 items-center justify-center gap-2 rounded-lg bg-app-green px-3 text-[13px] font-semibold text-white shadow-[0_6px_14px_rgb(25_128_88/0.2)] disabled:opacity-45"
-          type="button"
-          :disabled="!canStartMining"
-          @click="saveAndStartMining"
-        >
-          <MaterialIcon name="play_arrow" :size="22" filled />
-          <span class="truncate">{{ startButtonLabel }}</span>
-        </button>
-      </div>
-    </section>
+      </section>
+    </fieldset>
   </div>
 </template>

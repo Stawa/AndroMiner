@@ -44,7 +44,7 @@ export const cryptocurrencies: Cryptocurrency[] = [
       }
     ],
     logoText: 'M',
-    logoClass: 'bg-orange-500'
+    logoClass: 'bg-app-elevated'
   },
   {
     id: 'zeph',
@@ -82,7 +82,7 @@ export const cryptocurrencies: Cryptocurrency[] = [
       }
     ],
     logoText: 'Z',
-    logoClass: 'bg-cyan-600'
+    logoClass: 'bg-app-elevated'
   },
   {
     id: 'wow',
@@ -106,7 +106,7 @@ export const cryptocurrencies: Cryptocurrency[] = [
       }
     ],
     logoText: 'W',
-    logoClass: 'bg-pink-600'
+    logoClass: 'bg-app-elevated'
   },
   {
     id: 'arq',
@@ -130,7 +130,7 @@ export const cryptocurrencies: Cryptocurrency[] = [
       }
     ],
     logoText: 'A',
-    logoClass: 'bg-sky-600'
+    logoClass: 'bg-app-elevated'
   },
   {
     id: 'sfx',
@@ -154,7 +154,7 @@ export const cryptocurrencies: Cryptocurrency[] = [
       }
     ],
     logoText: 'S',
-    logoClass: 'bg-emerald-600'
+    logoClass: 'bg-app-elevated'
   },
   {
     id: 'kva',
@@ -178,7 +178,7 @@ export const cryptocurrencies: Cryptocurrency[] = [
       }
     ],
     logoText: 'K',
-    logoClass: 'bg-lime-700'
+    logoClass: 'bg-app-elevated'
   },
   {
     id: 'rtm',
@@ -216,7 +216,7 @@ export const cryptocurrencies: Cryptocurrency[] = [
       }
     ],
     logoText: 'R',
-    logoClass: 'bg-violet-600'
+    logoClass: 'bg-app-elevated'
   },
   {
     id: 'yerb',
@@ -240,7 +240,7 @@ export const cryptocurrencies: Cryptocurrency[] = [
       }
     ],
     logoText: 'Y',
-    logoClass: 'bg-green-700'
+    logoClass: 'bg-app-elevated'
   },
   {
     id: 'gspc',
@@ -264,7 +264,7 @@ export const cryptocurrencies: Cryptocurrency[] = [
       }
     ],
     logoText: 'G',
-    logoClass: 'bg-fuchsia-700'
+    logoClass: 'bg-app-elevated'
   },
   {
     id: 'chukwa',
@@ -288,7 +288,7 @@ export const cryptocurrencies: Cryptocurrency[] = [
       }
     ],
     logoText: 'C',
-    logoClass: 'bg-teal-700'
+    logoClass: 'bg-app-elevated'
   },
   {
     id: 'chukwav2',
@@ -312,7 +312,7 @@ export const cryptocurrencies: Cryptocurrency[] = [
       }
     ],
     logoText: 'C2',
-    logoClass: 'bg-teal-800'
+    logoClass: 'bg-app-elevated'
   },
   {
     id: 'ninja',
@@ -336,7 +336,7 @@ export const cryptocurrencies: Cryptocurrency[] = [
       }
     ],
     logoText: 'N',
-    logoClass: 'bg-neutral-600'
+    logoClass: 'bg-app-elevated'
   },
   {
     id: 'ccx',
@@ -360,7 +360,7 @@ export const cryptocurrencies: Cryptocurrency[] = [
       }
     ],
     logoText: 'CC',
-    logoClass: 'bg-indigo-700'
+    logoClass: 'bg-app-elevated'
   },
   {
     id: 'tlo',
@@ -384,7 +384,7 @@ export const cryptocurrencies: Cryptocurrency[] = [
       }
     ],
     logoText: 'T',
-    logoClass: 'bg-amber-700'
+    logoClass: 'bg-app-elevated'
   },
   {
     id: 'xla',
@@ -410,7 +410,7 @@ export const cryptocurrencies: Cryptocurrency[] = [
       }
     ],
     logoText: 'X',
-    logoClass: 'bg-blue-700'
+    logoClass: 'bg-app-elevated'
   },
   {
     id: 'dero',
@@ -436,7 +436,7 @@ export const cryptocurrencies: Cryptocurrency[] = [
       }
     ],
     logoText: 'D',
-    logoClass: 'bg-slate-600'
+    logoClass: 'bg-app-elevated'
   },
   {
     id: 'vkax',
@@ -462,7 +462,7 @@ export const cryptocurrencies: Cryptocurrency[] = [
       }
     ],
     logoText: 'V',
-    logoClass: 'bg-rose-700'
+    logoClass: 'bg-app-elevated'
   }
 ];
 

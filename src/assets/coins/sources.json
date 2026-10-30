@@ -1,0 +1,77 @@
+[
+  {
+    "id": "xmr",
+    "source": "https://static.coinpaprika.com/coin/xmr-monero/logo.png",
+    "details": "https://coinpaprika.com/coin/xmr-monero/"
+  },
+  {
+    "id": "zeph",
+    "source": "https://static.coinpaprika.com/coin/zeph2-zephyr-protocol/logo.png",
+    "details": "https://coinpaprika.com/coin/zeph2-zephyr-protocol/"
+  },
+  {
+    "id": "wow",
+    "source": "https://static.coinpaprika.com/coin/wow-wownero/logo.png",
+    "details": "https://coinpaprika.com/coin/wow-wownero/"
+  },
+  {
+    "id": "arq",
+    "source": "https://static.coinpaprika.com/coin/arq-arqma/logo.png",
+    "details": "https://coinpaprika.com/coin/arq-arqma/"
+  },
+  {
+    "id": "sfx",
+    "source": "https://static.coinpaprika.com/coin/sfx-safex-cash/logo.png",
+    "details": "https://coinpaprika.com/coin/sfx-safex-cash/"
+  },
+  {
+    "id": "rtm",
+    "source": "https://static.coinpaprika.com/coin/rtm-raptoreum/logo.png",
+    "details": "https://coinpaprika.com/coin/rtm-raptoreum/"
+  },
+  {
+    "id": "yerb",
+    "source": "https://static.coinpaprika.com/coin/yerb-yerbas/logo.png",
+    "details": "https://coinpaprika.com/coin/yerb-yerbas/"
+  },
+  {
+    "id": "gspc",
+    "source": "https://static.coinpaprika.com/coin/gspc-gsp-coin/logo.png",
+    "details": "https://coinpaprika.com/coin/gspc-gsp-coin/"
+  },
+  {
+    "id": "ninja",
+    "source": "https://static.coinpaprika.com/coin/ninja-ninjacoin/logo.png",
+    "details": "https://coinpaprika.com/coin/ninja-ninjacoin/"
+  },
+  {
+    "id": "ccx",
+    "source": "https://static.coinpaprika.com/coin/ccx-conceal/logo.png",
+    "details": "https://coinpaprika.com/coin/ccx-conceal/"
+  },
+  {
+    "id": "xla",
+    "source": "https://static.coinpaprika.com/coin/xla-scala/logo.png",
+    "details": "https://coinpaprika.com/coin/xla-scala/"
+  },
+  {
+    "id": "dero",
+    "source": "https://static.coinpaprika.com/coin/dero-dero/logo.png",
+    "details": "https://coinpaprika.com/coin/dero-dero/"
+  },
+  {
+    "id": "vkax",
+    "source": "https://static.coinpaprika.com/coin/vkax-vkax/logo.png",
+    "details": "https://coinpaprika.com/coin/vkax-vkax/"
+  },
+  {
+    "id": "kva",
+    "source": "https://raw.githubusercontent.com/kevacoin-project/kevacoin-website/master/images/logo.png",
+    "details": "https://github.com/kevacoin-project/kevacoin-website"
+  },
+  {
+    "id": "tlo",
+    "source": "https://avatars.githubusercontent.com/talleoproject?s=128",
+    "details": "https://github.com/talleoproject"
+  }
+]

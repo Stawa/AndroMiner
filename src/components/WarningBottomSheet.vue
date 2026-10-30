@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import MaterialIcon from './MaterialIcon.vue';
+import { useDialogFocus } from '../composables/useDialogFocus';
 
 export type WarningType = 'thermal' | 'battery';
 
@@ -7,9 +9,10 @@ interface WarningBottomSheetProps {
   open: boolean;
   type: WarningType;
   threshold: number;
+  message?: string;
 }
 
-defineProps<WarningBottomSheetProps>();
+const props = defineProps<WarningBottomSheetProps>();
 
 const emit = defineEmits<{
   resume: [];
@@ -17,64 +20,56 @@ const emit = defineEmits<{
   ignore: [];
   dismiss: [];
 }>();
+const panel = ref<HTMLElement | null>(null);
+useDialogFocus(
+  () => props.open,
+  panel,
+  () => {
+    emit('dismiss');
+  }
+);
 </script>
 
 <template>
-  <Transition name="fade">
-    <div v-if="open" class="fixed inset-0 z-50 bg-black/[0.62]" @click="emit('dismiss')" />
-  </Transition>
-  <Transition name="sheet">
+  <div v-if="open" class="modal-backdrop" @click.self="emit('dismiss')">
     <section
-      v-if="open"
-      class="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-[420px] rounded-t-[28px] border border-app-line bg-app-card px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-6 text-center"
+      ref="panel"
+      class="detail-sheet"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="guard-title"
+      tabindex="-1"
     >
-      <div
-        class="mx-auto grid h-16 w-16 place-items-center rounded-full border-2"
-        :class="
-          type === 'thermal' ? 'border-red-500 text-red-400' : 'border-app-yellow text-app-yellow'
-        "
-      >
+      <div class="section-heading">
+        <h2 id="guard-title" class="dialog-title">Mining is paused</h2>
+        <button class="outline-button" aria-label="Dismiss safety warning" @click="emit('dismiss')">
+          <MaterialIcon name="close" :size="20" />
+        </button>
+      </div>
+      <div class="notice">
         <MaterialIcon
           :name="type === 'thermal' ? 'device_thermostat' : 'battery_alert'"
-          :size="34"
+          :size="22"
         />
+        <p>
+          {{
+            message ||
+            (type === 'thermal'
+              ? `Temperature reached the configured limit (${threshold} °C). Let the phone cool before continuing.`
+              : `Battery fell below the configured limit (${threshold}%). Charge the phone before continuing.`)
+          }}
+        </p>
       </div>
-      <h2 class="mt-5 text-[22px] font-semibold leading-7 text-white">Mining Paused</h2>
-      <p class="mx-auto mt-3 max-w-[280px] text-[15px] leading-6 text-white/82">
-        <template v-if="type === 'thermal'">
-          Temperature reached the configured threshold ({{ threshold }} °C)
-        </template>
-        <template v-else> Battery level is below the safety limit ({{ threshold }}%) </template>
+      <p class="section-copy">
+        Native protection checks all limits before starting again. Resume requires your
+        confirmation.
       </p>
-      <div class="mt-6 space-y-3">
-        <button
-          class="ripple h-14 w-full rounded-xl bg-app-green-dim text-[16px] font-semibold text-app-green"
-          type="button"
-          @click="emit('resume')"
-        >
-          <MaterialIcon
-            class="mr-2 inline-block align-middle"
-            name="play_arrow"
-            :size="22"
-            filled
-          />
-          Resume Mining
-        </button>
-        <button
-          class="ripple h-14 w-full rounded-xl border border-app-line bg-app-elevated text-[16px] font-medium text-white"
-          type="button"
-          @click="type === 'thermal' ? emit('lowerPerformance') : emit('ignore')"
-        >
-          {{ type === 'thermal' ? 'Lower Performance' : 'Ignore & Continue' }}
-        </button>
-        <button
-          class="ripple h-12 w-full rounded-xl text-[15px] font-medium text-app-green"
-          type="button"
-          @click="emit('dismiss')"
-        >
-          Dismiss
-        </button>
+      <div class="guard-actions">
+        <button v-if="type === 'thermal'" class="primary-button" @click="emit('lowerPerformance')">
+          Switch to Battery Saver</button
+        ><button class="outline-button" @click="emit('resume')">Resume mining</button
+        ><button class="text-button" @click="emit('dismiss')">Keep paused</button>
       </div>
     </section>
-  </Transition>
+  </div>
 </template>

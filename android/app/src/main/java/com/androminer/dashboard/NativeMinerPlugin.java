@@ -1,14 +1,21 @@
 package com.androminer.dashboard;
 
+import android.Manifest;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
+import android.os.Build;
+import android.os.SystemClock;
+import androidx.core.content.ContextCompat;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -31,20 +38,21 @@ import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-@CapacitorPlugin(name = "NativeMiner")
+@CapacitorPlugin(
+        name = "NativeMiner",
+        permissions = {
+            @Permission(
+                    alias = "notifications",
+                    strings = {Manifest.permission.POST_NOTIFICATIONS})
+        })
 public class NativeMinerPlugin extends Plugin {
 
-    private static final Pattern SPEED_TABLE_PATTERN =
-            Pattern.compile("\\bspeed\\s+\\S+\\s+([0-9]+(?:\\.[0-9]+)?)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern HASHRATE_PATTERN =
-            Pattern.compile("speed.*?([0-9]+(?:\\.[0-9]+)?)\\s*H/s", Pattern.CASE_INSENSITIVE);
     private static final Pattern DIFFICULTY_PATTERN =
             Pattern.compile(
                     "\\bdiff\\s+([0-9]+(?:\\.[0-9]+)?)([kKmMgG]?)\\b", Pattern.CASE_INSENSITIVE);
@@ -163,11 +171,18 @@ public class NativeMinerPlugin extends Plugin {
     }
 
     private final ExecutorService outputExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService controlExecutor = Executors.newSingleThreadExecutor();
+    private JSObject activeConfig;
+    private boolean paused;
+    private boolean poolConnected;
+    private long lastStdoutHashrateAtMs;
+    private double stdoutHashrate;
     private final ExecutorService metadataExecutor = Executors.newSingleThreadExecutor();
     private final List<String> recentLogs = new ArrayList<>();
     private final SimpleDateFormat logTimeFormat = new SimpleDateFormat("HH:mm:ss", Locale.US);
     private Process minerProcess;
     private long startedAtMs;
+    private long stoppedUptimeSeconds;
     private double hashrate;
     private long difficulty;
     private int networkLatencyMs;
@@ -189,10 +204,89 @@ public class NativeMinerPlugin extends Plugin {
     private boolean apiTelemetryAvailable;
     private long lastApiTelemetryAtMs;
     private String apiTelemetryMessage = "XMRig API telemetry has not started.";
+    private volatile int batteryFloor = 25;
+    private volatile boolean chargingOnly;
+    private volatile boolean activityVisible = true;
+    private long sessionGeneration;
+
+    @Override
+    protected void handleOnPause() {
+        activityVisible = false;
+        controlExecutor.execute(
+                () -> {
+                    synchronized (this) {
+                        if (activeConfig != null
+                                && isRunning()
+                                && (!activeConfig.optBoolean("backgroundMining", true)
+                                        || activeConfig.optBoolean("autoPauseScreenOff", false)))
+                            stopForProtection(
+                                    "Mining paused when the app entered the background.",
+                                    sessionGeneration);
+                    }
+                });
+        super.handleOnPause();
+    }
+
+    @Override
+    protected void handleOnResume() {
+        activityVisible = true;
+        super.handleOnResume();
+    }
+
+    @PluginMethod
+    public void updateSafety(PluginCall call) {
+        controlExecutor.execute(
+                () -> {
+                    batteryFloor = Math.max(10, Math.min(60, call.getInt("batteryFloor", 25)));
+                    chargingOnly = call.getBoolean("chargingOnly", false);
+                    if (isRunning() && activeConfig != null) {
+                        String reason =
+                                DeviceStatusPlugin.safetyViolation(
+                                        getContext(),
+                                        activeConfig,
+                                        batteryFloor,
+                                        chargingOnly
+                                                || activeConfig.optBoolean(
+                                                        "autoPauseOnBattery", false));
+                        if (reason != null) stopForProtection(reason, sessionGeneration);
+                    }
+                    call.resolve();
+                });
+    }
+
+    private synchronized void stopForProtection(String reason, long generation) {
+        if (generation != sessionGeneration || !isRunning()) return;
+        try {
+            stopMinerProcess();
+            paused = !reason.startsWith("Stopped from the mining notification");
+            poolConnected = false;
+            apiTelemetryAvailable = false;
+            lastMessage = reason + " Resume manually after checking the device.";
+            appendLog(lastMessage);
+        } catch (RuntimeException failure) {
+            lastMessage = "Protection stop failed: " + failure.getMessage();
+            appendLog(lastMessage);
+        }
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        controlExecutor.execute(
+                () -> {
+                    try {
+                        stopMinerProcess();
+                    } finally {
+                        outputExecutor.shutdownNow();
+                        metadataExecutor.shutdownNow();
+                    }
+                });
+        controlExecutor.shutdown();
+        super.handleOnDestroy();
+    }
 
     @PluginMethod
     public void status(PluginCall call) {
-        call.resolve(createStatus());
+        controlExecutor.execute(() -> call.resolve(createStatus()));
     }
 
     @PluginMethod
@@ -253,7 +347,34 @@ public class NativeMinerPlugin extends Plugin {
     }
 
     @PluginMethod
-    public synchronized void start(PluginCall call) {
+    public void start(PluginCall call) {
+        if (Build.VERSION.SDK_INT >= 33
+                && ContextCompat.checkSelfPermission(
+                                getContext(), Manifest.permission.POST_NOTIFICATIONS)
+                        != PackageManager.PERMISSION_GRANTED) {
+            requestPermissionForAlias("notifications", call, "notificationsResult");
+            return;
+        }
+        controlExecutor.execute(
+                () -> {
+                    try {
+                        startOnWorker(call);
+                    } catch (RuntimeException exception) {
+                        call.reject(exception.getMessage(), exception);
+                    }
+                });
+    }
+
+    @PermissionCallback
+    private void notificationsResult(PluginCall call) {
+        if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.POST_NOTIFICATIONS)
+                == PackageManager.PERMISSION_GRANTED) start(call);
+        else
+            call.reject(
+                    "Allow notifications in Android settings before mining. The session needs a visible Stop control.");
+    }
+
+    private synchronized void startOnWorker(PluginCall call) {
         if (isRunning()) {
             call.resolve(createStatus());
             return;
@@ -268,6 +389,42 @@ public class NativeMinerPlugin extends Plugin {
         }
 
         JSObject config = call.getObject("config", new JSObject());
+        String wallet = config.getString("walletAddress", "").trim();
+        String host = config.getString("poolUrl", "").trim();
+        int port = config.getInteger("poolPort", 0);
+        if (wallet.isEmpty()
+                || wallet.toUpperCase(Locale.ROOT).startsWith("YOUR_")
+                || host.isEmpty()
+                || host.matches(".*\\s.*")
+                || port < 1
+                || port > 65535) {
+            call.reject("Enter a wallet or pool username, host, and valid port before mining.");
+            return;
+        }
+        if (!activityVisible) {
+            call.reject("Open AndroMiner before starting a mining session.");
+            return;
+        }
+        if (!MiningGuardService.notificationsEnabled(getContext())
+                || (Build.VERSION.SDK_INT >= 33
+                        && ContextCompat.checkSelfPermission(
+                                        getContext(), Manifest.permission.POST_NOTIFICATIONS)
+                                != PackageManager.PERMISSION_GRANTED)) {
+            call.reject(
+                    "Allow AndroMiner notifications in Android settings before mining. The session requires a visible Stop control.");
+            return;
+        }
+        String safetyReason =
+                DeviceStatusPlugin.safetyViolation(
+                        getContext(),
+                        config,
+                        batteryFloor,
+                        chargingOnly || config.optBoolean("autoPauseOnBattery", false));
+        if (safetyReason != null) {
+            call.reject(safetyReason);
+            return;
+        }
+        activeConfig = config;
         String hardwareMode = normalizeHardwareMode(config.getString("hardwareMode", "cpu"));
         int requestedThreads =
                 bounded(
@@ -291,6 +448,26 @@ public class NativeMinerPlugin extends Plugin {
         List<String> command = buildCommand(binary, config, apiPort, apiToken);
 
         try {
+            final long generation = ++sessionGeneration;
+            MiningGuardService.begin(
+                    getContext(),
+                    new MiningGuardService.Session() {
+                        public String check() {
+                            if (!MiningGuardService.notificationsEnabled(getContext()))
+                                return "Mining notifications were disabled.";
+                            return DeviceStatusPlugin.safetyViolation(
+                                    getContext(),
+                                    config,
+                                    batteryFloor,
+                                    chargingOnly || config.optBoolean("autoPauseOnBattery", false));
+                        }
+
+                        public void stop(String reason) {
+                            if (!controlExecutor.isShutdown())
+                                controlExecutor.execute(
+                                        () -> stopForProtection(reason, generation));
+                        }
+                    });
             binary.setExecutable(true);
             File pidFile = new File(getContext().getCacheDir(), "androminer-miner.pid");
             if (pidFile.exists()) {
@@ -306,19 +483,24 @@ public class NativeMinerPlugin extends Plugin {
             if (minerPid <= 0) {
                 minerPid = resolveProcessPid(minerProcess);
             }
-            startedAtMs = System.currentTimeMillis();
+            startedAtMs = SystemClock.elapsedRealtime();
+            stoppedUptimeSeconds = 0;
             hashrate = 0;
             difficulty = 0;
             networkLatencyMs = 0;
             resetCpuUsageSampling();
             acceptedShares = 0;
             rejectedShares = 0;
-            activeThreads = requestedThreads;
+            activeThreads = 0;
             activeHardwareMode = hardwareMode;
             lastMessage = "Native miner process started.";
             lastFailureReason = "";
             lastExitCode = Integer.MIN_VALUE;
             stopRequested = false;
+            paused = false;
+            poolConnected = false;
+            lastStdoutHashrateAtMs = 0;
+            stdoutHashrate = 0;
             clearLogs();
             appendLog(lastMessage);
             appendLog("Pool endpoint: " + poolEndpoint);
@@ -328,13 +510,15 @@ public class NativeMinerPlugin extends Plugin {
                     "Hardware mode: "
                             + formatHardwareMode(hardwareMode)
                             + ", threads: "
-                            + activeThreads
+                            + requestedThreads
                             + ", priority: "
                             + config.getString("priority", "low"));
-            outputExecutor.execute(this::readMinerOutput);
+            Process startedProcess = minerProcess;
+            outputExecutor.execute(() -> readMinerOutput(startedProcess));
             call.resolve(createStatus());
-        } catch (IOException exception) {
-            minerProcess = null;
+        } catch (Exception exception) {
+            stopMinerProcess();
+            MiningGuardService.end(getContext());
             lastMessage = exception.getMessage();
             appendLog("Failed to start native miner: " + exception.getMessage());
             call.reject("Failed to start native miner: " + exception.getMessage());
@@ -342,20 +526,45 @@ public class NativeMinerPlugin extends Plugin {
     }
 
     @PluginMethod
-    public synchronized void pause(PluginCall call) {
+    public void pause(PluginCall call) {
+        controlExecutor.execute(
+                () -> {
+                    try {
+                        pauseOnWorker(call);
+                    } catch (RuntimeException exception) {
+                        call.reject(exception.getMessage(), exception);
+                    }
+                });
+    }
+
+    private synchronized void pauseOnWorker(PluginCall call) {
         stopMinerProcess();
         hashrate = 0;
         activeThreads = 0;
         minerPid = -1;
         activeHardwareMode = "cpu";
         resetCpuUsageSampling();
+        paused = true;
+        poolConnected = false;
+        apiTelemetryAvailable = false;
         lastMessage = "Native miner paused.";
         appendLog(lastMessage);
         call.resolve(createStatus());
     }
 
     @PluginMethod
-    public synchronized void stop(PluginCall call) {
+    public void stop(PluginCall call) {
+        controlExecutor.execute(
+                () -> {
+                    try {
+                        stopOnWorker(call);
+                    } catch (RuntimeException exception) {
+                        call.reject(exception.getMessage(), exception);
+                    }
+                });
+    }
+
+    private synchronized void stopOnWorker(PluginCall call) {
         stopMinerProcess();
         hashrate = 0;
         minerPid = -1;
@@ -365,6 +574,8 @@ public class NativeMinerPlugin extends Plugin {
         apiTelemetryAvailable = false;
         lastApiTelemetryAtMs = 0;
         apiTelemetryMessage = "XMRig API telemetry stopped.";
+        paused = false;
+        poolConnected = false;
         lastMessage = "Native miner stopped.";
         appendLog(lastMessage);
         call.resolve(createStatus());
@@ -374,8 +585,8 @@ public class NativeMinerPlugin extends Plugin {
         String protocol = config.getString("protocol", "stratum+tcp");
         String poolUrl = config.getString("poolUrl", "");
         int poolPort = config.getInteger("poolPort", 3333);
-        String walletAddress = config.getString("walletAddress", "");
-        String workerName = config.getString("workerName", "android-phone");
+        String walletAddress = config.getString("walletAddress", "").trim();
+        String workerName = config.getString("workerName", "android-phone").trim();
         String password = config.getString("password", "x");
         int threadCount =
                 bounded(
@@ -874,7 +1085,7 @@ public class NativeMinerPlugin extends Plugin {
             failureReason = lastFailureReason;
             exitCode = lastExitCode;
             unexpectedExit = lastExitCode != Integer.MIN_VALUE && !stopRequested;
-            fallbackHashrate = hashrate;
+            fallbackHashrate = running ? stdoutHashrate : 0;
             fallbackDifficulty = difficulty;
             fallbackNetworkLatencyMs = networkLatencyMs;
             if (running) {
@@ -887,7 +1098,10 @@ public class NativeMinerPlugin extends Plugin {
             fallbackAcceptedShares = acceptedShares;
             fallbackRejectedShares = rejectedShares;
             fallbackActiveThreads = running ? activeThreads : 0;
-            fallbackUptimeSeconds = running ? (System.currentTimeMillis() - startedAtMs) / 1000 : 0;
+            fallbackUptimeSeconds =
+                    running
+                            ? (SystemClock.elapsedRealtime() - startedAtMs) / 1000
+                            : stoppedUptimeSeconds;
             telemetryPort = apiPort;
             telemetryToken = apiToken;
             telemetryAvailable = apiTelemetryAvailable;
@@ -912,6 +1126,13 @@ public class NativeMinerPlugin extends Plugin {
 
                 if (telemetry.available) {
                     hashrate = telemetry.hashrate;
+                    poolConnected =
+                            telemetry.connectionJson != null
+                                    && telemetry.connectionJson.optLong(
+                                                    "uptime_ms",
+                                                    telemetry.connectionJson.optLong("uptime", 0)
+                                                            * 1000)
+                                            > 0;
                     acceptedShares = telemetry.acceptedShares;
                     rejectedShares = telemetry.rejectedShares;
                     activeThreads =
@@ -941,6 +1162,11 @@ public class NativeMinerPlugin extends Plugin {
         JSObject result = new JSObject();
         result.put("available", binary != null);
         result.put("running", running);
+        if (running && activeConfig != null) result.put("activeConfig", activeConfig);
+        result.put("paused", !running && paused);
+        result.put("stopRequested", stopRequested);
+        result.put("connected", running && poolConnected);
+        result.put("hashrateUpdatedAt", lastStdoutHashrateAtMs > 0 ? lastStdoutHashrateAtMs : null);
         result.put("message", message);
         result.put("hardwareMode", running ? hardwareModeSnapshot : "cpu");
 
@@ -1001,7 +1227,13 @@ public class NativeMinerPlugin extends Plugin {
                 return telemetry;
             }
 
-            JSONObject backends = getApiJson(port, token, "/2/backends");
+            JSONObject backends = null;
+            // Optional backend details must never invalidate a valid summary.
+            try {
+                backends = getApiJson(port, token, "/2/backends");
+            } catch (IOException | JSONException ignored) {
+                // Summary metrics remain valid without optional per-thread data.
+            }
             telemetry.summary = toJSObject(summary);
             telemetry.backends = backends == null ? null : toJSObject(backends);
             telemetry.hashrateJson = toJSObject(summary.optJSONObject("hashrate"));
@@ -1048,7 +1280,10 @@ public class NativeMinerPlugin extends Plugin {
                     body.append(line);
                 }
 
-                return new JSONObject(body.toString());
+                String json = body.toString().trim();
+                return json.startsWith("[")
+                        ? new JSONObject().put("backends", new JSONArray(json))
+                        : new JSONObject(json);
             }
         } finally {
             connection.disconnect();
@@ -1056,24 +1291,10 @@ public class NativeMinerPlugin extends Plugin {
     }
 
     private double extractTotalHashrate(JSONObject summary) {
-        JSONObject hashrateJson = summary.optJSONObject("hashrate");
-        if (hashrateJson == null) {
-            return hashrate;
-        }
-
-        JSONArray total = hashrateJson.optJSONArray("total");
-        if (total == null) {
-            return hashrateJson.optDouble("total", hashrate);
-        }
-
-        for (int index = 0; index < total.length(); index += 1) {
-            double value = total.optDouble(index, 0);
-            if (value > 0) {
-                return value;
-            }
-        }
-
-        return total.optDouble(0, hashrate);
+        JSONObject rates = summary.optJSONObject("hashrate");
+        JSONArray total = rates == null ? null : rates.optJSONArray("total");
+        // Do not replace a valid zero 10s speed with an older 60s or 15m average.
+        return total == null || total.isNull(0) ? 0 : Math.max(0, total.optDouble(0, 0));
     }
 
     private int extractAcceptedShares(JSONObject summary) {
@@ -1097,15 +1318,8 @@ public class NativeMinerPlugin extends Plugin {
     }
 
     private long extractUptimeSeconds(JSONObject summary) {
-        JSONObject connection = summary.optJSONObject("connection");
-        if (connection != null) {
-            long uptime = connection.optLong("uptime", 0);
-            if (uptime > 0) {
-                return uptime;
-            }
-        }
-
-        return isRunning() ? (System.currentTimeMillis() - startedAtMs) / 1000 : 0;
+        // Pool connection uptime resets on reconnect; process uptime does not.
+        return isRunning() ? Math.max(0, (SystemClock.elapsedRealtime() - startedAtMs) / 1000) : 0;
     }
 
     private int extractActiveThreads(JSONObject summary, JSONObject backends) {
@@ -1218,21 +1432,14 @@ public class NativeMinerPlugin extends Plugin {
         }
     }
 
-    private void readMinerOutput() {
-        Process process;
-        synchronized (this) {
-            process = minerProcess;
-        }
-
-        if (process == null) {
-            return;
-        }
-
+    private void readMinerOutput(Process process) {
         try (BufferedReader reader =
                 new BufferedReader(new InputStreamReader(process.getInputStream()))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                parseMinerLine(line);
+                synchronized (this) {
+                    if (minerProcess == process) parseMinerLine(line);
+                }
             }
         } catch (IOException exception) {
             synchronized (this) {
@@ -1249,7 +1456,10 @@ public class NativeMinerPlugin extends Plugin {
                         Thread.currentThread().interrupt();
                     }
 
+                    stoppedUptimeSeconds =
+                            Math.max(0, (SystemClock.elapsedRealtime() - startedAtMs) / 1000);
                     minerProcess = null;
+                    MiningGuardService.end(getContext());
                     hashrate = 0;
                     activeThreads = 0;
                     activeHardwareMode = "cpu";
@@ -1280,19 +1490,31 @@ public class NativeMinerPlugin extends Plugin {
     }
 
     private synchronized void parseMinerLine(String line) {
+        line = MinerOutput.clean(line);
         lastMessage = line;
         appendLog(line);
-        Matcher speedTableMatcher = SPEED_TABLE_PATTERN.matcher(line);
-        if (speedTableMatcher.find()) {
-            hashrate = Double.parseDouble(speedTableMatcher.group(1));
-        } else {
-            Matcher hashMatcher = HASHRATE_PATTERN.matcher(line);
-            if (hashMatcher.find()) {
-                hashrate = Double.parseDouble(hashMatcher.group(1));
-            }
+        Double currentSpeed = MinerOutput.currentSpeed(line);
+        if (currentSpeed != null) {
+            hashrate = currentSpeed;
+            stdoutHashrate = currentSpeed;
+            lastStdoutHashrateAtMs = System.currentTimeMillis();
+        } else if (line.contains("speed 10s/60s/15m")) {
+            stdoutHashrate = 0;
+            lastStdoutHashrateAtMs = 0;
         }
 
         String normalized = line.toLowerCase(Locale.US);
+        Matcher readyThreads =
+                Pattern.compile("\\bREADY\\s+threads\\s+(\\d+)", Pattern.CASE_INSENSITIVE)
+                        .matcher(line);
+        if (readyThreads.find()) activeThreads = Integer.parseInt(readyThreads.group(1));
+        if (normalized.contains("new job from") || normalized.contains("use pool"))
+            poolConnected = true;
+        if (normalized.contains("no active pools")
+                || normalized.contains("connect error")
+                || normalized.contains("connection refused")
+                || normalized.contains("end of file")
+                || normalized.contains("read error")) poolConnected = false;
         if (normalized.contains("accepted")) {
             acceptedShares += 1;
         }
@@ -1407,30 +1629,70 @@ public class NativeMinerPlugin extends Plugin {
     }
 
     private synchronized boolean isRunning() {
-        return minerProcess != null && minerProcess.isAlive();
+        return minerProcess != null && isProcessAlive(minerProcess);
     }
 
     private synchronized void stopMinerProcess() {
         if (minerProcess == null) {
+            MiningGuardService.end(getContext());
             return;
         }
 
+        stoppedUptimeSeconds = Math.max(0, (SystemClock.elapsedRealtime() - startedAtMs) / 1000);
         stopRequested = true;
         minerProcess.destroy();
         try {
-            if (!minerProcess.waitFor(3, TimeUnit.SECONDS)) {
+            if (!waitForProcess(minerProcess, 3)) {
                 appendLog("Native miner did not stop in time; forcing shutdown.");
-                minerProcess.destroyForcibly();
-                minerProcess.waitFor(2, TimeUnit.SECONDS);
+                forceStopProcess(minerProcess);
+                if (!waitForProcess(minerProcess, 2)) {
+                    throw new IllegalStateException(
+                            "Miner is still running after shutdown. Retry Stop.");
+                }
             }
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            minerProcess.destroyForcibly();
+            forceStopProcess(minerProcess);
         } finally {
-            lastExitCode = getExitCode(minerProcess);
-            minerProcess = null;
-            minerPid = -1;
-            resetCpuUsageSampling();
+            if (minerProcess != null && !isProcessAlive(minerProcess)) {
+                lastExitCode = getExitCode(minerProcess);
+                minerProcess = null;
+            }
+            if (minerProcess == null) {
+                MiningGuardService.end(getContext());
+                minerPid = -1;
+                resetCpuUsageSampling();
+            }
+        }
+        if (isRunning()) throw new IllegalStateException("Miner is still running. Retry Stop.");
+    }
+
+    private boolean isProcessAlive(Process process) {
+        if (process == null) return false;
+        try {
+            process.exitValue();
+            return false;
+        } catch (IllegalThreadStateException alive) {
+            return true;
+        }
+    }
+
+    private boolean waitForProcess(Process process, int timeoutSeconds)
+            throws InterruptedException {
+        long deadline = System.nanoTime() + timeoutSeconds * 1000000000L;
+        while (isProcessAlive(process) && System.nanoTime() < deadline) Thread.sleep(25);
+        return !isProcessAlive(process);
+    }
+
+    private void forceStopProcess(Process process) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            process.destroyForcibly();
+        } else {
+            // Android 6/7 lack Process.destroyForcibly. Kill only this owned child PID.
+            int pid =
+                    process == minerProcess && minerPid > 0 ? minerPid : resolveProcessPid(process);
+            if (pid > 0 && isProcessAlive(process)) android.os.Process.killProcess(pid);
+            else process.destroy();
         }
     }
 
@@ -1537,9 +1799,9 @@ public class NativeMinerPlugin extends Plugin {
             ProcessBuilder builder = new ProcessBuilder(binary.getAbsolutePath(), argument);
             builder.redirectErrorStream(true);
             Process process = builder.start();
-            boolean finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
+            boolean finished = waitForProcess(process, timeoutSeconds);
             if (!finished) {
-                process.destroyForcibly();
+                forceStopProcess(process);
                 return "";
             }
 
@@ -1686,7 +1948,11 @@ public class NativeMinerPlugin extends Plugin {
                 throw new IOException("GitHub returned HTTP " + responseCode + ".");
             }
 
-            long totalBytes = connection.getContentLengthLong();
+            long totalBytes = -1;
+            try {
+                totalBytes = Long.parseLong(connection.getHeaderField("Content-Length"));
+            } catch (NumberFormatException ignored) {
+            }
             long downloadedBytes = 0;
             long lastProgressAtMs = 0;
             notifyDownloadProgress(variant, 0, downloadedBytes, totalBytes);

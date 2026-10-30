@@ -47,7 +47,7 @@ const defaultSettings = (): SettingsState => ({
   },
   autoStart: false,
   autoResume: true,
-  thermalThreshold: 72,
+  thermalThreshold: 42,
   batterySafety: {
     stopBelowPercent: 25,
     mineOnlyCharging: false
@@ -66,6 +66,7 @@ const defaultSettings = (): SettingsState => ({
 
 const normalizeSettings = (settings: Partial<SettingsState>): SettingsState => {
   const defaults = defaultSettings();
+  const floor = settings?.batterySafety?.stopBelowPercent;
 
   return {
     ...defaults,
@@ -75,8 +76,14 @@ const normalizeSettings = (settings: Partial<SettingsState>): SettingsState => {
       ...settings.notifications
     },
     batterySafety: {
-      ...defaults.batterySafety,
-      ...settings.batterySafety
+      stopBelowPercent:
+        typeof floor === 'number' && Number.isFinite(floor)
+          ? Math.min(60, Math.max(10, Math.round(floor)))
+          : defaults.batterySafety.stopBelowPercent,
+      mineOnlyCharging:
+        typeof settings?.batterySafety?.mineOnlyCharging === 'boolean'
+          ? settings.batterySafety.mineOnlyCharging
+          : defaults.batterySafety.mineOnlyCharging
     },
     performance: {
       ...defaults.performance,
@@ -105,8 +112,13 @@ export const useSettingsStore = defineStore('settings', {
         this.$patch(defaultSettings());
       }
     },
-    persist(): void {
-      localStorage.setItem(settingsKey, JSON.stringify(this.$state));
+    persist(): boolean {
+      try {
+        localStorage.setItem(settingsKey, JSON.stringify(this.$state));
+        return true;
+      } catch {
+        return false;
+      }
     },
     replace(next: SettingsState): void {
       this.$patch(normalizeSettings(next));

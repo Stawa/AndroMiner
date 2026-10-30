@@ -1,13 +1,15 @@
 <script setup lang="ts">
+import { formatSensor, formatHashrate } from '../utils/miningTelemetry';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Capacitor, registerPlugin } from '@capacitor/core';
-import HashrateRing from '../components/HashrateRing.vue';
+import TelemetrySparkline from '../components/TelemetrySparkline.vue';
 import MaterialIcon from '../components/MaterialIcon.vue';
 import SessionControls from '../components/SessionControls.vue';
 import StatusIndicator from '../components/StatusIndicator.vue';
 import WarningBottomSheet, { type WarningType } from '../components/WarningBottomSheet.vue';
 import { profilePresets } from '../composables/useMiningController';
 import { useSheetDrag } from '../composables/useSheetDrag';
+import { useDialogFocus } from '../composables/useDialogFocus';
 import { useSettingsStore } from '../stores/settings';
 import type {
   DeviceTelemetry,
@@ -48,42 +50,49 @@ const emit = defineEmits<{
   stop: [];
   profile: [value: MiningProfile];
   resume: [];
+  fullscreen: [active: boolean];
 }>();
 
 const detailsOpen = ref(false);
 const fullscreenActive = ref(false);
 const fullscreenBusy = ref(false);
+watch(fullscreenActive, (active) => emit('fullscreen', active));
 const profilePickerOpen = ref(false);
 const warningType = ref<WarningType | null>(null);
 const pendingSessionAction = ref<PendingSessionAction>(null);
+const actionFailure = ref('');
 const ImmersiveMode = registerPlugin<ImmersiveModePlugin>('ImmersiveMode');
 const liteSessionMode = computed(() => settings.performance.liteSessionMode);
 let pendingSessionActionTimeout = 0;
 
-const recentHashrates = computed(() =>
-  props.hashrateHistory
-    .map((point) => point.value)
-    .filter((value) => Number.isFinite(value) && value > 0)
+const averageHashrate = computed(() => props.stats.averageHashrate);
+const speedLabel = computed(() =>
+  props.stats.sampleState === 'live'
+    ? formatHashrate(props.stats.hashrate)
+    : props.stats.sampleState === 'stale'
+      ? 'Stale'
+      : props.stats.sampleState === 'inactive'
+        ? 'Stopped'
+        : 'Waiting'
 );
-const baselineHashrates = computed(() => {
-  if (recentHashrates.value.length <= 1) {
-    return recentHashrates.value;
-  }
-
-  return recentHashrates.value.slice(0, -1);
-});
-const averageHashrate = computed(() => {
-  const samples = baselineHashrates.value;
-
-  if (samples.length === 0) {
-    return Math.max(0, props.stats.hashrate);
-  }
-
-  return samples.reduce((total, value) => total + value, 0) / samples.length;
-});
+const minerStateLabel = computed(
+  () =>
+    ({
+      idle: 'Stopped',
+      starting: 'Starting',
+      mining: 'Running',
+      reconnecting: 'Reconnecting',
+      pausing: 'Pausing',
+      paused: 'Paused',
+      stopping: 'Stopping',
+      error: 'Error'
+    })[props.state]
+);
 const poolAddress = computed(() => `${props.config.poolUrl}:${props.config.poolPort}`);
 const totalHashesLabel = computed(() => {
-  const totalHashes = Math.max(0, props.stats.hashrate * props.stats.uptimeSeconds);
+  const results = asRecord(props.apiTelemetry.results);
+  const totalHashes = readNumber(results, 'hashes_total');
+  if (totalHashes === null) return 'Unsupported';
 
   if (totalHashes >= 1_000_000_000) {
     return `${(totalHashes / 1_000_000_000).toFixed(2)}B`;
@@ -100,9 +109,11 @@ const totalHashesLabel = computed(() => {
   return Math.round(totalHashes).toLocaleString();
 });
 const thermalTone = computed(() =>
-  props.stats.temperature >= props.config.thermalThreshold - 5 ? 'warning' : 'normal'
+  props.stats.temperature !== null && props.stats.temperature >= props.config.thermalThreshold - 5
+    ? 'warning'
+    : 'normal'
 );
-const batterySafetyLimit = 20;
+const batterySafetyLimit = computed(() => settings.batterySafety.stopBelowPercent);
 const profileLabel = computed(
   () => profilePresets.find((preset) => preset.id === props.config.profile)?.label || 'Profile'
 );
@@ -149,7 +160,9 @@ const telemetryEndpointLabel = computed(() =>
   props.apiTelemetry.port > 0 ? `${props.apiTelemetry.host}:${props.apiTelemetry.port}` : 'Inactive'
 );
 const showingPreparation = computed(
-  () => (props.state === 'starting' || props.state === 'mining') && props.stats.hashrate <= 0
+  () =>
+    ['starting', 'mining', 'reconnecting'].includes(props.state) &&
+    props.stats.sampleState !== 'live'
 );
 const preparationTitle = computed(() => {
   if (props.connected) {
@@ -202,18 +215,6 @@ const formatCompactNumber = (value: number | null): string => {
   }).format(value);
 };
 
-const formatSpeedLabel = (value: number): string => {
-  if (value >= 1_000_000) {
-    return `${(value / 1_000_000).toFixed(2)} MH/s`;
-  }
-
-  if (value >= 1_000) {
-    return `${(value / 1_000).toFixed(2)} KH/s`;
-  }
-
-  return `${value.toFixed(1)} H/s`;
-};
-
 const formatCpuUsage = (value: number | null | undefined): string =>
   typeof value === 'number' && Number.isFinite(value) ? `${Math.round(value)}%` : '-';
 
@@ -229,7 +230,6 @@ const logToneClass = (tone: LogTone): string => {
 };
 
 const cpuHardwareName = computed(() => props.device.cpuName || props.device.model || 'Android CPU');
-const cpuClockLabel = computed(() => props.device.cpuClockLabel || '-');
 const engineLabel = 'XMRig CPU Miner';
 
 const affinityLabel = computed(() => {
@@ -265,59 +265,11 @@ const powerDrawLabel = computed(() =>
     ? `${props.device.powerDrawW.toFixed(2)} W`
     : 'Unavailable'
 );
-const powerDrawDetail = computed(() => {
-  if (
-    typeof props.device.batteryCurrentMa === 'number' &&
-    Number.isFinite(props.device.batteryCurrentMa) &&
-    typeof props.device.batteryVoltageV === 'number' &&
-    Number.isFinite(props.device.batteryVoltageV)
-  ) {
-    return `${Math.round(props.device.batteryCurrentMa)} mA · ${props.device.batteryVoltageV.toFixed(
-      2
-    )} V`;
-  }
-
-  return 'Sensor not exposed';
-});
 const frequencyMhzLabel = computed(() =>
   typeof props.device.cpuClockGhz === 'number' && Number.isFinite(props.device.cpuClockGhz)
     ? `${Math.round(props.device.cpuClockGhz * 1000).toLocaleString()} MHz`
     : 'Unknown'
 );
-const sessionMetricCards = computed(() => [
-  {
-    id: 'latency',
-    icon: 'speed',
-    label: 'Network latency',
-    value: networkLatencyLabel.value,
-    detail: props.apiTelemetry.available ? 'XMRig API ping' : 'Pool ping fallback',
-    tone: networkLatencyLabel.value === 'Unknown' ? 'text-app-muted' : 'text-white'
-  },
-  {
-    id: 'power',
-    icon: 'bolt',
-    label: 'Power draw',
-    value: powerDrawLabel.value,
-    detail: powerDrawDetail.value,
-    tone: props.device.powerDrawW ? 'text-white' : 'text-app-muted'
-  },
-  {
-    id: 'frequency',
-    icon: 'memory_alt',
-    label: 'Frequency',
-    value: frequencyMhzLabel.value,
-    detail: 'Current CPU clock',
-    tone: 'text-white'
-  },
-  {
-    id: 'cpu',
-    icon: 'monitor_heart',
-    label: 'Miner CPU',
-    value: formatCpuUsage(props.stats.minerCpuUsage),
-    detail: `${props.stats.activeThreads || props.config.threadCount} active threads`,
-    tone: props.stats.minerCpuUsage === null ? 'text-app-muted' : 'text-white'
-  }
-]);
 const currentDifficultyLabel = computed(() =>
   formatCompactNumber(
     firstPositiveNumber(
@@ -338,6 +290,60 @@ const networkLatencyLabel = computed(() => {
 const toggleDetails = (): void => {
   detailsOpen.value = !detailsOpen.value;
 };
+
+const diagnosticGroups = computed(() => [
+  {
+    title: 'Connection',
+    items: [
+      { label: 'Pool', value: poolAddress.value, wide: true },
+      { label: 'Worker', value: props.config.workerName },
+      { label: 'Network latency', value: networkLatencyLabel.value },
+      { label: 'Difficulty', value: currentDifficultyLabel.value },
+      {
+        label: 'Telemetry',
+        value: telemetrySourceLabel.value,
+        tone: props.apiTelemetry.available ? 'success' : 'muted'
+      },
+      { label: 'API endpoint', value: telemetryEndpointLabel.value }
+    ]
+  },
+  {
+    title: 'Mining engine',
+    items: [
+      { label: 'Engine', value: engineLabel },
+      { label: 'CPU hardware', value: cpuHardwareName.value },
+      { label: 'CPU clock', value: frequencyMhzLabel.value },
+      { label: 'CPU workers', value: cpuWorkerLabel.value },
+      { label: 'CPU tuning', value: cpuTuningLabel.value },
+      { label: 'Miner CPU', value: formatCpuUsage(props.stats.minerCpuUsage) },
+      { label: 'Total hashes', value: totalHashesLabel.value }
+    ]
+  },
+  {
+    title: 'Device & power',
+    items: [
+      { label: 'Battery', value: formatSensor(props.stats.batteryLevel, '%') },
+      { label: 'Charging state', value: props.stats.isCharging ? 'Charging' : 'Unplugged' },
+      { label: 'Temperature', value: formatSensor(props.stats.temperature, ' °C') },
+      {
+        label: 'Thermal status',
+        value:
+          props.stats.temperature === null
+            ? 'Unavailable'
+            : thermalTone.value === 'warning'
+              ? 'Near limit'
+              : 'Below limit',
+        tone:
+          props.stats.temperature === null
+            ? 'muted'
+            : thermalTone.value === 'warning'
+              ? 'warning'
+              : 'success'
+      },
+      { label: 'Battery flow (calculated)', value: powerDrawLabel.value }
+    ]
+  }
+]);
 
 const closeDetails = (): void => {
   detailsOpen.value = false;
@@ -390,7 +396,7 @@ const setFullscreen = async (enabled: boolean): Promise<void> => {
 
     fullscreenActive.value = true;
   } catch {
-    fullscreenActive.value = enabled;
+    fullscreenActive.value = false;
   } finally {
     fullscreenBusy.value = false;
   }
@@ -424,14 +430,6 @@ const {
   endSheetDrag: endProfileDrag
 } = useSheetDrag(closeProfilePicker);
 
-const showThermalWarning = (): void => {
-  warningType.value = 'thermal';
-};
-
-const showBatteryWarning = (): void => {
-  warningType.value = 'battery';
-};
-
 const dismissWarning = (): void => {
   warningType.value = null;
 };
@@ -447,16 +445,6 @@ const lowerPerformance = (): void => {
 };
 
 const openProfilePicker = (): void => {
-  if (props.stats.temperature >= props.config.thermalThreshold - 5) {
-    showThermalWarning();
-    return;
-  }
-
-  if (props.stats.batteryLevel <= batterySafetyLimit + 5) {
-    showBatteryWarning();
-    return;
-  }
-
   profilePickerOpen.value = true;
 };
 
@@ -475,6 +463,7 @@ const clearPendingSessionAction = (): void => {
 };
 
 const setPendingSessionAction = (action: Exclude<PendingSessionAction, null>): void => {
+  actionFailure.value = '';
   pendingSessionAction.value = action;
 
   if (pendingSessionActionTimeout) {
@@ -513,22 +502,30 @@ const requestStop = (): void => {
 };
 
 watch(
-  () => [props.stats.temperature, props.stats.batteryLevel, props.state] as const,
-  ([temperature, batteryLevel, state]) => {
-    if (state !== 'mining' || warningType.value) {
-      return;
+  () => props.backendMessage,
+  (message) => {
+    const action = pendingSessionAction.value;
+    const failed =
+      action === 'pause'
+        ? ['mining', 'reconnecting'].includes(props.state)
+        : action === 'resume'
+          ? props.state === 'paused'
+          : action === 'stop' &&
+            ['starting', 'mining', 'reconnecting', 'paused'].includes(props.state);
+    if (failed) {
+      actionFailure.value = message;
+      clearPendingSessionAction();
     }
+  }
+);
 
-    if (temperature >= props.config.thermalThreshold) {
-      warningType.value = 'thermal';
-      requestPauseResume();
-      return;
-    }
-
-    if (batteryLevel <= batterySafetyLimit) {
+watch(
+  () => props.state,
+  (state) => {
+    if (state !== 'paused') return;
+    if (/temperature|thermal/i.test(props.backendMessage)) warningType.value = 'thermal';
+    else if (/battery|power disconnected/i.test(props.backendMessage))
       warningType.value = 'battery';
-      requestPauseResume();
-    }
   }
 );
 
@@ -538,7 +535,9 @@ watch(
     if (
       (pendingSessionAction.value === 'pause' && state === 'paused') ||
       (pendingSessionAction.value === 'resume' && state === 'mining') ||
-      (pendingSessionAction.value === 'stop' && state === 'idle')
+      (pendingSessionAction.value === 'stop' && state === 'idle') ||
+      state === 'error' ||
+      state === 'reconnecting'
     ) {
       clearPendingSessionAction();
     }
@@ -554,631 +553,319 @@ onBeforeUnmount(() => {
   clearPendingSessionAction();
   void exitFullscreenMode();
 });
-
-const highestHashrate = computed(() => Math.max(0, props.stats.hashrate, ...recentHashrates.value));
-const highestSpeedLabel = computed(() =>
-  highestHashrate.value > 0 ? formatSpeedLabel(highestHashrate.value) : 'Waiting'
-);
-const trendTone = computed(() =>
-  showingPreparation.value || highestHashrate.value <= 0 ? 'text-app-muted' : 'text-app-green'
-);
+const highestSpeedLabel = computed(() => formatHashrate(props.stats.peakHashrate));
+const detailsPanel = ref<HTMLElement | null>(null);
+const profilePanel = ref<HTMLElement | null>(null);
+useDialogFocus(() => detailsOpen.value, detailsPanel, closeDetails);
+useDialogFocus(() => profilePickerOpen.value, profilePanel, closeProfilePicker);
+defineExpose({ exitFullscreenMode });
 </script>
 
 <template>
-  <div class="session-page" :class="{ 'session-page-fullscreen': fullscreenActive }">
-    <header class="flex items-center gap-3">
-      <div
-        class="grid h-12 w-12 shrink-0 place-items-center rounded-full text-[22px] font-bold text-white"
-        :class="config.coin.logoClass"
-      >
-        {{ config.coin.logoText }}
-      </div>
-      <div class="min-w-0 flex-1">
-        <h1 class="truncate text-[18px] font-semibold leading-6 text-white">
-          {{ config.coin.name }} ({{ config.coin.symbol }})
-        </h1>
-        <p class="truncate text-[12px] leading-5 text-app-muted">
-          {{ config.algorithm }} · {{ poolAddress }}
-        </p>
-        <StatusIndicator :connected="connected" />
-      </div>
-    </header>
-
-    <section
-      class="mt-3 grid grid-cols-[1fr_48px] gap-2 rounded-xl border border-app-line bg-app-card p-1.5"
-      aria-label="Session display controls"
-    >
-      <div class="grid min-w-0 grid-cols-2 gap-1 rounded-lg bg-app-elevated p-1">
-        <button
-          class="ripple flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-md px-2 text-[12px] font-semibold transition-colors"
-          :class="!liteSessionMode ? 'bg-app-card text-app-green shadow-sm' : 'text-app-muted'"
-          type="button"
-          :aria-pressed="!liteSessionMode"
-          @click="settings.performance.liteSessionMode = false"
-        >
-          <MaterialIcon name="view_agenda" :size="18" />
-          <span class="truncate">Full</span>
-        </button>
-        <button
-          class="ripple flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-md px-2 text-[12px] font-semibold transition-colors"
-          :class="liteSessionMode ? 'bg-app-card text-app-green shadow-sm' : 'text-app-muted'"
-          type="button"
-          :aria-pressed="liteSessionMode"
-          @click="settings.performance.liteSessionMode = true"
-        >
-          <MaterialIcon name="view_compact" :size="18" />
-          <span class="truncate">Lite</span>
-        </button>
+  <div
+    class="app-page session-page redesign-page"
+    :class="{ 'session-page-fullscreen': fullscreenActive }"
+  >
+    <header class="screen-heading session-heading">
+      <div>
+        <h1>{{ config.coin.name }}</h1>
+        <p>{{ config.algorithm }} · {{ config.threadCount }} CPU threads</p>
       </div>
       <button
-        class="ripple grid min-h-12 w-12 place-items-center rounded-lg bg-app-elevated text-app-muted transition-colors active:bg-app-line/40"
-        :class="{ 'bg-app-green-dim text-app-green': fullscreenActive }"
-        type="button"
+        class="outline-button"
         :aria-label="fullscreenActive ? 'Exit fullscreen' : 'Enter fullscreen'"
-        :aria-pressed="fullscreenActive"
         :disabled="fullscreenBusy"
         @click="toggleFullscreen"
       >
         <MaterialIcon :name="fullscreenActive ? 'fullscreen_exit' : 'fullscreen'" :size="22" />
       </button>
-    </section>
-
-    <main v-if="liteSessionMode" class="flex flex-1 flex-col justify-center gap-4 py-5">
-      <section class="rounded-xl border border-app-line bg-app-card p-4">
-        <div class="flex items-center justify-between gap-3">
-          <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase leading-4 text-app-muted">Hashrate</p>
-            <h2 class="mt-1 text-[34px] font-semibold leading-9 text-white tabular-nums">
-              {{ formatSpeedLabel(stats.hashrate) }}
-            </h2>
+    </header>
+    <div class="session-layout grid min-w-0 gap-layout content-start md:grid-cols-2 items-start">
+      <div class="session-column grid min-w-0 gap-layout content-start">
+        <section class="hash-hero">
+          <div class="hero-top">
+            <span
+              >{{ config.coin.symbol }}
+              <small>
+                / {{ apiTelemetry.available ? '10s average' : 'Reported speed' }}</small
+              ></span
+            ><span
+              class="hero-pill"
+              :data-tone="
+                state === 'mining' && connected
+                  ? 'success'
+                  : state === 'error'
+                    ? 'error'
+                    : 'warning'
+              "
+              role="status"
+              aria-live="polite"
+              >{{ minerStateLabel }}</span
+            >
           </div>
-          <span
-            class="grid h-12 w-12 shrink-0 place-items-center rounded-full"
-            :class="
-              connected ? 'bg-app-green-dim text-app-green' : 'bg-app-elevated text-app-muted'
-            "
-          >
-            <MaterialIcon :name="connected ? 'lan' : 'link_off'" :size="24" />
-          </span>
-        </div>
-        <div class="mt-4 grid grid-cols-3 gap-2">
-          <div class="min-w-0 rounded-lg bg-app-elevated px-3 py-2">
-            <p class="text-[10px] font-semibold uppercase leading-4 text-app-muted">Uptime</p>
-            <p class="mt-1 truncate text-[13px] font-semibold leading-5 text-white">{{ uptime }}</p>
+          <p class="hero-label">Current hashrate</p>
+          <div class="hero-number" :class="{ 'hero-number-message': stats.sampleState !== 'live' }">
+            {{ speedLabel }}
           </div>
-          <div class="min-w-0 rounded-lg bg-app-elevated px-3 py-2">
-            <p class="text-[10px] font-semibold uppercase leading-4 text-app-muted">Avg</p>
-            <p class="mt-1 truncate text-[13px] font-semibold leading-5 text-white">
-              {{ formatSpeedLabel(averageHashrate) }}
-            </p>
+          <p class="hero-caption">
+            {{
+              stats.sampleState === 'live'
+                ? telemetrySourceLabel
+                : stats.sampleState === 'stale'
+                  ? 'Last sample expired; waiting for a fresh reading'
+                  : stats.sampleState === 'inactive'
+                    ? 'No active measurement'
+                    : preparationDetail
+            }}
+          </p>
+          <TelemetrySparkline v-if="!liteSessionMode" :points="hashrateHistory" />
+          <div class="hero-footer">
+            <span
+              >Average · 60s<strong>{{ formatHashrate(averageHashrate) }}</strong></span
+            ><span
+              >Peak<strong>{{ highestSpeedLabel }}</strong></span
+            ><span
+              >Uptime<strong>{{ uptime }}</strong></span
+            >
           </div>
-          <div class="min-w-0 rounded-lg bg-app-elevated px-3 py-2">
-            <p class="text-[10px] font-semibold uppercase leading-4 text-app-muted">Peak</p>
-            <p class="mt-1 truncate text-[13px] font-semibold leading-5 text-white">
-              {{ highestSpeedLabel }}
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section class="grid grid-cols-2 gap-2">
-        <div class="min-w-0 rounded-xl border border-app-line bg-app-card p-3">
-          <p class="text-[10px] font-semibold uppercase leading-4 text-app-muted">CPU clock</p>
-          <p class="mt-1 truncate text-[19px] font-semibold leading-6 text-white">
-            {{ frequencyMhzLabel }}
-          </p>
-          <p class="mt-1 truncate text-[11px] leading-4 text-app-muted">
-            {{ formatCpuUsage(stats.minerCpuUsage) }} miner CPU
-          </p>
-        </div>
-        <div class="min-w-0 rounded-xl border border-app-line bg-app-card p-3">
-          <p class="text-[10px] font-semibold uppercase leading-4 text-app-muted">Shares</p>
-          <p class="mt-1 truncate text-[19px] font-semibold leading-6">
-            <span class="text-app-green">{{ stats.acceptedShares.toLocaleString() }}</span>
-            <span class="px-1 text-app-muted">/</span>
-            <span class="text-red-400">{{ stats.rejectedShares.toLocaleString() }}</span>
-          </p>
-          <p class="mt-1 truncate text-[11px] leading-4 text-app-muted">
-            {{ networkLatencyLabel }} pool ping
-          </p>
-        </div>
-        <div class="min-w-0 rounded-xl border border-app-line bg-app-card p-3">
-          <p class="text-[10px] font-semibold uppercase leading-4 text-app-muted">Thermal</p>
-          <p
-            class="mt-1 truncate text-[19px] font-semibold leading-6"
-            :class="thermalTone === 'warning' ? 'text-app-yellow' : 'text-white'"
-          >
-            {{ Math.round(stats.temperature) }} °C
-          </p>
-          <p class="mt-1 truncate text-[11px] leading-4 text-app-muted">
-            Limit {{ config.thermalThreshold }} °C
-          </p>
-        </div>
-        <div class="min-w-0 rounded-xl border border-app-line bg-app-card p-3">
-          <p class="text-[10px] font-semibold uppercase leading-4 text-app-muted">Battery</p>
-          <p
-            class="mt-1 truncate text-[19px] font-semibold leading-6"
-            :class="stats.batteryLevel <= batterySafetyLimit ? 'text-app-yellow' : 'text-white'"
-          >
-            {{ Math.round(stats.batteryLevel) }}%
-          </p>
-          <p class="mt-1 truncate text-[11px] leading-4 text-app-muted">
-            {{ stats.isCharging ? 'Charging' : 'Unplugged' }}
-          </p>
-        </div>
-      </section>
-
-      <section class="rounded-xl border border-app-line bg-app-card p-3">
-        <div class="flex min-w-0 items-center gap-3">
-          <span
-            class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-app-elevated text-app-green"
-          >
-            <MaterialIcon name="memory" :size="21" />
-          </span>
-          <div class="min-w-0 flex-1">
-            <p class="truncate text-[14px] font-semibold leading-5 text-white">
-              {{ cpuWorkerLabel }}
-            </p>
-            <p class="mt-0.5 truncate text-[12px] leading-4 text-app-muted">
-              {{ cpuTuningLabel }}
-            </p>
-          </div>
-          <span
-            class="shrink-0 rounded-full bg-app-elevated px-2.5 py-1 text-[11px] font-semibold text-app-muted"
-          >
-            Lite
-          </span>
-        </div>
-      </section>
-    </main>
-
-    <main v-else class="flex flex-1 flex-col justify-center gap-4 py-5">
-      <HashrateRing
-        v-if="!showingPreparation"
-        :value="stats.hashrate"
-        :average="averageHashrate"
-        :active="state === 'mining' || state === 'starting'"
-      />
-      <section
-        v-else
-        class="mx-auto flex w-full max-w-[330px] flex-col items-center px-4 py-2 text-center"
-      >
-        <div class="relative grid h-[168px] w-[168px] place-items-center">
-          <div class="absolute inset-0 rounded-full bg-app-green-dim/30" />
-          <div
-            class="absolute inset-3 rounded-full border border-app-green/20 border-t-app-green/80 animate-spin"
-          />
-          <div class="absolute inset-8 rounded-full border border-app-line/70" />
-          <div
-            class="relative grid h-[94px] w-[94px] place-items-center rounded-full bg-app-card text-app-green shadow-[0_12px_28px_rgb(25_128_88/0.16)]"
-          >
-            <MaterialIcon name="precision_manufacturing" :size="38" />
-          </div>
-        </div>
-
-        <p class="mt-2 text-[11px] font-semibold uppercase leading-4 text-app-green">
-          Session Startup
-        </p>
-        <h2 class="mt-1 text-[24px] font-semibold leading-7 text-white">
-          {{ preparationTitle }}
-        </h2>
-        <p class="mt-2 max-w-[260px] text-[13px] leading-[19px] text-app-muted">
-          {{ preparationDetail }}
-        </p>
-      </section>
-
-      <div class="mb-6 text-center">
-        <p class="text-[30px] font-semibold tracking-tight text-white">
-          {{ uptime }}
-        </p>
-
-        <p class="mt-1 text-[12px] text-app-muted">Session uptime</p>
-
-        <!-- subtle inline status -->
+        </section>
+        <SessionControls
+          :state="state"
+          :profile-label="profileLabel"
+          :pending-action="pendingSessionAction"
+          :animations-enabled="settings.performance.animationsEnabled"
+          @pause="requestPauseResume"
+          @stop="requestStop"
+          @profile="openProfilePicker"
+        />
         <div
-          class="mx-auto mt-4 flex w-fit items-center rounded-full border border-app-line bg-app-elevated/60 px-2 py-2 backdrop-blur"
+          class="session-protection"
+          :data-tone="
+            device.temperatureC === null || device.batteryLevel === null ? 'warning' : 'normal'
+          "
         >
-          <!-- trend -->
-          <div class="flex items-center gap-1 rounded-full px-3 py-1" :class="trendTone">
-            <span class="text-[12px] font-medium">
-              Peak
-              <span class="ml-1 text-white">{{ highestSpeedLabel }}</span>
-            </span>
-          </div>
-
-          <div class="mx-2 h-4 w-px bg-app-line" />
-
-          <!-- avg -->
-          <div class="px-3 text-[12px]">
-            <span class="text-app-muted">Avg</span>
-            <span class="ml-1 font-medium text-white">
-              {{ averageHashrate.toFixed(1) }}
-            </span>
-            <span class="text-app-muted">H/s</span>
+          <MaterialIcon name="shield" :size="20" />
+          <p>
+            <strong>{{
+              device.temperatureC === null || device.batteryLevel === null
+                ? 'Protection readings unavailable'
+                : 'Native device protection'
+            }}</strong>
+            <span
+              >{{ device.thermalSource === 'battery' ? 'Battery' : 'Sensor' }}
+              {{ formatSensor(device.temperatureC, ' °C') }} · Limit
+              {{ config.thermalThreshold }} °C · Battery
+              {{ formatSensor(device.batteryLevel, '%') }}</span
+            >
+          </p>
+        </div>
+        <div v-if="actionFailure" class="notice notice-error" role="alert">
+          <MaterialIcon name="error" :size="20" />
+          <div>
+            <strong>Action needs attention</strong>
+            <p>{{ actionFailure }}</p>
           </div>
         </div>
       </div>
-
-      <section class="grid grid-cols-2 gap-2">
+      <div class="session-column grid min-w-0 gap-layout content-start">
+        <section class="share-strip">
+          <div>
+            <span class="status-dot"></span><strong>{{ stats.acceptedShares }}</strong
+            ><small>Accepted shares</small>
+          </div>
+          <div>
+            <strong>{{ stats.rejectedShares }}</strong
+            ><small>Rejected shares</small>
+          </div>
+          <div>
+            <StatusIndicator
+              :connected="connected"
+              :label="connected ? 'Connected' : 'Disconnected'"
+            /><small>Pool connection</small>
+          </div>
+        </section>
         <div
-          v-for="metric in sessionMetricCards"
-          :key="metric.id"
-          class="min-w-0 rounded-xl border border-app-line bg-app-card p-3"
+          v-if="
+            showingPreparation || state === 'paused' || state === 'stopping' || state === 'error'
+          "
+          class="notice"
         >
-          <div class="mb-3 flex items-center justify-between gap-2">
-            <span
-              class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-app-elevated text-app-green"
-            >
-              <MaterialIcon :name="metric.icon" :size="20" />
-            </span>
-            <span class="truncate text-[10px] font-semibold uppercase leading-4 text-app-muted">
-              {{ metric.label }}
-            </span>
+          <MaterialIcon name="info" :size="20" />
+          <div>
+            <strong>{{ showingPreparation ? preparationTitle : minerStateLabel }}</strong>
+            <p>{{ backendMessage }}</p>
           </div>
-          <p class="truncate text-[18px] font-semibold leading-6" :class="metric.tone">
-            {{ metric.value }}
-          </p>
-          <p class="mt-1 truncate text-[11px] leading-4 text-app-muted">
-            {{ metric.detail }}
-          </p>
         </div>
-      </section>
-
-      <section class="overflow-hidden rounded-2xl border border-app-line bg-app-card">
-        <div class="flex items-center justify-between gap-3 border-b border-app-line px-3 py-2.5">
-          <div class="flex min-w-0 items-center gap-2">
-            <MaterialIcon class="shrink-0 text-app-green" name="memory" :size="18" />
-            <p class="truncate text-[12px] font-semibold uppercase leading-4 text-app-muted">
-              Hardware engine
-            </p>
-          </div>
-          <span
-            class="shrink-0 rounded-full bg-app-green-dim px-2.5 py-1 text-[11px] font-semibold leading-4 text-app-green"
-          >
-            {{ engineLabel }}
-          </span>
-        </div>
-
-        <div class="divide-y divide-app-line">
-          <div class="flex min-w-0 items-center gap-3 px-3 py-3">
-            <span
-              class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-app-elevated text-app-green"
+        <div class="section-heading">
+          <div class="segment">
+            <button
+              :aria-pressed="!liteSessionMode"
+              @click="settings.performance.liteSessionMode = false"
             >
-              <MaterialIcon name="developer_board" :size="21" />
-            </span>
-            <div class="min-w-0 flex-1">
-              <div class="flex min-w-0 items-center gap-2">
-                <p class="truncate text-[14px] font-semibold leading-5 text-white">
-                  {{ cpuHardwareName }}
-                </p>
-                <span
-                  class="shrink-0 rounded-full bg-app-green-dim px-2 py-0.5 text-[10px] font-semibold uppercase leading-4 text-app-green"
-                >
-                  CPU
-                </span>
+              Full view</button
+            ><button
+              :aria-pressed="liteSessionMode"
+              @click="settings.performance.liteSessionMode = true"
+            >
+              Lite view
+            </button>
+          </div>
+          <button class="text-button" @click="toggleDetails">
+            Diagnostics <MaterialIcon name="chevron_right" :size="18" />
+          </button>
+        </div>
+        <template v-if="!liteSessionMode">
+          <section class="device-strip">
+            <div :class="{ 'text-app-yellow': thermalTone === 'warning' }">
+              <MaterialIcon name="device_thermostat" :size="20" /><strong>{{
+                formatSensor(stats.temperature, ' °C')
+              }}</strong
+              ><small>{{
+                device.thermalSource === 'battery' ? 'Battery temp' : 'Temperature'
+              }}</small>
+            </div>
+            <div>
+              <MaterialIcon name="battery_5_bar" :size="20" /><strong>{{
+                formatSensor(stats.batteryLevel, '%')
+              }}</strong
+              ><small>{{ stats.isCharging ? 'Charging' : 'Battery' }}</small>
+            </div>
+            <div>
+              <MaterialIcon name="memory" :size="20" /><strong>{{
+                formatCpuUsage(stats.minerCpuUsage)
+              }}</strong
+              ><small>Miner CPU</small>
+            </div>
+          </section>
+          <section class="surface">
+            <div class="section-heading">
+              <h3>Connection</h3>
+              <span class="supporting-label">{{ config.protocol }}</span>
+            </div>
+            <dl class="definition-list">
+              <div>
+                <dt>Pool</dt>
+                <dd>{{ poolAddress }}</dd>
               </div>
-              <p class="mt-0.5 truncate text-[12px] leading-4 text-app-muted">
-                {{ cpuClockLabel }} · {{ cpuWorkerLabel }}
-              </p>
-              <p class="mt-0.5 truncate text-[11px] leading-4 text-app-muted">
-                {{ cpuTuningLabel }}
-              </p>
-            </div>
-            <div class="shrink-0 text-right">
-              <p class="text-[11px] leading-4 text-app-muted">Load</p>
-              <p class="text-[17px] font-semibold leading-6 text-white">
-                {{ formatCpuUsage(stats.minerCpuUsage) }}
-              </p>
-            </div>
-          </div>
-
-          <div class="flex min-w-0 items-center gap-3 px-3 py-3">
-            <span
-              class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-app-elevated"
-              :class="thermalTone === 'warning' ? 'text-app-yellow' : 'text-app-green'"
-            >
-              <MaterialIcon
-                :name="stats.isCharging ? 'battery_charging_full' : 'battery_5_bar'"
-                :size="21"
-              />
-            </span>
-            <div class="min-w-0 flex-1">
-              <div class="flex min-w-0 items-center gap-2">
-                <p class="truncate text-[14px] font-semibold leading-5 text-white">Device power</p>
-                <span
-                  class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase leading-4"
-                  :class="
-                    stats.isCharging
-                      ? 'bg-app-green-dim text-app-green'
-                      : 'bg-app-elevated text-app-muted'
-                  "
-                >
-                  {{ stats.isCharging ? 'Plugged' : 'Battery' }}
-                </span>
+              <div>
+                <dt>Worker</dt>
+                <dd>{{ config.workerName }}</dd>
               </div>
-              <p class="mt-0.5 truncate text-[12px] leading-4 text-app-muted">
-                {{ Math.round(stats.temperature) }} °C ·
-                {{ stats.isCharging ? 'Charging' : 'Unplugged' }}
-              </p>
-              <p class="mt-0.5 truncate text-[11px] leading-4 text-app-muted">
-                Thermal limit {{ config.thermalThreshold }} °C
-              </p>
-            </div>
-            <div class="shrink-0 text-right">
-              <p class="text-[11px] leading-4 text-app-muted">Battery</p>
-              <p
-                class="text-[17px] font-semibold leading-6"
-                :class="stats.batteryLevel <= batterySafetyLimit ? 'text-app-yellow' : 'text-white'"
-              >
-                {{ Math.round(stats.batteryLevel) }}%
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="overflow-hidden rounded-2xl border border-app-line bg-app-card">
-        <div class="flex items-center justify-between gap-3 border-b border-app-line px-3 py-2.5">
-          <div class="flex min-w-0 items-center gap-2">
-            <MaterialIcon class="shrink-0 text-app-green" name="task_alt" :size="18" />
-            <p class="truncate text-[12px] font-semibold uppercase leading-4 text-app-muted">
-              Shares
-            </p>
-          </div>
-          <span
-            class="shrink-0 rounded-full bg-app-elevated px-2.5 py-1 text-[11px] font-semibold leading-4 text-app-muted"
-          >
-            {{ networkLatencyLabel }}
-          </span>
-        </div>
-
-        <div class="divide-y divide-app-line">
-          <div class="flex min-w-0 items-center gap-3 px-3 py-3">
-            <span
-              class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-app-elevated text-app-green"
-            >
-              <MaterialIcon name="speed" :size="21" />
-            </span>
-            <div class="min-w-0 flex-1">
-              <p class="truncate text-[14px] font-semibold leading-5 text-white">Difficulty</p>
-              <p class="mt-0.5 truncate text-[12px] leading-4 text-app-muted">
-                Current pool share target
-              </p>
-            </div>
-            <div class="shrink-0 text-right">
-              <p class="text-[11px] leading-4 text-app-muted">Diff</p>
-              <p class="text-[17px] font-semibold leading-6 text-white">
-                {{ currentDifficultyLabel }}
-              </p>
-            </div>
-          </div>
-
-          <div class="flex min-w-0 items-center gap-3 px-3 py-3">
-            <span
-              class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-app-elevated text-app-green"
-            >
-              <MaterialIcon name="done_all" :size="21" />
-            </span>
-            <div class="min-w-0 flex-1">
-              <p class="truncate text-[14px] font-semibold leading-5 text-white">
-                Accepted / rejected
-              </p>
-              <p class="mt-0.5 truncate text-[12px] leading-4 text-app-muted">Pool share results</p>
-            </div>
-            <div class="shrink-0 text-right">
-              <p class="text-[11px] leading-4 text-app-muted">Shares</p>
-              <p class="text-[17px] font-semibold leading-6">
-                <span class="text-app-green">{{ stats.acceptedShares.toLocaleString() }}</span>
-                <span class="px-1.5 text-app-muted">/</span>
-                <span class="text-red-400">{{ stats.rejectedShares.toLocaleString() }}</span>
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="rounded-2xl border border-app-line bg-app-card p-3">
-        <div class="mb-2 flex items-center justify-between gap-3">
-          <div class="flex min-w-0 items-center gap-2">
-            <MaterialIcon name="terminal" :size="18" class="shrink-0 text-app-green" />
-            <p class="truncate text-[13px] font-semibold text-white">Miner logs</p>
-          </div>
-          <span
-            class="shrink-0 rounded-full bg-app-elevated px-2 py-1 text-[10px] uppercase text-app-muted"
-          >
-            {{ latestLogCountLabel }}
-          </span>
-        </div>
-
-        <div
-          class="max-h-56 overflow-y-auto overflow-x-auto rounded-xl border border-app-line bg-app-elevated/70 p-2 font-mono text-[11px] leading-[17px]"
-        >
-          <p v-if="latestLogs.length === 0" class="whitespace-pre-wrap break-words text-app-muted">
-            {{ backendMessage || 'Waiting for miner output...' }}
-          </p>
-          <p
-            v-for="line in latestLogs"
-            :key="line.id"
-            class="mb-1 whitespace-pre-wrap break-words rounded border-l-2 px-2 py-1 last:mb-0"
-            :class="logToneClass(line.tone)"
-          >
-            {{ line.text }}
-          </p>
-        </div>
-      </section>
-    </main>
-
-    <SessionControls
-      :state="state"
-      :profile-label="profileLabel"
-      :pending-action="pendingSessionAction"
-      :animations-enabled="settings.performance.animationsEnabled"
-      @pause="requestPauseResume"
-      @stop="requestStop"
-      @profile="openProfilePicker"
-    />
-
-    <button
-      class="ripple mx-auto mt-4 flex h-12 items-center justify-center gap-1 rounded-full px-5 text-[15px] font-medium text-app-green"
-      type="button"
-      @click="toggleDetails"
-    >
-      <MaterialIcon :name="detailsOpen ? 'expand_more' : 'expand_less'" :size="22" />
-      Details
-    </button>
-
-    <Transition name="fade">
-      <div v-if="detailsOpen" class="fixed inset-0 z-40 bg-black/[0.36]" @click="closeDetails" />
-    </Transition>
-    <Transition name="sheet">
-      <section
-        v-if="detailsOpen"
-        class="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[82vh] max-w-[420px] overflow-hidden rounded-t-[28px] border border-app-line bg-app-card px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3"
-        :style="detailsSheetStyle"
-      >
-        <button
-          class="ripple mx-auto mb-3 block h-8 min-h-8 w-24 touch-none rounded-full"
-          type="button"
-          aria-label="Close details"
-          @click="closeDetails"
-          @pointerdown="startDetailsDrag"
-          @pointermove="moveDetailsDrag"
-          @pointerup="endDetailsDrag"
-          @pointercancel="endDetailsDrag"
-        >
-          <span class="mx-auto block h-1 w-10 rounded-full bg-white/25" />
-        </button>
-        <div class="max-h-[calc(82vh-5rem)] overflow-y-auto divide-y divide-app-line">
-          <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
-            <span class="text-app-muted">Pool</span
-            ><strong class="break-all text-right font-medium text-white">{{ poolAddress }}</strong>
-          </div>
-          <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
-            <span class="text-app-muted">Worker</span
-            ><strong class="font-medium text-white">{{ config.workerName }}</strong>
-          </div>
-          <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
-            <span class="text-app-muted">Difficulty</span
-            ><strong class="font-medium text-white">{{ currentDifficultyLabel }}</strong>
-          </div>
-          <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
-            <span class="text-app-muted">Total hashes</span
-            ><strong class="font-medium text-white">{{ totalHashesLabel }}</strong>
-          </div>
-          <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
-            <span class="text-app-muted">Mining Engine</span
-            ><strong class="font-medium text-white">{{ engineLabel }}</strong>
-          </div>
-          <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
-            <span class="text-app-muted">CPU hardware</span
-            ><strong class="break-words text-right font-medium text-white">{{
-              cpuHardwareName
-            }}</strong>
-          </div>
-          <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
-            <span class="text-app-muted">CPU clock</span
-            ><strong class="font-medium text-white">{{ frequencyMhzLabel }}</strong>
-          </div>
-          <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
-            <span class="text-app-muted">CPU workers</span
-            ><strong class="font-medium text-white">{{ cpuWorkerLabel }}</strong>
-          </div>
-          <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
-            <span class="text-app-muted">CPU tuning</span
-            ><strong class="text-right font-medium text-white">{{ cpuTuningLabel }}</strong>
-          </div>
-          <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
-            <span class="text-app-muted">Miner CPU</span
-            ><strong class="font-medium text-white">{{
-              formatCpuUsage(stats.minerCpuUsage)
-            }}</strong>
-          </div>
-          <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
-            <span class="text-app-muted">Power draw</span
-            ><strong
-              class="font-medium"
-              :class="device.powerDrawW ? 'text-white' : 'text-app-muted'"
-              >{{ powerDrawLabel }}</strong
-            >
-          </div>
-          <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
-            <span class="text-app-muted">Network latency</span
-            ><strong
-              class="font-medium"
-              :class="apiTelemetry.available ? 'text-app-green' : 'text-app-muted'"
-              >{{ networkLatencyLabel }}</strong
-            >
-          </div>
-          <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
-            <span class="text-app-muted">Telemetry</span
-            ><strong
-              class="break-all text-right font-medium"
-              :class="apiTelemetry.available ? 'text-app-green' : 'text-app-muted'"
-              >{{ telemetrySourceLabel }} · {{ telemetryEndpointLabel }}</strong
-            >
-          </div>
-          <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
-            <span class="text-app-muted">Battery</span
-            ><strong class="font-medium text-white">{{ Math.round(stats.batteryLevel) }}%</strong>
-          </div>
-          <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
-            <span class="text-app-muted">Charging state</span
-            ><strong
-              class="font-medium"
-              :class="stats.isCharging ? 'text-app-green' : 'text-app-muted'"
-              >{{ stats.isCharging ? 'Charging' : 'Unplugged' }}</strong
-            >
-          </div>
-          <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
-            <span class="text-app-muted">Thermal status</span
-            ><strong
-              class="font-medium"
-              :class="thermalTone === 'warning' ? 'text-app-yellow' : 'text-app-green'"
-              >{{ thermalTone === 'warning' ? 'Warm' : 'Good' }}</strong
-            >
-          </div>
-          <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
-            <span class="text-app-muted">Estimated earnings</span
-            ><strong class="font-medium text-white"
-              >{{ stats.estimatedEarnings.toFixed(6) }} {{ config.coin.symbol }} / 24h</strong
-            >
-          </div>
-          <div class="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
-            <span class="text-app-muted">Background mode</span
-            ><strong class="font-medium text-white">{{
-              config.backgroundMining ? 'Enabled' : 'Disabled'
-            }}</strong>
-          </div>
-          <div class="py-3 text-[14px]">
-            <div class="mb-2 flex items-center justify-between gap-3">
-              <span class="text-app-muted">Miner logs</span>
-              <strong class="font-medium text-white">{{ logs.length }} lines</strong>
-            </div>
-            <div
-              class="max-h-[48vh] overflow-y-auto overflow-x-auto rounded-xl border border-app-line bg-app-elevated/70 p-2 font-mono text-[11px] leading-[17px]"
-            >
-              <p
-                v-if="detailLogs.length === 0"
-                class="whitespace-pre-wrap break-words text-app-muted"
-              >
-                {{ backendMessage || 'Waiting for miner output...' }}
-              </p>
-              <p
-                v-for="line in detailLogs"
-                :key="line.id"
-                class="mb-1 whitespace-pre-wrap break-words rounded border-l-2 px-2 py-1 last:mb-0"
-                :class="logToneClass(line.tone)"
-              >
+              <div>
+                <dt>Latency</dt>
+                <dd>{{ networkLatencyLabel }}</dd>
+              </div>
+              <div>
+                <dt>Difficulty</dt>
+                <dd>{{ currentDifficultyLabel }}</dd>
+              </div>
+            </dl>
+          </section>
+          <details class="surface log-disclosure" open>
+            <summary>
+              <span>Miner output</span><small>{{ latestLogCountLabel }}</small>
+            </summary>
+            <div class="terminal">
+              <p v-if="!latestLogs.length">{{ backendMessage || 'Waiting for output…' }}</p>
+              <p v-for="line in latestLogs" :key="line.id" :class="logToneClass(line.tone)">
                 {{ line.text }}
               </p>
             </div>
-          </div>
+          </details>
+        </template>
+      </div>
+    </div>
+    <Teleport to="body">
+      <Transition name="fade">
+        <div
+          v-if="detailsOpen"
+          class="diagnostics-backdrop"
+          aria-hidden="true"
+          @click="closeDetails"
+        />
+      </Transition>
+      <Transition name="sheet">
+        <div v-if="detailsOpen" class="diagnostics-positioner">
+          <section
+            ref="detailsPanel"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Mining diagnostics"
+            tabindex="-1"
+            class="diagnostics-sheet"
+            :style="detailsSheetStyle"
+          >
+            <button
+              class="sheet-handle diagnostics-handle"
+              type="button"
+              aria-label="Drag down or tap to close diagnostics"
+              @click="closeDetails"
+              @pointerdown="startDetailsDrag"
+              @pointermove="moveDetailsDrag"
+              @pointerup="endDetailsDrag"
+              @pointercancel="endDetailsDrag"
+            >
+              <span />
+            </button>
+            <header class="diagnostics-heading">
+              <div>
+                <h2>Diagnostics</h2>
+                <p>Live mining and device readings</p>
+              </div>
+              <button
+                type="button"
+                class="outline-button diagnostics-close"
+                aria-label="Close diagnostics"
+                @click="closeDetails"
+              >
+                <MaterialIcon name="close" :size="22" />
+              </button>
+            </header>
+            <div class="diagnostics-body">
+              <section
+                v-for="group in diagnosticGroups"
+                :key="group.title"
+                class="diagnostics-section"
+                :aria-label="group.title"
+              >
+                <h3>{{ group.title }}</h3>
+                <dl class="diagnostics-list">
+                  <div
+                    v-for="item in group.items"
+                    :key="item.label"
+                    :class="{ 'diagnostics-wide': 'wide' in item && item.wide }"
+                  >
+                    <dt>{{ item.label }}</dt>
+                    <dd :data-tone="'tone' in item ? item.tone : undefined">{{ item.value }}</dd>
+                  </div>
+                </dl>
+              </section>
+              <details class="diagnostics-output diagnostics-section">
+                <summary>
+                  <span>Miner output</span><small>{{ logs.length }} lines</small>
+                </summary>
+                <div class="terminal" data-swipe-ignore>
+                  <p v-if="!detailLogs.length">
+                    {{ backendMessage || 'Waiting for miner output...' }}
+                  </p>
+                  <p v-for="line in detailLogs" :key="line.id" :class="logToneClass(line.tone)">
+                    {{ line.text }}
+                  </p>
+                </div>
+              </details>
+              <p class="diagnostics-note">Estimated earnings are not available from the miner.</p>
+            </div>
+            <footer class="diagnostics-footer">
+              <button type="button" class="primary-button" @click="closeDetails">Done</button>
+            </footer>
+          </section>
         </div>
-      </section>
-    </Transition>
+      </Transition>
+    </Teleport>
 
     <WarningBottomSheet
       :open="warningType !== null"
+      :message="backendMessage"
       :type="warningType || 'thermal'"
       :threshold="warningType === 'battery' ? batterySafetyLimit : config.thermalThreshold"
       @resume="resumeFromWarning"
@@ -1187,22 +874,18 @@ const trendTone = computed(() =>
       @dismiss="dismissWarning"
     />
 
-    <Transition name="fade">
-      <div
-        v-if="profilePickerOpen"
-        class="fixed inset-0 z-50 bg-black/[0.62]"
-        @click="closeProfilePicker"
-      />
-    </Transition>
-    <Transition name="sheet">
+    <div v-if="profilePickerOpen" class="modal-backdrop" @click.self="closeProfilePicker">
       <section
-        v-if="profilePickerOpen"
-        class="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-[420px] rounded-t-[28px] border border-app-line bg-app-card px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-3"
+        ref="profilePanel"
+        class="detail-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Change CPU profile"
+        tabindex="-1"
         :style="profileSheetStyle"
       >
         <button
-          class="ripple mx-auto mb-3 block h-8 min-h-8 w-24 touch-none rounded-full"
-          type="button"
+          class="sheet-handle"
           aria-label="Close profile picker"
           @click="closeProfilePicker"
           @pointerdown="startProfileDrag"
@@ -1210,42 +893,35 @@ const trendTone = computed(() =>
           @pointerup="endProfileDrag"
           @pointercancel="endProfileDrag"
         >
-          <span class="mx-auto block h-1 w-10 rounded-full bg-white/25" />
+          <span />
         </button>
-        <h2 class="text-[18px] font-semibold leading-6 text-white">Mining profile</h2>
-        <div class="mt-4 space-y-2">
-          <button
-            v-for="preset in profilePresets"
-            :key="preset.id"
-            class="ripple flex min-h-[68px] w-full items-center gap-3 rounded-xl border px-3 text-left active:bg-white/5"
-            :class="
-              config.profile === preset.id
-                ? 'border-app-green bg-app-green-dim text-app-green'
-                : 'border-app-line bg-app-elevated text-white'
-            "
-            type="button"
-            @click="selectProfile(preset.id)"
-          >
-            <MaterialIcon
-              :name="
-                preset.id === 'battery_saver'
-                  ? 'battery_saver'
-                  : preset.id === 'performance'
-                    ? 'speed'
-                    : 'tune'
-              "
-              :size="24"
-            />
-            <span class="min-w-0 flex-1">
-              <span class="block text-[15px] font-semibold leading-5">{{ preset.label }}</span>
-              <span class="mt-0.5 block text-[12px] leading-4 text-app-muted">{{
-                preset.description
-              }}</span>
-            </span>
-            <MaterialIcon v-if="config.profile === preset.id" name="check" :size="22" />
-          </button>
+        <div class="section-heading">
+          <h3>Change CPU profile</h3>
+          <MaterialIcon name="tune" :size="20" />
         </div>
+        <p class="section-copy">
+          Choose a different CPU allocation. Watch temperature after changing the load.
+        </p>
+        <button
+          v-for="preset in profilePresets"
+          :key="preset.id"
+          class="profile-option"
+          :aria-pressed="config.profile === preset.id"
+          @click="selectProfile(preset.id)"
+        >
+          <MaterialIcon name="memory" :size="21" /><span
+            ><strong>{{ preset.label }}</strong
+            ><small>{{ preset.description }}</small
+            ><small
+              >{{ preset.id === 'custom' ? config.customThreadCount : preset.threads }} worker
+              threads</small
+            ></span
+          ><MaterialIcon
+            :name="config.profile === preset.id ? 'radio_button_checked' : 'radio_button_unchecked'"
+            :size="21"
+          />
+        </button>
       </section>
-    </Transition>
+    </div>
   </div>
 </template>

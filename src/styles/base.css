@@ -1,0 +1,111 @@
+:root {
+  --app-inset-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --app-inset-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+  --app-inset-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --app-inset-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+  --color-app-bg: 249 250 248;
+  --color-app-card: 255 255 255;
+  --color-app-elevated: 237 241 238;
+  --color-app-line: 213 222 217;
+  --color-app-on: 24 33 39;
+  --color-app-muted: 78 95 105;
+  --color-app-green: 16 103 86;
+  --color-app-green-dim: 221 240 234;
+  --color-app-yellow: 137 91 17;
+  --danger: #b3313f;
+  --action-ink: #fff;
+  @apply font-sans;
+  color-scheme: light;
+  background: rgb(var(--color-app-bg));
+  color: rgb(var(--color-app-on));
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+}
+:root.dark {
+  --color-app-bg: 17 23 25;
+  --color-app-card: 26 34 36;
+  --color-app-elevated: 34 44 45;
+  --color-app-line: 48 63 64;
+  --color-app-on: 234 240 243;
+  --color-app-muted: 166 184 194;
+  --color-app-green: 122 214 191;
+  --color-app-green-dim: 29 62 54;
+  --color-app-yellow: 231 192 119;
+  --danger: #ff9ca4;
+  --action-ink: #102e27;
+  color-scheme: dark;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-width: 280px;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+html {
+  scroll-padding-block: calc(5.5rem + var(--app-inset-top)) calc(6rem + var(--app-inset-bottom));
+}
+input,
+select,
+textarea {
+  scroll-margin-block: 1rem;
+}
+button,
+input,
+select {
+  font: inherit;
+}
+button,
+a,
+summary {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+button,
+summary {
+  cursor: pointer;
+}
+button {
+  min-height: 48px;
+}
+button:disabled,
+fieldset:disabled button {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+:focus-visible {
+  outline: 2px solid rgb(var(--color-app-green));
+  outline-offset: 4px;
+}
+input:focus-visible {
+  outline-offset: 2px;
+}
+::selection {
+  background: rgb(var(--color-app-green-dim));
+}
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+dl,
+dt,
+dd,
+strong,
+.hero-number {
+  font-variant-numeric: tabular-nums;
+}
+summary {
+  min-height: 48px;
+  align-content: center;
+}
+small {
+  font-size: 0.75rem;
+}
+svg,
+img {
+  max-width: 100%;
+}

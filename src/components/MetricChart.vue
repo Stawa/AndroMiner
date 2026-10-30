@@ -100,8 +100,8 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
   <section class="app-card p-4">
     <div class="mb-4 flex items-start justify-between gap-3">
       <div>
-        <h2 class="text-[16px] font-semibold leading-6 text-white">{{ title }}</h2>
-        <p class="text-[12px] leading-[18px] text-app-muted">{{ subtitle }}</p>
+        <h2 class="text-[1rem] font-semibold leading-6 text-app-on">{{ title }}</h2>
+        <p class="text-[0.75rem] leading-[1.125rem] text-app-muted">{{ subtitle }}</p>
       </div>
       <span class="h-2.5 w-2.5 rounded-full" :style="{ backgroundColor: accent }" />
     </div>

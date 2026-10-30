@@ -1,0 +1,82 @@
+/* Shared keyframes and accessibility overrides, including teleported dialogs. */
+
+.view-enter-active {
+  transition: opacity 140ms ease-out;
+}
+.view-leave-active {
+  transition: opacity 90ms ease-out;
+}
+.view-enter-from,
+.view-leave-to {
+  opacity: 0;
+}
+.select-sheet.dialog-enter-active,
+.select-sheet.dialog-leave-active {
+  transition:
+    transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 180ms;
+}
+.select-sheet.dialog-enter-from,
+.select-sheet.dialog-leave-to {
+  --sheet-offset: 18px;
+  opacity: 0;
+}
+.bottom-nav-icon,
+.bottom-nav-button {
+  transition:
+    background-color 180ms,
+    color 180ms,
+    transform 180ms;
+}
+.bottom-nav-button:active .bottom-nav-icon {
+  transform: scale(0.92);
+}
+.saved-setup-option,
+.profile-option {
+  transition:
+    background-color 180ms,
+    border-color 180ms;
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (hover: hover) {
+  .outline-button:hover:not(:disabled),
+  .history-row:hover,
+  .drawer-row:hover,
+  .session-action:hover:not(:disabled) {
+    background: rgb(var(--color-app-elevated));
+  }
+  .select-trigger:hover:not(:disabled) {
+    border-color: rgb(var(--color-app-green) / 0.65);
+  }
+  .recent-run-card:hover {
+    background: rgb(var(--color-app-elevated) / 0.35);
+  }
+}
+/* Apply to teleported dialogs as well as page content. */
+html.motion-reduced *,
+html.motion-reduced *::before,
+html.motion-reduced *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

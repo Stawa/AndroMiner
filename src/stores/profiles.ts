@@ -13,6 +13,7 @@ interface ProfilesState {
   profiles: SavedMiningProfile[];
   activeProfileId: string;
   loaded: boolean;
+  storageError: string;
 }
 
 const normalizeHardwareMode = (value: unknown): MiningHardwareMode =>
@@ -46,15 +47,12 @@ const readProfiles = (): SavedMiningProfile[] => {
   }
 };
 
-const writeProfiles = (profiles: SavedMiningProfile[]): void => {
-  localStorage.setItem(profilesKey, JSON.stringify(profiles));
-};
-
 export const useProfilesStore = defineStore('profiles', {
   state: (): ProfilesState => ({
     profiles: [],
     activeProfileId: '',
-    loaded: false
+    loaded: false,
+    storageError: ''
   }),
   getters: {
     profilesByCoin:
@@ -71,13 +69,23 @@ export const useProfilesStore = defineStore('profiles', {
       }
 
       this.profiles = readProfiles();
-      this.activeProfileId =
-        localStorage.getItem(`${profilesKey}:active`) || this.profiles[0]?.id || '';
+      try {
+        this.activeProfileId =
+          localStorage.getItem(`${profilesKey}:active`) || this.profiles[0]?.id || '';
+      } catch {
+        this.activeProfileId = this.profiles[0]?.id || '';
+      }
       this.loaded = true;
     },
     persist(): void {
-      writeProfiles(this.profiles);
-      localStorage.setItem(`${profilesKey}:active`, this.activeProfileId);
+      try {
+        localStorage.setItem(profilesKey, JSON.stringify(this.profiles));
+        localStorage.setItem(`${profilesKey}:active`, this.activeProfileId);
+        this.storageError = '';
+      } catch {
+        this.storageError =
+          'Could not save your setup on this device. Export a copy before closing the app.';
+      }
     },
     saveFromConfig(name: string, config: MiningConfig): SavedMiningProfile {
       const now = new Date().toISOString();

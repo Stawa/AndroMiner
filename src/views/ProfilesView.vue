@@ -2,11 +2,13 @@
 import { computed, ref } from 'vue';
 import ConfigInput from '../components/ConfigInput.vue';
 import MaterialIcon from '../components/MaterialIcon.vue';
+import CoinIcon from '../components/CoinIcon.vue';
 import { useProfilesStore } from '../stores/profiles';
 import type { MiningConfig, SavedMiningProfile } from '../types/mining';
 
 interface ProfilesViewProps {
   config: MiningConfig;
+  locked?: boolean;
 }
 
 const props = defineProps<ProfilesViewProps>();
@@ -42,11 +44,13 @@ const saveProfile = (): void => {
 };
 
 const applyProfile = (profile: SavedMiningProfile): void => {
+  if (props.locked) return;
   profiles.setActive(profile.id);
   emit('apply', profile);
 };
 
 const deleteProfile = (profile: SavedMiningProfile): void => {
+  if (props.locked) return;
   const confirmed = window.confirm(
     `Delete "${profile.name}"? This saved mining profile cannot be restored.`
   );
@@ -54,98 +58,91 @@ const deleteProfile = (profile: SavedMiningProfile): void => {
     return;
   }
 
+  const wasActive = profile.id === profiles.activeProfileId;
   profiles.deleteProfile(profile.id);
+  if (wasActive && profiles.activeProfile) emit('apply', profiles.activeProfile);
+};
+
+const duplicateProfile = (profile: SavedMiningProfile): void => {
+  if (props.locked) return;
+  profiles.duplicateProfile(profile.id);
+  if (profiles.activeProfile) emit('apply', profiles.activeProfile);
 };
 </script>
 
 <template>
-  <div class="phone-page">
-    <section class="app-card p-4">
-      <p class="text-[12px] font-semibold uppercase leading-4 text-app-green">Current coin</p>
-      <div class="mt-3 flex items-center gap-3">
-        <div
-          class="grid h-12 w-12 shrink-0 place-items-center rounded-full text-[22px] font-bold text-white"
-          :class="config.coin.logoClass"
-        >
-          {{ config.coin.logoText }}
-        </div>
-        <div class="min-w-0">
-          <p class="truncate text-[16px] font-semibold text-white">
-            {{ config.coin.name }} / {{ config.coin.symbol }}
-          </p>
-          <p class="text-[12px] text-app-muted">
-            {{ coinProfiles.length }} saved profiles for this coin
-          </p>
-        </div>
-      </div>
-    </section>
-
-    <section class="app-card p-4">
-      <h2 class="text-[16px] font-semibold text-white">Save current setup</h2>
-      <div class="mt-3 space-y-3">
-        <ConfigInput v-model="newName" label="Profile name" />
-        <button
-          class="ripple h-14 w-full rounded-xl bg-app-green-dim text-[15px] font-semibold text-app-green"
-          type="button"
-          @click="saveProfile"
-        >
-          Save Profile
-        </button>
-      </div>
-    </section>
-
-    <section class="app-card overflow-hidden">
-      <div class="settings-heading">
-        <MaterialIcon name="tune" :size="20" />
-        <span>Saved profiles</span>
-      </div>
-      <div
-        v-if="profiles.profiles.length === 0"
-        class="border-t border-app-line p-4 text-[13px] leading-5 text-app-muted"
+  <div class="app-page phone-page redesign-page profiles-page">
+    <header class="screen-heading">
+      <h1>Mining profiles</h1>
+      <p>
+        {{ coinProfiles.length }} {{ config.coin.symbol }} setups ·
+        {{ profiles.profiles.length }} saved in total.
+      </p>
+    </header>
+    <div v-if="locked" class="notice">
+      <p>Stop the active run to apply a different setup. You can still save a copy.</p>
+    </div>
+    <section class="surface profile-save">
+      <h3 class="section-title">Save this configuration</h3>
+      <p class="section-copy">
+        Keep your wallet, pool, and CPU settings together for your next run.
+      </p>
+      <ConfigInput v-model="newName" label="Setup name" /><button
+        class="primary-button full-width"
+        :disabled="!newName.trim()"
+        @click="saveProfile"
       >
-        No saved profiles yet. Save your current setup to reuse it later.
+        <MaterialIcon name="add" :size="20" />Save setup
+      </button>
+    </section>
+    <section class="surface">
+      <div class="section-heading">
+        <h3>Your saved setups</h3>
+        <span class="supporting-label">{{ profiles.profiles.length }}</span>
       </div>
-      <div v-else class="divide-y divide-app-line">
-        <article v-for="profile in profiles.profiles" :key="profile.id" class="p-4">
-          <div class="flex items-start gap-3">
-            <div
-              class="grid h-10 w-10 shrink-0 place-items-center rounded-full text-[18px] font-bold text-white"
-              :class="profile.config.coin.logoClass"
-            >
-              {{ profile.config.coin.logoText }}
-            </div>
+      <div v-if="!profiles.profiles.length" class="empty-state">
+        <MaterialIcon name="bookmark_border" :size="28" /><strong
+          >A good setup is worth keeping</strong
+        >
+        <p>Save the current configuration to reuse it later.</p>
+      </div>
+      <div class="profile-library grid min-w-0 grid-cols-1 gap-3.5 md:grid-cols-2">
+        <article v-for="profile in profiles.profiles" :key="profile.id" class="profile-row min-w-0">
+          <div class="setup-identity">
+            <CoinIcon
+              :symbol="profile.config.coin.symbol"
+              :name="profile.config.coin.name"
+              :size="36"
+            />
             <div class="min-w-0 flex-1">
-              <p class="truncate text-[15px] font-semibold text-white">{{ profile.name }}</p>
-              <p class="mt-0.5 text-[12px] leading-[18px] text-app-muted">
+              <strong class="block [overflow-wrap:anywhere]">{{ profile.name }}</strong>
+              <p>
                 {{ profile.config.coin.symbol }} · {{ profile.config.threadCount }} threads ·
-                {{ profile.config.protocol }}
+                {{ profile.config.affinity }}
               </p>
-              <p class="text-[11px] leading-4 text-app-muted">
-                Updated {{ formatDate(profile.updatedAt) }}
-              </p>
+              <small class="text-app-muted">{{ formatDate(profile.updatedAt) }}</small>
             </div>
+            <span v-if="profile.id === profiles.activeProfileId" class="supporting-label"
+              >ACTIVE</span
+            >
           </div>
-          <div class="mt-3 grid grid-cols-3 gap-2">
-            <button
-              class="ripple min-h-12 rounded-xl bg-app-green-dim text-[13px] font-semibold text-app-green"
-              type="button"
-              @click="applyProfile(profile)"
+          <div class="action-row">
+            <button class="outline-button" :disabled="locked" @click="applyProfile(profile)">
+              Use setup</button
+            ><button
+              class="outline-button"
+              :aria-label="'Duplicate ' + profile.name"
+              :disabled="locked"
+              @click="duplicateProfile(profile)"
             >
-              Apply
-            </button>
-            <button
-              class="ripple min-h-12 rounded-xl bg-app-elevated text-[13px] font-medium text-white"
-              type="button"
-              @click="profiles.duplicateProfile(profile.id)"
-            >
-              Copy
-            </button>
-            <button
-              class="ripple min-h-12 rounded-xl bg-app-elevated text-[13px] font-medium text-red-300"
-              type="button"
+              <MaterialIcon name="content_copy" :size="18" /></button
+            ><button
+              class="outline-button danger-text"
+              :aria-label="'Delete ' + profile.name"
+              :disabled="locked"
               @click="deleteProfile(profile)"
             >
-              Delete
+              <MaterialIcon name="delete" :size="18" />
             </button>
           </div>
         </article>

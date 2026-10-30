@@ -1,4 +1,5 @@
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { Capacitor, SystemBars, SystemBarsStyle } from '@capacitor/core';
 
 type ThemeMode = 'light' | 'dark';
 
@@ -11,6 +12,14 @@ const applyTheme = (mode: ThemeMode): void => {
 
   document.documentElement.classList.toggle('dark', mode === 'dark');
   document.documentElement.style.colorScheme = mode;
+  document
+    .querySelector('meta[name="theme-color"]')
+    ?.setAttribute('content', mode === 'dark' ? '#111719' : '#f9faf8');
+  if (Capacitor.isNativePlatform()) {
+    void SystemBars.setStyle({
+      style: mode === 'dark' ? SystemBarsStyle.Dark : SystemBarsStyle.Light
+    }).catch(() => {});
+  }
 };
 
 const getInitialTheme = (): ThemeMode => {
@@ -18,16 +27,32 @@ const getInitialTheme = (): ThemeMode => {
     return 'dark';
   }
 
-  const stored = localStorage.getItem(storageKey);
+  let stored: string | null = null;
+  try {
+    stored = localStorage.getItem(storageKey);
+  } catch {
+    return 'dark';
+  }
   if (stored === 'light' || stored === 'dark') {
     return stored;
   }
 
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  return 'dark';
 };
 
 const theme = ref<ThemeMode>(getInitialTheme());
-applyTheme(theme.value);
+watch(
+  theme,
+  (mode) => {
+    applyTheme(mode);
+    try {
+      localStorage.setItem(storageKey, mode);
+    } catch {
+      /* Keep appearance usable if storage is full. */
+    }
+  },
+  { immediate: true }
+);
 
 export const useTheme = () => {
   const isDark = computed(() => theme.value === 'dark');
@@ -39,19 +64,6 @@ export const useTheme = () => {
   const toggleTheme = (): void => {
     setTheme(isDark.value ? 'light' : 'dark');
   };
-
-  onMounted(() => {
-    applyTheme(theme.value);
-  });
-
-  watch(
-    theme,
-    (mode) => {
-      applyTheme(mode);
-      localStorage.setItem(storageKey, mode);
-    },
-    { immediate: true }
-  );
 
   return {
     theme,

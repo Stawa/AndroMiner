@@ -1,0 +1,22 @@
+/* Repeated page geometry includes native safe areas; individual grids live in Vue. */
+@utility app-page {
+  @apply mx-auto flex w-full min-w-0 flex-col gap-layout;
+  max-width: var(--container-phone);
+  padding: var(--spacing-layout) max(var(--spacing-page), var(--app-inset-right))
+    calc(6.75rem + var(--app-inset-bottom)) max(var(--spacing-page), var(--app-inset-left));
+  & > * {
+    min-width: 0;
+  }
+  @variant md {
+    max-width: var(--container-workspace);
+    padding-bottom: calc(2rem + var(--app-inset-bottom));
+  }
+  &:where(.session-page-fullscreen) {
+    padding-top: calc(1.25rem + var(--app-inset-top));
+    padding-bottom: calc(1.75rem + var(--app-inset-bottom));
+  }
+  &:where(.data-feedback) {
+    padding-top: 1rem;
+    padding-bottom: 0;
+  }
+}

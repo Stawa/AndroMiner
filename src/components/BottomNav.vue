@@ -21,28 +21,52 @@ const emit = defineEmits<{
 }>();
 
 const items: NavItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: 'space_dashboard' },
-  { id: 'mining', label: 'Mining', icon: 'handyman' },
-  { id: 'statistics', label: 'Insights', icon: 'insights' },
+  { id: 'dashboard', label: 'Overview', icon: 'speed' },
+  { id: 'mining', label: 'Miner', icon: 'tune' },
+  { id: 'statistics', label: 'History', icon: 'history' },
   { id: 'settings', label: 'Settings', icon: 'settings' }
+];
+const secondaryItems: NavItem[] = [
+  { id: 'profiles', label: 'Profiles', icon: 'tune' },
+  { id: 'help', label: 'Help', icon: 'help' },
+  { id: 'about', label: 'About', icon: 'info' }
 ];
 </script>
 
 <template>
-  <nav class="app-bottom-nav">
-    <div class="mx-auto grid h-[72px] max-w-[440px] grid-cols-4 px-2">
+  <nav class="app-bottom-nav" aria-label="Main navigation">
+    <div
+      class="nav-primary mx-auto grid h-18 max-w-phone grid-cols-4 px-2 md:flex md:h-auto md:flex-col md:gap-1.5"
+    >
       <button
         v-for="item in items"
         :key="item.id"
-        class="bottom-nav-button"
+        class="bottom-nav-button flex min-w-0 flex-col items-center justify-center gap-1.5 text-[0.75rem] font-medium md:min-h-18 md:text-[0.75rem]"
         :class="{ 'bottom-nav-button-active': modelValue === item.id }"
+        :aria-current="modelValue === item.id ? 'page' : undefined"
         type="button"
         @click="emit('update:modelValue', item.id)"
       >
-        <span class="bottom-nav-icon">
+        <span class="bottom-nav-icon grid h-8 w-14 place-items-center rounded-control md:w-12">
           <MaterialIcon :name="item.icon" :size="21" :filled="modelValue === item.id" />
         </span>
-        <span class="max-w-full truncate">{{ item.label }}</span>
+        <span class="max-w-full break-words text-center">{{ item.label }}</span>
+      </button>
+    </div>
+    <div
+      class="nav-secondary mx-2 mt-5 hidden flex-col gap-1.5 border-t border-app-line pt-4 pb-3 md:flex"
+    >
+      <button
+        v-for="item in secondaryItems"
+        :key="item.id"
+        class="bottom-nav-button flex min-w-0 flex-col items-center justify-center gap-1.5 text-[0.75rem] font-medium md:min-h-18 md:text-[0.75rem]"
+        :class="{ 'bottom-nav-button-active': modelValue === item.id }"
+        :aria-current="modelValue === item.id ? 'page' : undefined"
+        @click="emit('update:modelValue', item.id)"
+      >
+        <span class="bottom-nav-icon grid h-8 w-14 place-items-center rounded-control md:w-12"
+          ><MaterialIcon :name="item.icon" :size="21" /></span
+        ><span>{{ item.label }}</span>
       </button>
     </div>
   </nav>

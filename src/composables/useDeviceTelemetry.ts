@@ -13,7 +13,7 @@ type NavigatorWithBattery = Navigator & {
 };
 
 interface NativeDeviceStatus {
-  batteryLevel: number;
+  batteryLevel?: number | null;
   isCharging: boolean;
   cpuThreads: number;
   cpuName?: string;
@@ -73,19 +73,10 @@ const getNativeDeviceStatus = async (): Promise<NativeDeviceStatus | null> => {
   }
 };
 
-const estimateThermalStatus = (
-  batteryLevel: number,
-  isCharging: boolean
-): DeviceTelemetry['thermalStatus'] => {
-  if (isCharging && batteryLevel > 85) {
-    return 'warm';
-  }
-
-  return 'normal';
-};
-
 export const useDeviceTelemetry = () => {
   let refreshHandle = 0;
+  let refreshing = false;
+  let disposed = false;
   const refreshIntervalMs = 3000;
 
   const device = reactive<DeviceTelemetry>({
@@ -94,7 +85,7 @@ export const useDeviceTelemetry = () => {
     operatingSystem: 'unknown',
     osVersion: '',
     manufacturer: 'unknown',
-    batteryLevel: 100,
+    batteryLevel: null,
     isCharging: false,
     cpuThreads: getHardwareConcurrency(),
     cpuName: 'Android CPU',
@@ -109,20 +100,25 @@ export const useDeviceTelemetry = () => {
     deviceMemoryGb: getDeviceMemory(),
     temperatureC: null,
     thermalStatus: 'unknown',
-    thermalSource: 'estimated',
+    thermalSource: 'unavailable',
     thermalSensorName: null
   });
 
   const refresh = async (): Promise<void> => {
+    if (refreshing || disposed || document.visibilityState === 'hidden') return;
+    refreshing = true;
     try {
       const [info, battery, webBattery, nativeStatus] = await Promise.all([
         Device.getInfo(),
-        Device.getBatteryInfo(),
+        Device.getBatteryInfo().catch(() => ({ batteryLevel: undefined, isCharging: undefined })),
         getWebBattery(),
         getNativeDeviceStatus()
       ]);
       const nativeLevel =
-        typeof nativeStatus?.batteryLevel === 'number'
+        typeof nativeStatus?.batteryLevel === 'number' &&
+        Number.isFinite(nativeStatus.batteryLevel) &&
+        nativeStatus.batteryLevel >= 0 &&
+        nativeStatus.batteryLevel <= 1
           ? Math.round(nativeStatus.batteryLevel * 100)
           : null;
       const capacitorLevel =
@@ -164,21 +160,17 @@ export const useDeviceTelemetry = () => {
           ? Number(nativeStatus.powerDrawW.toFixed(2))
           : null;
       device.deviceMemoryGb = getDeviceMemory();
-      device.batteryLevel = nativeLevel ?? capacitorLevel ?? webLevel ?? device.batteryLevel;
+      device.batteryLevel = nativeStatus ? nativeLevel : (capacitorLevel ?? webLevel ?? null);
       device.isCharging = nativeStatus?.isCharging ?? Boolean(capacitorCharging || webCharging);
       device.temperatureC =
         typeof nativeStatus?.temperatureC === 'number'
           ? Number(nativeStatus.temperatureC.toFixed(1))
-          : nativeStatus
-            ? null
-            : device.temperatureC;
-      device.thermalStatus =
-        nativeStatus?.thermalStatus ||
-        estimateThermalStatus(device.batteryLevel, device.isCharging);
-      device.thermalSource =
-        nativeStatus?.temperatureSource || (nativeStatus ? 'native' : 'estimated');
+          : null;
+      device.thermalStatus = nativeStatus?.thermalStatus || 'unavailable';
+      device.thermalSource = nativeStatus?.temperatureSource || 'unavailable';
       device.thermalSensorName = nativeStatus?.temperatureSensor || null;
     } catch {
+      device.batteryLevel = null;
       device.cpuThreads = getHardwareConcurrency();
       device.cpuName = 'Android CPU';
       device.cpuClockGhz = null;
@@ -194,7 +186,13 @@ export const useDeviceTelemetry = () => {
       device.thermalStatus = 'unavailable';
       device.thermalSource = 'unavailable';
       device.thermalSensorName = null;
+    } finally {
+      refreshing = false;
     }
+  };
+
+  const onVisibilityChange = (): void => {
+    if (document.visibilityState === 'visible') void refresh();
   };
 
   onMounted(() => {
@@ -203,15 +201,13 @@ export const useDeviceTelemetry = () => {
       void refresh();
     }, refreshIntervalMs);
 
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        void refresh();
-      }
-    });
+    document.addEventListener('visibilitychange', onVisibilityChange);
   });
 
   onUnmounted(() => {
+    disposed = true;
     window.clearInterval(refreshHandle);
+    document.removeEventListener('visibilitychange', onVisibilityChange);
   });
 
   return {

@@ -1,166 +1,85 @@
-# AndroMiner XMRig Builder
+# Android miner builder
 
-This folder builds the Android ARM64 XMRig binary used by AndroMiner.
-Most users do not need to run this manually. GitHub Actions builds the miner and publishes ready-to-download binaries to the `miner-builder` branch.
+Builds the CPU-only XMRig executable used by AndroMiner. The default target is
+`arm64-v8a`, Android API 29, with TLS enabled.
 
-## Quick Answers
-
-- **Default build is TLS-enabled.**
-  Use this for encrypted pool protocols like `stratum+ssl` and `stratum+tls`.
-
-- **The output file is named `libxmrig.so` on purpose.**
-  Android packaging treats it like a native library, but the app runs it as the miner process.
-
-- **Local APKs do not bundle the miner by default.**
-  Pass `-PbundleMiner=true` when building the APK if you want to include the local `libxmrig.so`.
-
-- **Windows Defender may block the miner.**
-  Miner binaries are commonly flagged. Use `-SkipInstall` if you only want to verify that the native build works.
-
-## What Gets Built?
-
-Current native stack:
-
-- XMRig `v6.26.0`
-- libuv `v1.48.0`
-- OpenSSL `openssl-4.0.0`
-- ABI `arm64-v8a`
-- hwloc disabled
-- TLS enabled by default
-
-Local install output, when install is not skipped:
-
-```text
-android/app/src/main/jniLibs/arm64-v8a/libxmrig.so
-```
-
-Published GitHub branch outputs:
-
-```text
-lib/arm64-v8a/tls/libxmrig.so
-lib/arm64-v8a/notls/libxmrig.so
-```
-
-The Android app can ask the user which branch payload to download on first run.
+The app can download prebuilt miners from the
+[`miner-builder` branch](https://github.com/Stawa/AndroMiner/tree/miner-builder).
+Build locally when you need a different XMRig version or build configuration.
 
 ## Requirements
 
-Install these before building locally:
+- Android SDK and NDK, Git, CMake, and Ninja.
+- TLS builds also need `make` and a full Perl installation. On Windows, use MSYS2
+  Perl; Git for Windows Perl and Strawberry Perl are not supported by this TLS build.
 
-- Android Studio with SDK, NDK, and CMake
-- Git
-- CMake and Ninja
-- PowerShell on Windows, or Bash on Linux/WSL
-- MSYS2 Perl or WSL/Ubuntu Perl for TLS builds
+Set `ANDROID_HOME` or `ANDROID_SDK_ROOT` to the SDK directory. The scripts detect
+an installed NDK, or you can select one with `ANDROID_NDK_HOME`.
 
-> [!IMPORTANT]
-> Git for Windows Perl is too small for OpenSSL, and Strawberry Perl is rejected by OpenSSL's Android target. Use MSYS2 Perl or WSL/Ubuntu Perl for TLS builds.
+## Build
 
-## Build On Windows
+Run from the repository root.
 
-Run from the repository root:
+Windows:
 
 ```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\miner-builder\build-xmrig-android.ps1
 ```
 
-Build without TLS:
-
-```powershell
-.\miner-builder\build-xmrig-android.ps1 -NoTls
-```
-
-Build without copying the miner into the Android project:
-
-```powershell
-.\miner-builder\build-xmrig-android.ps1 -SkipInstall
-```
-
-Show full compiler output:
-
-```powershell
-.\miner-builder\build-xmrig-android.ps1 -ShowBuildOutput
-```
-
-## Build On Linux / WSL
-
-Run from the repository root:
+Linux or WSL, using a Linux SDK/NDK:
 
 ```bash
 bash miner-builder/build-xmrig-android.sh
 ```
 
-Build without TLS:
+| Option                                         | PowerShell         | Bash environment  |
+| ---------------------------------------------- | ------------------ | ----------------- |
+| Disable TLS                                    | `-NoTls`           | `WITH_TLS=OFF`    |
+| Build without copying into the Android project | `-SkipInstall`     | `SKIP_INSTALL=1`  |
+| Show compiler output                           | `-ShowBuildOutput` | `QUIET=OFF`       |
+| Limit parallel build jobs                      | `-Jobs 4`          | `JOBS=4`          |
+| Select an XMRig tag or branch                  | `-XmrigRef <ref>`  | `XMRIG_REF=<ref>` |
 
-```bash
-WITH_TLS=OFF bash miner-builder/build-xmrig-android.sh
+XMRig defaults to `master`; libuv defaults to `v1.48.0`, and OpenSSL to
+`openssl-4.0.0`. TLS builds link OpenSSL statically. A no-TLS binary cannot connect
+to encrypted pools.
+
+## Output
+
+By default, the builder copies the executable to:
+
+```text
+android/app/src/main/jniLibs/arm64-v8a/libxmrig.so
 ```
 
-Build without copying the miner into the Android project:
+AndroMiner runs this file as a separate process. The `.so` name lets Android
+package it as a native library. TLS and no-TLS builds write to the same destination,
+so the last installed build determines which variant the APK contains.
 
-```bash
-SKIP_INSTALL=1 bash miner-builder/build-xmrig-android.sh
-```
+With `-SkipInstall` or `SKIP_INSTALL=1`, the executable stays under
+`miner-builder/work/build/xmrig-arm64-v8a/`; the script prints its exact path.
+Treat `work/` as generated: rebuilds reset its source checkouts.
 
-Show full compiler output:
+## Bundle in an APK
 
-```bash
-QUIET=OFF bash miner-builder/build-xmrig-android.sh
-```
-
-or:
-
-```bash
-VERBOSE=1 bash miner-builder/build-xmrig-android.sh
-```
-
-## Build The App With The Local Miner
-
-After building the miner, sync and build Android:
+From the repository root:
 
 ```powershell
 npm run android:sync
-cd android
-.\gradlew.bat assembleDebug -PbundleMiner=true
+.\android\gradlew.bat -p android assembleDebug -PbundleMiner=true
 ```
 
-For a local release APK with the bundled miner:
+Direct Gradle builds require `-PbundleMiner=true` to include the miner. The
+PowerShell release helper, `.\scripts\build-release-apk.ps1`, bundles it by
+default and requires release signing credentials; see the [project README](../README.md).
 
-```powershell
-cd android
-.\gradlew.bat assembleRelease -PbundleMiner=true
-```
+## Build failures
 
-> [!NOTE]
-> Without `-PbundleMiner=true`, Gradle excludes `libxmrig.so` from the APK.
+Quiet builds save logs in `miner-builder/work/logs/` and print the last 120 lines
+when a build step fails. Use `-ShowBuildOutput` or `QUIET=OFF` to stream output.
 
-## Logs And Troubleshooting
+If Windows blocks the final copy, rerun with `-SkipInstall` to keep the build
+separate from the Android project. Check the antivirus detection and confirm
+`android/app/src/main/jniLibs/arm64-v8a/libxmrig.so` exists before bundling an APK.
 
-The builder is quiet by default. It shows high-level progress and writes detailed logs to:
-
-```text
-miner-builder/work/logs/
-```
-
-If a build step fails, the script prints the last 120 lines from the matching log file.
-
-### Windows Defender
-
-Windows Defender may flag local miner binaries as potentially unwanted software.
-
-If the final copy step is blocked, the PowerShell builder can:
-
-- continue without installing the local artifact
-- download the published TLS or no-TLS miner from the `miner-builder` branch
-- exit cleanly
-
-If you insist on building locally, whitelist the parent project folder only if you trust your checkout.
-
-## Notes
-
-- Official XMRig releases do not publish Android binaries, so this builder compiles from source.
-- The Android app uses the CPU backend only.
-- OpenSSL is statically linked into the miner binary; no separate OpenSSL `.so` file should be needed in the APK.
-- OpenSSL 4 needs a small XMRig compatibility patch. The builder patches `TlsGen.cpp` after checkout.
-- XMRig is GPLv3. If you distribute the miner binary, follow GPLv3 license and source availability requirements.
+XMRig is distributed under GPLv3.

@@ -2,8 +2,8 @@
 import { computed } from 'vue';
 
 interface HashrateRingProps {
-  value: number;
-  average: number;
+  value: number | null;
+  peak: number | null;
   active: boolean;
 }
 
@@ -11,7 +11,9 @@ const props = defineProps<HashrateRingProps>();
 
 const radius = 106;
 const circumference = 2 * Math.PI * radius;
-const progress = computed(() => Math.min(1, Math.max(0.03, props.value / 110)));
+const progress = computed(() =>
+  props.value === null || !props.peak ? 0 : Math.min(1, props.value / props.peak)
+);
 </script>
 
 <template>
@@ -22,7 +24,7 @@ const progress = computed(() => Math.min(1, Math.max(0.03, props.value / 110)));
         cy="140"
         r="124"
         fill="none"
-        stroke="rgba(255,255,255,0.06)"
+        stroke="rgb(var(--color-app-line))"
         stroke-width="2"
       />
       <circle
@@ -30,7 +32,7 @@ const progress = computed(() => Math.min(1, Math.max(0.03, props.value / 110)));
         cy="140"
         r="106"
         fill="none"
-        stroke="rgba(255,255,255,0.08)"
+        stroke="rgb(var(--color-app-line))"
         stroke-width="18"
       />
       <circle
@@ -39,7 +41,7 @@ const progress = computed(() => Math.min(1, Math.max(0.03, props.value / 110)));
         cy="140"
         :r="radius"
         fill="none"
-        stroke="#5ad989"
+        stroke="rgb(var(--color-app-green))"
         stroke-linecap="round"
         stroke-width="18"
         :stroke-dasharray="circumference"
@@ -51,10 +53,12 @@ const progress = computed(() => Math.min(1, Math.max(0.03, props.value / 110)));
       class="relative z-10 grid h-[196px] w-[196px] place-items-center rounded-full border border-app-line bg-app-card text-center"
     >
       <div>
-        <p class="text-[11px] font-medium uppercase tracking-[0.18em] text-app-muted">Hashrate</p>
+        <p class="text-[0.75rem] font-medium uppercase tracking-[0.18em] text-app-muted">
+          Hashrate
+        </p>
 
-        <p class="mt-3 text-[48px] font-bold leading-none text-white">
-          {{ value.toFixed(2) }}
+        <p class="mt-3 text-[3rem] font-bold leading-none text-app-on">
+          {{ value === null ? '—' : value.toFixed(1) }}
         </p>
 
         <p class="mt-1 text-sm font-medium text-app-muted">H/s</p>

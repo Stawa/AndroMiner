@@ -43,8 +43,12 @@ public class MiningNotificationPlugin extends Plugin {
                         .setOnlyAlertOnce(true)
                         .setPriority(NotificationCompat.PRIORITY_LOW);
 
-        NotificationManagerCompat.from(getContext())
-                .notify(MINING_NOTIFICATION_ID, builder.build());
+        try {
+            NotificationManagerCompat.from(getContext())
+                    .notify(MINING_NOTIFICATION_ID, builder.build());
+        } catch (SecurityException revokedPermission) {
+            // Permission can be revoked after the earlier check. Mining remains controllable.
+        }
         call.resolve();
     }
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import MaterialIcon from './MaterialIcon.vue';
+import { useDialogFocus } from '../composables/useDialogFocus';
 import type { MinerBinaryVariant } from '../composables/useMiningController';
 
 interface MinerDownloadProgress {
@@ -14,9 +15,10 @@ interface MinerDownloadWarningSheetProps {
   open: boolean;
   downloading: boolean;
   progress: MinerDownloadProgress;
+  error?: string;
 }
 
-defineProps<MinerDownloadWarningSheetProps>();
+const props = defineProps<MinerDownloadWarningSheetProps>();
 
 const emit = defineEmits<{
   confirm: [variant: MinerBinaryVariant];
@@ -36,123 +38,94 @@ const formatBytes = (bytes: number): string => {
 
   return `${Math.round(bytes)} B`;
 };
+const panel = ref<HTMLElement | null>(null);
+useDialogFocus(
+  () => props.open,
+  panel,
+  () => {
+    if (!props.downloading) emit('cancel');
+  }
+);
 </script>
 
 <template>
-  <Transition name="fade">
-    <div
-      v-if="open"
-      class="fixed inset-0 z-50 bg-black/[0.62]"
-      @click="!downloading && emit('cancel')"
-    />
-  </Transition>
-  <Transition name="sheet">
+  <div v-if="open" class="modal-backdrop" @click.self="!downloading && emit('cancel')">
     <section
-      v-if="open"
-      class="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-[420px] rounded-t-[28px] border border-app-line bg-app-card px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-6 text-center"
+      ref="panel"
+      class="detail-sheet"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="download-title"
+      tabindex="-1"
     >
-      <div
-        class="mx-auto grid h-16 w-16 place-items-center rounded-full border-2 border-app-yellow text-app-yellow"
-      >
-        <MaterialIcon name="warning" :size="34" />
-      </div>
-      <h2 class="mt-5 text-[22px] font-semibold leading-7 text-white">Download Miner?</h2>
-      <p class="mx-auto mt-3 max-w-[310px] text-[15px] leading-6 text-white/82">
-        AndroMiner does not include the native miner in the APK. To start mining, it will download
-        the ARM64 XMRig binary from the project's GitHub miner-builder branch and run it locally.
-      </p>
-      <p class="mx-auto mt-3 max-w-[310px] text-[13px] leading-5 text-app-muted">
-        Mining can heat your device, drain battery, and may be flagged by security apps. Continue
-        only if you trust this source and understand the workload.
-      </p>
-
-      <div
-        class="mt-5 grid grid-cols-1 gap-2 rounded-2xl bg-app-elevated p-1 text-left min-[360px]:grid-cols-2"
-      >
+      <div class="section-heading">
+        <h2 id="download-title" class="dialog-title">Download mining engine</h2>
         <button
-          class="ripple min-h-[76px] rounded-xl px-3 py-2 disabled:opacity-55"
-          :class="
-            selectedVariant === 'tls'
-              ? 'bg-app-green-dim text-app-green'
-              : 'text-white active:bg-white/5'
-          "
-          type="button"
-          :disabled="downloading"
-          @click="selectedVariant = 'tls'"
-        >
-          <MaterialIcon name="lock" :size="21" />
-          <span class="mt-1 block text-[14px] font-semibold leading-5">TLS</span>
-          <span class="block text-[11px] leading-4 text-app-muted">Encrypted pool support</span>
-        </button>
-        <button
-          class="ripple min-h-[76px] rounded-xl px-3 py-2 disabled:opacity-55"
-          :class="
-            selectedVariant === 'notls'
-              ? 'bg-app-green-dim text-app-green'
-              : 'text-white active:bg-white/5'
-          "
-          type="button"
-          :disabled="downloading"
-          @click="selectedVariant = 'notls'"
-        >
-          <MaterialIcon name="lock_open" :size="21" />
-          <span class="mt-1 block text-[14px] font-semibold leading-5">No TLS</span>
-          <span class="block text-[11px] leading-4 text-app-muted">Plain TCP only</span>
-        </button>
-      </div>
-
-      <div v-if="downloading" class="mt-5 text-left">
-        <div class="mb-2 flex items-center justify-between gap-3 text-[12px] leading-4">
-          <span class="min-w-0 truncate font-medium text-white">
-            {{ progress.variant === 'tls' ? 'TLS' : 'No TLS' }} miner
-          </span>
-          <span class="shrink-0 font-semibold text-app-green"
-            >{{ Math.round(progress.percent) }}%</span
-          >
-        </div>
-        <div class="h-2 overflow-hidden rounded-full bg-white/10">
-          <div
-            class="h-full rounded-full bg-app-green transition-[width] duration-200"
-            :style="{ width: `${Math.max(0, Math.min(100, progress.percent))}%` }"
-          />
-        </div>
-        <p class="mt-2 break-words text-[11px] leading-4 text-app-muted">
-          <template v-if="progress.totalBytes">
-            {{ formatBytes(progress.downloadedBytes) }} / {{ formatBytes(progress.totalBytes) }}
-          </template>
-          <template v-else> {{ formatBytes(progress.downloadedBytes) }} downloaded </template>
-        </p>
-      </div>
-
-      <div class="mt-5 space-y-3">
-        <button
-          class="ripple min-h-14 w-full rounded-xl bg-app-green-dim px-3 py-3 text-[15px] font-semibold leading-5 text-app-green disabled:opacity-55"
-          type="button"
-          :disabled="downloading"
-          @click="emit('confirm', selectedVariant)"
-        >
-          <MaterialIcon
-            class="mr-2 inline-block align-middle"
-            :name="downloading ? 'downloading' : 'download'"
-            :size="22"
-          />
-          <span class="align-middle">
-            {{
-              downloading
-                ? `Downloading ${Math.round(progress.percent)}%`
-                : `Download ${selectedVariant === 'tls' ? 'TLS' : 'No TLS'} & Continue`
-            }}
-          </span>
-        </button>
-        <button
-          class="ripple h-12 w-full rounded-xl text-[15px] font-medium text-app-muted disabled:opacity-55"
-          type="button"
+          class="outline-button"
+          aria-label="Close download warning"
           :disabled="downloading"
           @click="emit('cancel')"
         >
-          Cancel
+          <MaterialIcon name="close" :size="20" />
+        </button>
+      </div>
+      <p class="section-copy">
+        This APK needs an ARM64 XMRig executable. It downloads from the AndroMiner project's GitHub
+        miner-builder branch and runs locally on your phone.
+      </p>
+      <div class="notice">
+        <MaterialIcon name="info" :size="20" />
+        <p>
+          Continue only if you trust this source. Security apps may flag mining software. Downloaded
+          binaries need the compatible download APK.
+        </p>
+      </div>
+      <div class="variant-picker">
+        <button
+          :aria-pressed="selectedVariant === 'tls'"
+          :disabled="downloading"
+          @click="selectedVariant = 'tls'"
+        >
+          <MaterialIcon name="lock" :size="20" /><strong>TLS</strong
+          ><small>Encrypted pools supported</small></button
+        ><button
+          :aria-pressed="selectedVariant === 'notls'"
+          :disabled="downloading"
+          @click="selectedVariant = 'notls'"
+        >
+          <MaterialIcon name="lock_open" :size="20" /><strong>No TLS</strong
+          ><small>Plain TCP only</small>
+        </button>
+      </div>
+      <div v-if="downloading" class="download-progress" role="status" aria-live="polite">
+        <strong>{{
+          progress.totalBytes ? Math.round(progress.percent) + '%' : 'Downloading…'
+        }}</strong
+        ><progress
+          v-if="progress.totalBytes"
+          :value="progress.percent"
+          max="100"
+          aria-label="Miner download progress"
+        /><progress v-else aria-label="Miner download progress" />
+        <p>
+          {{ formatBytes(progress.downloadedBytes)
+          }}{{ progress.totalBytes ? ' / ' + formatBytes(progress.totalBytes) : ' downloaded' }}
+        </p>
+      </div>
+      <div v-if="error" class="notice notice-error" role="alert">
+        <p>{{ error }}</p>
+      </div>
+      <div class="action-row dialog-actions">
+        <button class="outline-button" :disabled="downloading" @click="emit('cancel')">
+          Cancel</button
+        ><button
+          class="primary-button"
+          :disabled="downloading"
+          @click="emit('confirm', selectedVariant)"
+        >
+          {{ downloading ? 'Downloading…' : 'Download & continue' }}
         </button>
       </div>
     </section>
-  </Transition>
+  </div>
 </template>

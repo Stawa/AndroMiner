@@ -24,10 +24,12 @@ const emit = defineEmits<{
       @click="emit('update:modelValue', !modelValue)"
     >
       <span class="min-w-0 flex-1">
-        <span class="block text-[15px] font-semibold leading-5 text-white">{{ title }}</span>
-        <span v-if="supportingText" class="mt-1 block text-[12px] leading-[18px] text-app-muted">{{
-          supportingText
-        }}</span>
+        <span class="block text-[0.9375rem] font-semibold leading-5 text-app-on">{{ title }}</span>
+        <span
+          v-if="supportingText"
+          class="mt-1 block text-[0.75rem] leading-[1.125rem] text-app-muted"
+          >{{ supportingText }}</span
+        >
       </span>
       <MaterialIcon
         class="transition-transform duration-200"

@@ -1,175 +1,229 @@
-# AndroMiner
+<p align="center">
+  <img src="assets/brand/androminer-logo.png" alt="AndroMiner app icon" width="88" />
+</p>
 
-AndroMiner is an Android crypto mining app built with Vue 3, TypeScript, Vite, Tailwind CSS, Capacitor, and a native Android miner bridge. Designed for real Android mining with a native ARM64 XMRig-compatible backend, live telemetry, and direct miner process integration.
+<h1 align="center">AndroMiner</h1>
 
-> [!CAUTION]
-> Mining keeps the CPU busy for long periods. It can heat the phone, drain battery, reduce battery health, and make some devices unstable.
-> The maintainers are not responsible for device damage, data loss, instability, or issues caused by installation, use, modified builds, or third-party distributions.
-> **Use it at your own risk.**
+<p align="center">
+  An open-source Android CPU miner powered by XMRig.<br />
+  Configure pools, monitor device readings, and manage mining sessions on your phone.
+</p>
 
-> [!TIP]
-> For maximum transparency and safety, clone the repository and build the app yourself rather than relying on prebuilt binaries.
+<p align="center">
+  <a href="#device-compatibility"><img src="https://img.shields.io/badge/Android-minSdk%2024-3DDC84?logo=android&amp;logoColor=white" alt="Android declared minimum SDK: 24" /></a>
+  <a href="#development"><img src="https://img.shields.io/badge/Vue-3-4FC08D?logo=vuedotjs&amp;logoColor=white" alt="Vue 3" /></a>
+  <a href="#development"><img src="https://img.shields.io/badge/Capacitor-8-119EFF?logo=capacitor&amp;logoColor=white" alt="Capacitor 8" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/App%20license-MIT-8A949E" alt="Application code license: MIT" /></a>
+</p>
 
-## Which APK Should I Use?
+<p align="center">
+  <a href="https://github.com/Stawa/AndroMiner/releases"><strong>Download an APK</strong></a>
+  &nbsp; · &nbsp;
+  <a href="#getting-started">Getting started</a>
+  &nbsp; · &nbsp;
+  <a href="#building-android-apks">Build from source</a>
+</p>
 
-GitHub releases publish three Android APKs:
+## Screenshots
 
-| APK                             | Includes miner?   | Target SDK | Use this when                                                                |
-| ------------------------------- | ----------------- | ---------- | ---------------------------------------------------------------------------- |
-| `androminer-tls-<tag>.apk`      | Yes, TLS miner    | 35         | You want the recommended modern Android build with encrypted pool support.   |
-| `androminer-notls-<tag>.apk`    | Yes, no-TLS miner | 35         | You only need plain TCP pool connections.                                    |
-| `androminer-download-<tag>.apk` | No                | 28         | You want the app to ask before downloading TLS or no-TLS miner on first run. |
+Real Android 16 device screenshots. Mining remained stopped; History contains
+existing runs. The wallet is a placeholder. Tap any image for full size.
 
-The downloader APK targets SDK 28 because Android blocks target SDK 29+ apps from executing downloaded app-private binaries. The bundled TLS and no-TLS APKs target SDK 35 and avoid that runtime download limitation.
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <a href="overview/overview.png"><img src="overview/overview.png" alt="Overview with idle mining status and native device readings" width="240" /></a><br />
+      <sub>Overview</sub>
+    </td>
+    <td align="center" width="33%">
+      <a href="overview/miner-setup.png"><img src="overview/miner-setup.png" alt="Miner setup with Monero selected and a placeholder wallet" width="240" /></a><br />
+      <sub>Miner setup</sub>
+    </td>
+    <td align="center" width="33%">
+      <a href="overview/engine.png"><img src="overview/engine.png" alt="Engine settings with CPU thread allocation and power profiles" width="240" /></a><br />
+      <sub>Engine</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%">
+      <a href="overview/safety.png"><img src="overview/safety.png" alt="Safety settings with temperature and power protection controls" width="240" /></a><br />
+      <sub>Safety</sub>
+    </td>
+    <td align="center" width="33%">
+      <a href="overview/history.png"><img src="overview/history.png" alt="Session history with completed runs and recorded share results" width="240" /></a><br />
+      <sub>History</sub>
+    </td>
+    <td align="center" width="33%">
+      <a href="overview/settings.png"><img src="overview/settings.png" alt="Settings with appearance, configuration export, and update information" width="240" /></a><br />
+      <sub>Settings</sub>
+    </td>
+  </tr>
+</table>
 
-## Device Requirements
+## Features
 
-| Requirement        | Minimum               | Recommended         |
-| ------------------ | --------------------- | ------------------- |
-| Android OS install | Android 6.0+ / API 23 | Android 10+         |
-| Architecture       | ARM64 / `arm64-v8a`   | ARM64 / `arm64-v8a` |
-| CPU                | 4 threads             | 4+ threads          |
-| RAM                | 2 GB                  | 4 GB+               |
-| Power              | Battery supported     | Plugged in          |
-| Internet           | Required              | Stable connection   |
+- Configure supported coins, wallets, workers, and pool connections.
+- Choose a CPU profile or adjust threads, priority, and core affinity.
+- Follow measured hashrate, accepted and rejected shares, and miner output.
+- Monitor available temperature and battery readings, with native protection rules.
+- Save mining setups and session history locally; import or export configuration.
+- Use light or dark mode and swipe between the main pages.
+- Install a bundled TLS or no-TLS miner, or download one after confirmation.
 
-> [!NOTE]
-> 32-bit Android devices are not supported. I don't have access to a 32-bit device for testing, and XMRig's Android support focuses on ARM64. Pull requests to add 32-bit support are welcome, but it is not a priority for this project.
+## Download & installation
 
-## Miner Download And Safety
+Get an APK from [GitHub Releases](https://github.com/Stawa/AndroMiner/releases),
+open it on your phone, and allow installation from that source if Android asks.
+For encrypted pool connections without a separate miner download, choose the TLS APK.
 
-Official XMRig releases do not ship Android binaries. AndroMiner builds XMRig from source in this repo and publishes TLS and no-TLS `libxmrig.so` files to the [`miner-builder`](https://github.com/Stawa/AndroMiner/tree/miner-builder) branch.
+| APK                             | Mining engine                 | Pool connections                    |
+| ------------------------------- | ----------------------------- | ----------------------------------- |
+| `androminer-tls-<tag>.apk`      | Bundled with TLS              | Encrypted or plain TCP              |
+| `androminer-notls-<tag>.apk`    | Bundled without TLS           | Plain TCP only                      |
+| `androminer-download-<tag>.apk` | Downloaded after confirmation | Choose TLS or no TLS on first start |
 
-If you use the downloader APK, the app asks before downloading or running the miner for the first time. You choose TLS or no-TLS in the app.
+### Device compatibility
 
-> [!NOTE]
-> VirusTotal and antivirus products may flag XMRig or APKs that include it as malware, trojan, or cryptocurrency miner software. That is common for miner binaries. AndroMiner is open source, the miner download requires user consent, and the app is intended to mine only to the wallet and pool settings you enter.
+- The app declares Android 7 / API 24 as its minimum. This does not guarantee
+  that the mining engine runs on every device at that API level.
+- Mining requires ARM64 (`arm64-v8a`). The native builder targets API 29 by
+  default; binary compatibility and available sensors determine whether a device can mine.
+- Bundled APKs target SDK 35. The downloader targets SDK 28 so Android permits
+  executing the downloaded miner from app storage. Both compile against SDK 36.
+- Check **About → Installed mining engine** for the installed binary's details.
 
-## Build Locally
+## Getting started
 
-> [!IMPORTANT]
-> If you want to build the app yourself, you must also build the miner locally. Windows are sensitive with miner binaries, I suggest to turn off Windows Defender real-time or add an exclusion for the `android/` and `miner-builder/` directories while building and testing.
+1. Read the workload warning and complete the device check.
+2. Open **Miner → Setup**, choose a supported coin, and enter your wallet address
+   or pool username in place of the placeholder.
+3. In **Pool**, enter the host, port, and protocol. Encrypted pools require the TLS miner.
+4. Choose a CPU profile in **Engine**. Review **Safety** and
+   **Settings → Power & protection** before starting.
+5. Enable Android notifications for AndroMiner. Every run requires an ongoing
+   notification with a Stop control.
+6. Start from **Overview** and confirm the workload. Watch temperature alongside
+   hashrate and shares; stop the run to save its results in **History**.
 
-### Requirements
+Pausing ends and saves the current run. Resuming starts a new run after confirmation.
 
-| Tool                       | Version / Notes                |
-| -------------------------- | ------------------------------ |
-| Node.js                    | 22+                            |
-| npm                        | 10+                            |
-| JDK                        | 21+                            |
-| Android Studio / SDK tools | Required                       |
-| Android SDK Platform       | 35                             |
-| Gradle                     | Wrapper included in `android/` |
+## Development
 
-Build the web app and Android debug APK:
+The frontend uses Vue 3, TypeScript, and Vite; Capacitor 8 connects it to the
+Android mining and device APIs. Use Node.js 24 and Bun, matching CI.
+
+Run from the repository root:
+
+```sh
+bun install --frozen-lockfile
+npm run dev
+```
+
+The browser preview cannot mine. To typecheck and build the frontend into `dist/`:
+
+```sh
+npm run build
+```
+
+## Building Android APKs
+
+Install Android Studio, Android SDK platform 36, and JDK 21. Set `JAVA_HOME` to
+the JDK and `ANDROID_HOME` to the SDK, or configure the SDK in `android/local.properties`.
+
+Build the TLS miner first using the [miner builder guide](miner-builder/README.md).
+It requires the Android NDK, Git, CMake, and Ninja; TLS builds also need `make`
+and a supported Perl installation. The frontend build does not compile XMRig.
+
+The builder installs the executable at
+`android/app/src/main/jniLibs/arm64-v8a/libxmrig.so`. TLS and no-TLS builds use
+the same destination, so the last miner copied there is the one the APK bundles.
+The `minerVariant` property labels the APK; it does not change the binary's TLS support.
+
+### Bundled debug APK
+
+From the repository root in PowerShell:
 
 ```powershell
-npm install
 npm run android:sync
-cd android
-.\gradlew.bat assembleDebug
+.\android\gradlew.bat -p android assembleDebug -PbundleMiner=true -PminerVariant=tls
 ```
 
-Build with a locally bundled miner:
+Output: `android/app/build/outputs/apk/debug/app-debug.apk`.
+For a no-TLS binary, use `-PminerVariant=notls` instead.
+On Linux/macOS, replace `.\android\gradlew.bat` with `./android/gradlew`.
+
+### Signed release APK
+
+Use an existing release keystore or create one with Android Studio. Set all four
+signing variables in PowerShell, using that keystore's alias and passwords:
 
 ```powershell
-.\miner-builder\build-xmrig-android.ps1
+$env:ANDROID_KEYSTORE_FILE = "C:/path/to/your-release.jks"
+$env:ANDROID_KEYSTORE_PASSWORD = "<keystore-password>"
+$env:ANDROID_KEY_ALIAS = "<key-alias>"
+$env:ANDROID_KEY_PASSWORD = "<key-password>"
+
 npm run android:sync
-cd android
-.\gradlew.bat assembleDebug -PbundleMiner=true
+.\android\gradlew.bat -p android clean assembleRelease -PbundleMiner=true -PminerVariant=tls
 ```
 
-Build the downloader release variant:
+Output: `android/app/build/outputs/apk/release/app-release.apk`.
+Keep the keystore and credentials private, and retain the signing key for future updates.
+
+<details>
+<summary>Local PowerShell release helper</summary>
+
+If you have `scripts/build-release-apk.ps1` locally (the `scripts/` directory is
+currently gitignored), it can load the same four signing settings from
+`.env.release.local` as `KEY=value` lines:
+
+```dotenv
+ANDROID_KEYSTORE_FILE=C:/path/to/your-release.jks
+ANDROID_KEYSTORE_PASSWORD=<keystore-password>
+ANDROID_KEY_ALIAS=<key-alias>
+ANDROID_KEY_PASSWORD=<key-password>
+```
 
 ```powershell
-cd android
-.\gradlew.bat assembleRelease -PtargetSdkVersionOverride=28
+.\scripts\build-release-apk.ps1 -PbundleMiner=true
 ```
 
-More build details are in [docs/TECHNICAL.md](docs/TECHNICAL.md) and [miner-builder/README.md](miner-builder/README.md).
+The helper builds the frontend, syncs Capacitor, and runs the signed release build.
+Existing environment variables take precedence over values in the file.
 
-## Code Formatting
+</details>
 
-Format the web app:
+## Known limitations
 
-```powershell
-npm run format
-```
+- Sensor support varies by phone. Missing required temperature or battery readings
+  block mining or stop an active run. A battery sensor is not a CPU temperature sensor.
+- **Waiting**, **Stale**, and unavailable readings are not measured zero. The app
+  does not calculate earnings or pool payouts.
+- Coins requiring another mining engine are listed but disabled.
+- Automatic start/restart, adaptive intensity, background throttling, automatic
+  efficiency-core preference, and individual event notifications are not implemented.
+  These preferences are disabled in Settings; the ongoing mining notification is implemented.
+- Clearing app data removes saved setups and history. Configuration exports
+  include wallet and pool settings, so review them before sharing.
 
-Format Android Java, Gradle, XML, properties, and ProGuard files:
+## Safety
 
-```powershell
-.\scripts\format-android.ps1
-```
+Mining keeps the CPU under sustained load. It can overheat a phone, degrade the
+battery, and reduce responsiveness. Prefer a spare device and supervise every run.
 
-Check Android formatting without changing files:
+AndroMiner checks temperature, battery level, charging rules, and Android thermal
+status. A battery reading of 45 °C or severe thermal throttling stops mining.
+Configured limits and protection checks reduce risk; they are not guarantees.
 
-```powershell
-.\scripts\format-android.ps1 -Check
-```
+## Contributing & issues
 
-## Supported Mining
-
-AndroMiner is focused on phone CPU mining with the bundled Android ARM64 XMRig binary. The app includes presets for coins and algorithms that XMRig can launch directly.
-
-| Coin                    | Symbol  | XMRig algorithm   | Status               |
-| ----------------------- | ------- | ----------------- | -------------------- |
-| Monero                  | XMR     | `rx/0`            | Bundled XMRig preset |
-| Zephyr Protocol         | ZEPH    | `rx/0`            | Bundled XMRig preset |
-| Wownero                 | WOW     | `rx/wow`          | Bundled XMRig preset |
-| ArQmA                   | ARQ     | `rx/arq`          | Bundled XMRig preset |
-| Safex Cash              | SFX     | `rx/sfx`          | Bundled XMRig preset |
-| KevaCoin                | KVA     | `rx/keva`         | Bundled XMRig preset |
-| Raptoreum               | RTM     | `gr`              | Bundled XMRig preset |
-| Yerbas                  | YERB    | `gr`              | Bundled XMRig preset |
-| GSP Coin                | GSPC    | `gr`              | Bundled XMRig preset |
-| Chukwa-compatible pools | CHUKWA  | `argon2/chukwa`   | Bundled XMRig preset |
-| Chukwa v2 pools         | CHUKWA2 | `argon2/chukwav2` | Bundled XMRig preset |
-| NinjaCoin               | NINJA   | `argon2/ninja`    | Bundled XMRig preset |
-| Conceal                 | CCX     | `cn/ccx`          | Bundled XMRig preset |
-| Talleo                  | TLO     | `cn-pico/tlo`     | Bundled XMRig preset |
-
-Some coins are shown in the app catalog for visibility, but they are disabled until
-AndroMiner has support for the required miner binary:
-
-| Coin  | Symbol | Required miner support                   |
-| ----- | ------ | ---------------------------------------- |
-| Scala | XLA    | XLArig or another Panthera-capable miner |
-| Dero  | DERO   | Current DERO miner / AstroBWT flow       |
-| Vkax  | VKAX   | XMRigCC-style build with the Mike algo   |
-
-Pool endpoints, ports, wallet formats, and active coin algorithms can change. Always
-check the pool's current setup guide before mining, especially for smaller coins.
-
-Bitcoin, Litecoin, Ethereum Classic, Ravencoin, and other hardware-accelerated coins are not practical targets for this Android CPU miner.
-
-## App Overview
-
-| System Check                                                                | Dashboard                                                             |
-| --------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| <img src="overview/system-check.png" alt="System check screen" width="220"> | <img src="overview/dashboard.png" alt="Dashboard screen" width="220"> |
-
-| Mining Setup                                                                | Statistics                                                              |
-| --------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| <img src="overview/mining-setup.png" alt="Mining setup screen" width="220"> | <img src="overview/statistics.png" alt="Statistics screen" width="220"> |
-
-| Settings                                                            | Live Session                                                                       |
-| ------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| <img src="overview/settings.png" alt="Settings screen" width="220"> | <img src="overview/live-session.png" alt="Live mining session screen" width="220"> |
-
-## More Documentation
-
-- [Technical notes](docs/TECHNICAL.md)
-- [Miner builder](miner-builder/README.md)
-- [XMRig command-line options](https://xmrig.com/docs/miner/command-line-options)
-- [XMRig algorithms](https://xmrig.com/docs/algorithms)
+[Report a problem](https://github.com/Stawa/AndroMiner/issues) with your device
+model, Android version, APK variant, steps to reproduce, and relevant diagnostic
+or miner output. Remove wallet addresses, pool credentials, and other private
+details before posting. For code changes, describe the behavior changed and how
+you checked it on Android.
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
-
-## Contributors
-
-<a href="https://github.com/stawa/androminer/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=stawa/androminer" />
-</a>
+AndroMiner application code is licensed under [MIT](LICENSE).
+XMRig is licensed separately under [GPLv3](https://github.com/xmrig/xmrig/blob/master/LICENSE).

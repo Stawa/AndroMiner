@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { Capacitor, registerPlugin } from '@capacitor/core';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { Capacitor } from '@capacitor/core';
+import { App as NativeApp } from '@capacitor/app';
+import { validateMiningSetup } from './utils/configValidation';
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import AppDrawer from './components/AppDrawer.vue';
+import UpdateBanner from './components/UpdateBanner.vue';
 import AppHeader from './components/AppHeader.vue';
 import BottomNav, { type AppTab } from './components/BottomNav.vue';
 import MaterialIcon from './components/MaterialIcon.vue';
@@ -14,6 +17,7 @@ import { useDeviceTelemetry } from './composables/useDeviceTelemetry';
 import { useGitHubReleaseUpdater } from './composables/useGitHubReleaseUpdater';
 import { useMiningController, type MinerBinaryVariant } from './composables/useMiningController';
 import { useTheme } from './composables/useTheme';
+import { usePageSwipe } from './composables/usePageSwipe';
 import { useProfilesStore } from './stores/profiles';
 import { useSettingsStore, type SettingsState } from './stores/settings';
 import DashboardView from './views/DashboardView.vue';
@@ -35,7 +39,10 @@ const importInput = ref<HTMLInputElement | null>(null);
 const systemCheckComplete = ref(false);
 const phoneRiskWarningAccepted = ref(localStorage.getItem(phoneRiskWarningKey) === 'true');
 const minerDownloadWarningOpen = ref(false);
+const minerDownloadError = ref('');
 const startWarningOpen = ref(false);
+const dataFeedback = ref('');
+let removeBackListener: (() => Promise<void>) | undefined;
 const updateBanner = ref({
   visible: false,
   title: '',
@@ -47,18 +54,25 @@ const profiles = useProfilesStore();
 const { device } = useDeviceTelemetry();
 const updater = useGitHubReleaseUpdater();
 useTheme();
-const sessionActive = computed(() => miner.state.value !== 'idle');
+const sessionActive = computed(() => !['idle', 'error'].includes(miner.state.value));
+const sessionFullscreen = ref(false);
+const sessionView = ref<InstanceType<typeof MiningSessionView> | null>(null);
+const pageSwipe = usePageSwipe<AppTab>(
+  ['dashboard', 'mining', 'statistics', 'settings'],
+  activeTab,
+  () =>
+    systemCheckComplete.value &&
+    phoneRiskWarningAccepted.value &&
+    !sessionFullscreen.value &&
+    !drawerOpen.value
+);
+watch(sessionActive, (active) => {
+  if (!active) sessionFullscreen.value = false;
+});
 const configAutosaveReady = ref(false);
 let configAutosaveHandle = 0;
 let lastNotifiedUpdateVersion = '';
 const updateCheckIntervalMs = 10 * 60 * 1000;
-
-interface MiningNotificationPlugin {
-  show: (options: { title: string; body: string }) => Promise<void>;
-  cancel: () => Promise<void>;
-}
-
-const MiningNotification = registerPlugin<MiningNotificationPlugin>('MiningNotification');
 
 interface ConfigBundle {
   version: 1;
@@ -78,12 +92,19 @@ const saveCurrentProfile = (name: string): void => {
 };
 
 const applyProfile = (profile: SavedMiningProfile): void => {
+  if (sessionActive.value) return;
   miner.applySavedProfile(profile);
   activeTab.value = 'mining';
 };
 
 const requestStartMining = (): void => {
+  if (sessionActive.value || startWarningOpen.value || minerDownloadWarningOpen.value) return;
+  if (Object.values(validateMiningSetup(miner.config)).some(Boolean)) {
+    activeTab.value = 'mining';
+    return;
+  }
   if (miner.backendState.value === 'missing') {
+    minerDownloadError.value = '';
     minerDownloadWarningOpen.value = true;
     return;
   }
@@ -97,8 +118,10 @@ const saveAndStartMining = (): void => {
 };
 
 const confirmMinerDownloadAndStart = async (variant: MinerBinaryVariant): Promise<void> => {
+  minerDownloadError.value = '';
   const ready = await miner.downloadMiner(variant);
   if (!ready) {
+    minerDownloadError.value = miner.backendMessage.value;
     return;
   }
 
@@ -108,7 +131,12 @@ const confirmMinerDownloadAndStart = async (variant: MinerBinaryVariant): Promis
 
 const confirmStartMining = async (): Promise<void> => {
   startWarningOpen.value = false;
+  activeTab.value = 'dashboard';
   await miner.startMining();
+};
+
+const requestResumeMining = (): void => {
+  startWarningOpen.value = true;
 };
 
 const acceptPhoneRiskWarning = (): void => {
@@ -195,9 +223,22 @@ const navigateToProfiles = (): void => {
   activeTab.value = 'profiles';
 };
 
-const openUpdateSettings = (): void => {
+let pendingUpdateScroll = false;
+const revealUpdateSettings = (): void => {
+  if (!pendingUpdateScroll || activeTab.value !== 'settings') return;
+  const updates = document.querySelector('.updates-card');
+  if (updates) {
+    updates.scrollIntoView({ block: 'start' });
+    pendingUpdateScroll = false;
+  }
+};
+
+const openUpdateSettings = async (): Promise<void> => {
+  pendingUpdateScroll = true;
   activeTab.value = 'settings';
   hideUpdateBanner();
+  await nextTick();
+  revealUpdateSettings();
 };
 
 const completeSystemCheck = (): void => {
@@ -217,7 +258,7 @@ const createBundle = (): ConfigBundle => ({
   settings: settings.$state
 });
 
-const exportConfig = async (): Promise<void> => {
+const performExport = async (): Promise<void> => {
   const fileName = `androminer-config-${new Date().toISOString().slice(0, 10)}.json`;
   const content = JSON.stringify(createBundle(), null, 2);
 
@@ -249,7 +290,19 @@ const exportConfig = async (): Promise<void> => {
   URL.revokeObjectURL(url);
 };
 
+const exportConfig = async (): Promise<void> => {
+  try {
+    await performExport();
+  } catch {
+    dataFeedback.value = 'Could not export your configuration. Please try again.';
+  }
+};
+
 const openImportPicker = (): void => {
+  if (sessionActive.value) {
+    dataFeedback.value = 'Stop the active session before importing a configuration.';
+    return;
+  }
   importInput.value?.click();
 };
 
@@ -268,6 +321,10 @@ const isConfigBundle = (value: unknown): value is ConfigBundle => {
 };
 
 const importConfig = async (event: Event): Promise<void> => {
+  if (sessionActive.value) {
+    window.alert('Stop the active session before importing a configuration.');
+    return;
+  }
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
   input.value = '';
@@ -276,19 +333,91 @@ const importConfig = async (event: Event): Promise<void> => {
     return;
   }
 
-  const raw = await file.text();
-  const parsed = JSON.parse(raw) as unknown;
-
-  if (!isConfigBundle(parsed)) {
-    return;
+  try {
+    const parsed: unknown = JSON.parse(await file.text());
+    if (
+      !isConfigBundle(parsed) ||
+      !isMiningConfig(parsed.currentConfig) ||
+      !parsed.profiles.every(
+        (profile) =>
+          profile &&
+          typeof profile.id === 'string' &&
+          typeof profile.name === 'string' &&
+          isMiningConfig(profile.config)
+      ) ||
+      !parsed.settings ||
+      typeof parsed.settings !== 'object'
+    ) {
+      throw new Error('Invalid configuration');
+    }
+    profiles.replaceAll(parsed.profiles, parsed.activeProfileId);
+    settings.replace(parsed.settings);
+    Object.assign(miner.config, parsed.currentConfig);
+    dataFeedback.value = 'Configuration imported. Your saved setups are ready.';
+  } catch {
+    dataFeedback.value =
+      'Could not import this file. Choose an AndroMiner JSON configuration export.';
   }
-
-  profiles.replaceAll(parsed.profiles, parsed.activeProfileId);
-  settings.replace(parsed.settings);
-  Object.assign(miner.config, parsed.currentConfig);
 };
 
+const isMiningConfig = (value: unknown): value is MiningConfig => {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as MiningConfig;
+  return (
+    Boolean(
+      candidate.coin &&
+      typeof candidate.coin.id === 'string' &&
+      typeof candidate.coin.symbol === 'string'
+    ) &&
+    ['walletAddress', 'poolUrl', 'workerName', 'password', 'algorithm', 'protocol'].every(
+      (key) => typeof candidate[key as keyof MiningConfig] === 'string'
+    ) &&
+    [
+      'threadCount',
+      'customThreadCount',
+      'totalDetectedThreads',
+      'poolPort',
+      'thermalThreshold'
+    ].every(
+      (key) =>
+        typeof candidate[key as keyof MiningConfig] === 'number' &&
+        Number.isFinite(candidate[key as keyof MiningConfig])
+    )
+  );
+};
+
+watch(
+  () => settings.performance.animationsEnabled,
+  (enabled) => {
+    document.documentElement.classList.toggle('motion-reduced', !enabled);
+  },
+  { immediate: true }
+);
+
+watch(
+  [activeTab, systemCheckComplete, phoneRiskWarningAccepted, sessionActive],
+  () => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  },
+  { flush: 'post' }
+);
+
 onMounted(() => {
+  if (Capacitor.isNativePlatform()) {
+    void NativeApp.addListener('backButton', () => {
+      if (document.querySelector('[role="dialog"]')) {
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      } else if (sessionFullscreen.value) {
+        void sessionView.value?.exitFullscreenMode();
+      } else if (activeTab.value !== 'dashboard') {
+        activeTab.value = 'dashboard';
+      } else {
+        void NativeApp.minimizeApp();
+      }
+    }).then((listener) => {
+      removeBackListener = () => listener.remove();
+    });
+  }
   phoneRiskWarningAccepted.value = localStorage.getItem(phoneRiskWarningKey) === 'true';
   systemCheckComplete.value = localStorage.getItem(systemCheckKey) === 'true';
   settings.load();
@@ -313,8 +442,18 @@ onMounted(() => {
 
 watch(
   () => settings.$state,
-  () => settings.persist(),
+  () => {
+    if (!settings.persist())
+      dataFeedback.value =
+        'Settings could not be saved. Current protection remains active until you close the app.';
+  },
   { deep: true }
+);
+watch(
+  () => profiles.storageError,
+  (message) => {
+    if (message) dataFeedback.value = message;
+  }
 );
 
 watch(
@@ -353,41 +492,18 @@ watch(
 );
 
 watch(
-  () =>
-    [
-      miner.state.value,
-      miner.stats.hashrate,
-      miner.stats.temperature,
-      miner.stats.acceptedShares,
-      miner.stats.rejectedShares,
-      settings.notifications.miningStatus
-    ] as const,
-  ([state]) => {
-    if (!Capacitor.isNativePlatform()) {
-      return;
-    }
-
-    if (state === 'idle' || !settings.notifications.miningStatus) {
-      void MiningNotification.cancel();
-      return;
-    }
-
-    const status = state === 'paused' ? 'Paused' : state === 'starting' ? 'Starting' : 'Mining';
-    const body = `${status} ${miner.config.coin.symbol} at ${miner.stats.hashrate.toFixed(
-      1
-    )} H/s · ${Math.round(miner.stats.temperature)} °C · ${
-      miner.stats.acceptedShares
-    } accepted / ${miner.stats.rejectedShares} rejected`;
-
-    void MiningNotification.show({
-      title: `AndroMiner ${status}`,
-      body
+  () => [settings.batterySafety.stopBelowPercent, settings.batterySafety.mineOnlyCharging],
+  () => {
+    void miner.syncSafetySettings().catch(() => {
+      dataFeedback.value =
+        'Could not update native protection. Stop mining and reopen the app before changing limits.';
+      void miner.stopMining();
     });
-  },
-  { immediate: true }
+  }
 );
 
 onBeforeUnmount(() => {
+  void removeBackListener?.();
   flushConfigAutosave();
   document.removeEventListener('visibilitychange', flushConfigAutosave);
   document.removeEventListener('visibilitychange', checkUpdatesWhenVisible);
@@ -397,8 +513,15 @@ onBeforeUnmount(() => {
 
 <template>
   <div
-    class="min-h-screen bg-app-bg text-app-on"
-    :class="{ 'motion-reduced': !settings.performance.animationsEnabled }"
+    class="app-shell min-h-screen bg-app-bg text-app-on"
+    @touchstart.passive="pageSwipe.onTouchStart"
+    @touchmove.passive="pageSwipe.onTouchMove"
+    @touchend.passive="pageSwipe.onTouchEnd"
+    @touchcancel.passive="pageSwipe.cancel"
+    :class="{
+      'motion-reduced': !settings.performance.animationsEnabled,
+      'app-shell-ready': systemCheckComplete && phoneRiskWarningAccepted && !sessionFullscreen
+    }"
   >
     <PhoneMiningRiskView v-if="!phoneRiskWarningAccepted" @continue="acceptPhoneRiskWarning" />
 
@@ -410,7 +533,8 @@ onBeforeUnmount(() => {
       />
 
       <AppHeader
-        v-if="systemCheckComplete && !sessionActive"
+        :session-state="sessionActive ? miner.state.value : undefined"
+        v-if="systemCheckComplete && !sessionFullscreen"
         :connected="miner.connected.value"
         :backend-state="miner.backendState.value"
         :active-tab="activeTab"
@@ -419,51 +543,38 @@ onBeforeUnmount(() => {
         @notifications="activeTab = 'settings'"
       />
 
-      <Transition name="banner">
-        <div
-          v-if="systemCheckComplete && !sessionActive && updateBanner.visible"
-          class="mx-auto w-full max-w-[440px] px-4 pt-2"
-          role="status"
-          aria-live="polite"
+      <div
+        v-if="sessionActive && activeTab !== 'dashboard'"
+        class="active-session-bar"
+        role="status"
+      >
+        <button class="text-button" @click="activeTab = 'dashboard'">
+          {{ miner.statusLabel.value }} · View session
+        </button>
+        <button
+          class="stop-button"
+          :disabled="miner.state.value === 'stopping'"
+          @click="miner.stopMining"
         >
-          <div
-            class="flex min-h-14 items-center gap-3 rounded-lg border border-app-line bg-app-card px-3 py-2 text-app-on shadow-sm"
-          >
-            <span
-              class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-app-elevated text-app-green"
-            >
-              <MaterialIcon name="new_releases" :size="20" filled />
-            </span>
-            <span class="min-w-0 flex-1">
-              <span class="block truncate text-[13px] font-semibold leading-5 text-white">
-                {{ updateBanner.title }}
-              </span>
-              <span class="block truncate text-[12px] leading-4 text-app-muted">
-                {{ updateBanner.message }}
-              </span>
-            </span>
-            <button
-              class="ripple grid h-10 min-h-10 w-10 shrink-0 place-items-center rounded-full text-app-green active:bg-app-green-dim"
-              type="button"
-              aria-label="View update"
-              @click="openUpdateSettings"
-            >
-              <MaterialIcon name="arrow_forward" :size="20" />
-            </button>
-            <button
-              class="ripple grid h-10 min-h-10 w-10 shrink-0 place-items-center rounded-full text-app-muted active:bg-app-elevated"
-              type="button"
-              aria-label="Dismiss update notification"
-              @click="hideUpdateBanner"
-            >
-              <MaterialIcon name="close" :size="20" />
-            </button>
-          </div>
-        </div>
+          <MaterialIcon name="stop" :size="20" />Stop mining
+        </button>
+      </div>
+
+      <Transition name="banner">
+        <UpdateBanner
+          v-if="systemCheckComplete && !sessionActive && updateBanner.visible"
+          :title="updateBanner.title"
+          :message="updateBanner.message"
+          @view="openUpdateSettings"
+          @dismiss="hideUpdateBanner"
+        />
       </Transition>
 
       <MiningSessionView
+        ref="sessionView"
         v-if="sessionActive"
+        v-show="activeTab === 'dashboard'"
+        @fullscreen="sessionFullscreen = $event"
         :state="miner.state.value"
         :config="miner.config"
         :stats="miner.stats"
@@ -477,64 +588,81 @@ onBeforeUnmount(() => {
         @pause="miner.pauseMining"
         @stop="miner.stopMining"
         @profile="miner.updateProfile"
-        @resume="miner.pauseMining"
+        @resume="requestResumeMining"
       />
 
-      <main v-else-if="systemCheckComplete">
-        <DashboardView
-          v-if="activeTab === 'dashboard'"
-          :config="miner.config"
-          :device="device"
-          :connected="miner.connected.value"
-          :backend-state="miner.backendState.value"
-          :backend-message="miner.backendMessage.value"
-          :logs="miner.minerLogs.value"
-          :session-history="miner.sessionHistory.value"
-          :active-profile="profiles.activeProfile"
-          @start="requestStartMining"
-          @configure="navigateToSetup"
-          @statistics="navigateToStatistics"
-          @profiles="navigateToProfiles"
-          @delete-session="miner.deleteSessionHistoryItem"
-          @clear-sessions="miner.clearSessionHistory"
-        />
-        <MiningConfigView
-          v-else-if="activeTab === 'mining'"
-          :config="miner.config"
-          :device="device"
-          :backend-state="miner.backendState.value"
-          :backend-message="miner.backendMessage.value"
-          @profile="updateProfile"
-          @coin="miner.updateCoin"
-          @apply-profile="applyProfile"
-          @start="saveAndStartMining"
-        />
-        <StatisticsView
-          v-else-if="activeTab === 'statistics'"
-          :config="miner.config"
-          :session-history="miner.sessionHistory.value"
-        />
-        <SettingsView
-          v-else-if="activeTab === 'settings'"
-          @export-config="exportConfig"
-          @import-config="openImportPicker"
-          @open-about="activeTab = 'about'"
-        />
-        <ProfilesView
-          v-else-if="activeTab === 'profiles'"
-          :config="miner.config"
-          @apply="applyProfile"
-          @save-current="saveCurrentProfile"
-        />
-        <HelpSupportView v-else-if="activeTab === 'help'" />
-        <AboutView v-else :device="device" />
+      <div v-if="dataFeedback" class="app-page phone-page data-feedback" role="status">
+        <div class="notice">
+          <p>{{ dataFeedback }}</p>
+          <button
+            class="text-button"
+            aria-label="Dismiss configuration message"
+            @click="dataFeedback = ''"
+          >
+            <MaterialIcon name="close" :size="20" />
+          </button>
+        </div>
+      </div>
+      <main v-if="systemCheckComplete && (!sessionActive || activeTab !== 'dashboard')">
+        <Transition name="view" mode="out-in" @after-enter="revealUpdateSettings">
+          <DashboardView
+            v-if="activeTab === 'dashboard'"
+            :config="miner.config"
+            :device="device"
+            :connected="miner.connected.value"
+            :backend-state="miner.backendState.value"
+            :backend-message="miner.backendMessage.value"
+            :logs="miner.minerLogs.value"
+            :session-history="miner.sessionHistory.value"
+            :active-profile="profiles.activeProfile"
+            @start="requestStartMining"
+            @configure="navigateToSetup"
+            @statistics="navigateToStatistics"
+            @profiles="navigateToProfiles"
+            @delete-session="miner.deleteSessionHistoryItem"
+            @clear-sessions="miner.clearSessionHistory"
+          />
+          <MiningConfigView
+            v-else-if="activeTab === 'mining'"
+            :locked="sessionActive"
+            :config="miner.config"
+            :device="device"
+            :backend-state="miner.backendState.value"
+            :backend-message="miner.backendMessage.value"
+            @profile="updateProfile"
+            @coin="miner.updateCoin"
+            @apply-profile="applyProfile"
+            @start="saveAndStartMining"
+          />
+          <StatisticsView
+            v-else-if="activeTab === 'statistics'"
+            :config="miner.config"
+            :session-history="miner.sessionHistory.value"
+          />
+          <SettingsView
+            v-else-if="activeTab === 'settings'"
+            @export-config="exportConfig"
+            @import-config="openImportPicker"
+            @open-about="activeTab = 'about'"
+          />
+          <ProfilesView
+            v-else-if="activeTab === 'profiles'"
+            :locked="sessionActive"
+            :config="miner.config"
+            @apply="applyProfile"
+            @save-current="saveCurrentProfile"
+          />
+          <HelpSupportView v-else-if="activeTab === 'help'" />
+          <AboutView v-else :device="device" />
+        </Transition>
       </main>
 
-      <BottomNav v-if="systemCheckComplete && !sessionActive" v-model="activeTab" />
+      <BottomNav v-if="systemCheckComplete && !sessionFullscreen" v-model="activeTab" />
       <MinerDownloadWarningSheet
         :open="minerDownloadWarningOpen"
         :downloading="miner.backendState.value === 'downloading'"
         :progress="miner.downloadProgress.value"
+        :error="minerDownloadError"
         @confirm="confirmMinerDownloadAndStart"
         @cancel="minerDownloadWarningOpen = false"
       />
@@ -545,7 +673,7 @@ onBeforeUnmount(() => {
         @cancel="startWarningOpen = false"
       />
       <AppDrawer
-        v-if="systemCheckComplete && !sessionActive"
+        v-if="systemCheckComplete"
         :open="drawerOpen"
         :active-tab="activeTab"
         @close="drawerOpen = false"

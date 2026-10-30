@@ -12,6 +12,7 @@ coverage/
 
 # Capacitor / Android generated files
 android/.gradle/
+android/.kotlin/
 android/**/build/
 android/capacitor-cordova-android-plugins/
 android/app/src/main/assets/public/

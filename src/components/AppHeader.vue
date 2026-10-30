@@ -1,16 +1,33 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
 import MaterialIcon from './MaterialIcon.vue';
 import type { AppTab } from './BottomNav.vue';
 import type { MinerBackendState } from '../composables/useMiningController';
 
 interface AppHeaderProps {
   connected: boolean;
+  sessionState?: string;
   activeTab: AppTab;
   backendState: MinerBackendState;
 }
 
 const props = defineProps<AppHeaderProps>();
+const header = ref<HTMLElement | null>(null);
+let sizeObserver: ResizeObserver | undefined;
+onMounted(() => {
+  sizeObserver = new ResizeObserver(() => {
+    if (header.value)
+      document.documentElement.style.setProperty(
+        '--app-header-height',
+        `${Math.ceil(header.value.getBoundingClientRect().height)}px`
+      );
+  });
+  if (header.value) sizeObserver.observe(header.value);
+});
+onBeforeUnmount(() => {
+  sizeObserver?.disconnect();
+  document.documentElement.style.removeProperty('--app-header-height');
+});
 
 const emit = defineEmits<{
   openDrawer: [];
@@ -19,9 +36,9 @@ const emit = defineEmits<{
 }>();
 
 const titles: Record<AppTab, string> = {
-  dashboard: 'AndroMiner',
-  mining: 'Mining Setup',
-  statistics: 'Insights',
+  dashboard: 'CPU mining utility',
+  mining: 'Miner configuration',
+  statistics: 'Session history',
   settings: 'Settings',
   profiles: 'Profiles',
   help: 'Help & support',
@@ -35,6 +52,12 @@ const showBack = (): boolean =>
   props.activeTab === 'about';
 
 const dashboardStatus = computed(() => {
+  if (props.sessionState)
+    return {
+      label: props.sessionState.charAt(0).toUpperCase() + props.sessionState.slice(1),
+      dot: props.sessionState === 'mining' ? 'bg-app-green' : 'bg-app-yellow',
+      text: 'text-app-muted'
+    };
   if (props.connected) {
     return { label: 'Pool connected', dot: 'bg-app-green', text: 'text-app-muted' };
   }
@@ -57,43 +80,25 @@ const dashboardStatus = computed(() => {
 </script>
 
 <template>
-  <header
-    class="sticky top-0 z-30 border-b border-app-line/70 bg-app-bg/92 px-4 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur"
-  >
-    <div class="mx-auto w-full max-w-[430px]">
-      <div class="flex h-16 items-center gap-2">
-        <button
-          class="top-icon-button"
-          type="button"
-          :aria-label="showBack() ? 'Back' : 'Open menu'"
-          @click="showBack() ? emit('back') : emit('openDrawer')"
+  <header ref="header" class="app-header sticky top-0 z-35 bg-app-bg pt-[var(--app-inset-top)]">
+    <div class="app-header-inner mx-auto flex min-h-16 items-center justify-between gap-3 py-2.5">
+      <div class="min-w-0">
+        <div class="app-wordmark"><MaterialIcon name="memory" :size="23" />AndroMiner</div>
+        <p class="header-section hidden md:block">
+          {{ titles[activeTab] }}
+        </p>
+      </div>
+      <div class="header-actions flex shrink-0 items-center gap-1.5">
+        <span class="mr-3 hidden items-center gap-2 text-caption text-app-muted md:inline-flex"
+          ><span class="h-2 w-2 rounded-full" :class="dashboardStatus.dot" />{{
+            dashboardStatus.label
+          }}</span
         >
-          <MaterialIcon :name="showBack() ? 'arrow_back' : 'menu'" :size="25" />
+        <button v-if="showBack()" class="outline-button" aria-label="Back" @click="emit('back')">
+          <MaterialIcon name="arrow_back" :size="20" /></button
+        ><button class="outline-button" aria-label="Open menu" @click="emit('openDrawer')">
+          <MaterialIcon name="menu" :size="20" />
         </button>
-
-        <div class="min-w-0 flex-1">
-          <h1 class="truncate text-[19px] font-semibold leading-6 text-white">
-            {{ titles[props.activeTab] }}
-          </h1>
-          <p
-            v-if="props.activeTab === 'dashboard'"
-            class="mt-0.5 flex items-center gap-1.5 text-[12px] leading-4 text-app-muted"
-          >
-            <span class="h-2 w-2 rounded-full" :class="dashboardStatus.dot" />
-            <span :class="dashboardStatus.text">{{ dashboardStatus.label }}</span>
-          </p>
-        </div>
-
-        <button
-          v-if="props.activeTab === 'dashboard'"
-          class="top-icon-button"
-          type="button"
-          aria-label="Open notification settings"
-          @click="emit('notifications')"
-        >
-          <MaterialIcon name="notifications" :size="23" />
-        </button>
-        <span v-else class="h-12 w-12 shrink-0" />
       </div>
     </div>
   </header>

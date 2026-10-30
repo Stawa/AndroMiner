@@ -21,11 +21,16 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="grid grid-cols-3 gap-2">
+  <div class="session-controls grid gap-2" role="group" aria-label="Mining controls">
     <button
       class="session-action ripple"
       type="button"
-      :disabled="Boolean(pendingAction)"
+      :disabled="
+        Boolean(pendingAction) ||
+        state === 'starting' ||
+        state === 'pausing' ||
+        state === 'stopping'
+      "
       :aria-busy="pendingAction === 'pause' || pendingAction === 'resume'"
       @click="emit('pause')"
     >
@@ -47,9 +52,9 @@ const emit = defineEmits<{
       }}</span>
     </button>
     <button
-      class="session-action ripple text-red-600"
+      class="session-action stop-button"
       type="button"
-      :disabled="Boolean(pendingAction)"
+      :disabled="Boolean(pendingAction) || state === 'pausing' || state === 'stopping'"
       :aria-busy="pendingAction === 'stop'"
       @click="emit('stop')"
     >
@@ -65,7 +70,12 @@ const emit = defineEmits<{
     <button
       class="session-action ripple"
       type="button"
-      :disabled="Boolean(pendingAction)"
+      :disabled="
+        Boolean(pendingAction) ||
+        state === 'starting' ||
+        state === 'pausing' ||
+        state === 'stopping'
+      "
       @click="emit('profile')"
     >
       <MaterialIcon name="tune" :size="28" />

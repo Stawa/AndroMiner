@@ -31,10 +31,12 @@ const resolvedTone = computed(() => props.tone || (props.connected ? 'good' : 'w
 
 <template>
   <span
-    class="inline-flex min-w-0 items-center gap-1.5 text-[12px] leading-4"
+    class="inline-flex min-w-0 max-w-full items-center gap-1.5 text-caption"
     :class="toneClasses[resolvedTone]"
   >
     <span class="h-2 w-2 shrink-0 rounded-full" :class="dotClasses[resolvedTone]" />
-    <span class="truncate">{{ label || (connected ? 'Connected' : 'Reconnecting') }}</span>
+    <span class="min-w-0 [overflow-wrap:anywhere]">{{
+      label || (connected ? 'Connected' : 'Reconnecting')
+    }}</span>
   </span>
 </template>

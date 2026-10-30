@@ -5,8 +5,9 @@ const config: CapacitorConfig = {
   appName: 'AndroMiner',
   webDir: 'dist',
   android: {
-    backgroundColor: '#05070d'
-  }
+    backgroundColor: '#11171c'
+  },
+  plugins: { SystemBars: { style: 'DARK', insetsHandling: 'css' } }
 };
 
 export default config;

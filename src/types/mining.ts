@@ -1,4 +1,5 @@
-export type MiningState = 'idle' | 'starting' | 'mining' | 'paused';
+export type MiningState =
+  'idle' | 'starting' | 'mining' | 'reconnecting' | 'pausing' | 'paused' | 'stopping' | 'error';
 
 export type MiningProfile = 'battery_saver' | 'balanced' | 'performance' | 'custom';
 
@@ -79,17 +80,20 @@ export interface MiningConfig {
 
 export interface MiningStats {
   hashrate: number;
+  averageHashrate: number | null;
+  peakHashrate: number | null;
+  sampleState: 'live' | 'stale' | 'unavailable' | 'inactive';
   difficulty: number | null;
   networkLatencyMs: number | null;
   acceptedShares: number;
   rejectedShares: number;
   cpuUsage: number;
   minerCpuUsage: number | null;
-  temperature: number;
-  batteryLevel: number;
+  temperature: number | null;
+  batteryLevel: number | null;
   isCharging: boolean;
   activeThreads: number;
-  estimatedEarnings: number;
+  estimatedEarnings: number | null;
   uptimeSeconds: number;
 }
 
@@ -123,7 +127,7 @@ export interface MiningSessionHistoryItem {
   durationSeconds: number;
   acceptedShares: number;
   rejectedShares: number;
-  averageHashrate: number;
+  averageHashrate: number | null;
   startedAt: string;
   endedAt: string;
 }
@@ -165,7 +169,7 @@ export interface DeviceTelemetry {
   operatingSystem: string;
   osVersion: string;
   manufacturer: string;
-  batteryLevel: number;
+  batteryLevel: number | null;
   isCharging: boolean;
   cpuThreads: number;
   cpuName: string;
