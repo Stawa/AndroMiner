@@ -13,7 +13,17 @@ permissions:
 jobs:
   android:
     name: ${{ github.event_name == 'workflow_dispatch' && 'Android Manual Tests' || 'Android Release Build' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+    env:
+      NDK_VERSION: 27.2.12479018
+      ABI: arm64-v8a
+      ANDROID_PLATFORM: android-29
+      XMRIG_REF: v6.26.0
+      LIBUV_REF: v1.48.0
+      OPENSSL_REF: openssl-4.0.0
 
     steps:
       - name: Check out repository
@@ -43,14 +53,16 @@ jobs:
         if: github.event_name == 'release'
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake make ninja-build perl
+          sudo apt-get install -y build-essential cmake make ninja-build perl pkg-config
 
       - name: Install Android SDK packages
         if: github.event_name == 'release'
         run: |
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          yes | "$SDKMANAGER" --licenses
-          "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018"
+          # yes can receive SIGPIPE after sdkmanager has read the final answer.
+          (yes || true) | "$SDKMANAGER" --licenses
+          "$SDKMANAGER" "platforms;android-36" "build-tools;35.0.0" "ndk;$NDK_VERSION"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
 
       - name: Prepare APK signing key
         if: github.event_name == 'release'
@@ -180,12 +192,9 @@ jobs:
       - name: Build TLS miner
         if: github.event_name == 'release'
         env:
-          XMRIG_REF: v6.26.0
-          LIBUV_REF: v1.48.0
-          OPENSSL_REF: openssl-4.0.0
-          WITH_TLS: ON
-          QUIET: ON
-        run: ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018" bash miner-builder/build-xmrig-android.sh
+          WITH_TLS: 'ON'
+          QUIET: 'ON'
+        run: bash miner-builder/build-xmrig-android.sh
 
       - name: Build TLS bundled APK
         if: github.event_name == 'release'
@@ -199,12 +208,9 @@ jobs:
       - name: Build no-TLS miner
         if: github.event_name == 'release'
         env:
-          XMRIG_REF: v6.26.0
-          LIBUV_REF: v1.48.0
-          OPENSSL_REF: openssl-4.0.0
-          WITH_TLS: OFF
-          QUIET: ON
-        run: ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018" bash miner-builder/build-xmrig-android.sh
+          WITH_TLS: 'OFF'
+          QUIET: 'ON'
+        run: bash miner-builder/build-xmrig-android.sh
 
       - name: Build no-TLS bundled APK
         if: github.event_name == 'release'
@@ -277,3 +283,15 @@ jobs:
 
           cat "$checksums_file" >> "$next_body_file"
           gh release edit "$RELEASE_TAG" --notes-file "$next_body_file"
+
+      - name: Upload miner build diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: androminer-release-miner-build-logs
+          path: |
+            miner-builder/work/logs/
+            miner-builder/work/build/**/CMakeCache.txt
+            miner-builder/work/build/**/CMakeFiles/CMakeConfigureLog.yaml
+            miner-builder/work/build/**/build.ninja
+          if-no-files-found: warn

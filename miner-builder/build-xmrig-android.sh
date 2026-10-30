@@ -7,14 +7,19 @@ WORK_DIR="${WORK_DIR:-$BUILDER_DIR/work}"
 SRC_DIR="$WORK_DIR/src"
 BUILD_DIR="$WORK_DIR/build"
 PREFIX_DIR="$WORK_DIR/prefix"
-LOG_DIR="$WORK_DIR/logs"
 
 ABI="${ABI:-arm64-v8a}"
 ANDROID_PLATFORM="${ANDROID_PLATFORM:-android-29}"
-XMRIG_REF="${XMRIG_REF:-master}"
+XMRIG_REF="${XMRIG_REF:-v6.26.0}"
 LIBUV_REF="${LIBUV_REF:-v1.48.0}"
 OPENSSL_REF="${OPENSSL_REF:-openssl-4.0.0}"
 WITH_TLS="${WITH_TLS:-ON}"
+WITH_TLS="${WITH_TLS^^}"
+if [[ "$WITH_TLS" != "ON" && "$WITH_TLS" != "OFF" ]]; then
+  echo "WITH_TLS must be ON or OFF." >&2
+  exit 1
+fi
+LOG_DIR="$WORK_DIR/logs/$ABI-$WITH_TLS"
 CPU_TUNE="${CPU_TUNE:-}"
 THIN_LTO="${THIN_LTO:-0}"
 QUIET="${QUIET:-ON}"
@@ -86,6 +91,7 @@ OUTPUT_BINARY="$INSTALL_DIR/libxmrig.so"
 command -v git >/dev/null || { echo "git is required." >&2; exit 1; }
 command -v cmake >/dev/null || { echo "cmake is required." >&2; exit 1; }
 command -v ninja >/dev/null || { echo "ninja is required." >&2; exit 1; }
+command -v pkg-config >/dev/null || { echo "pkg-config is required." >&2; exit 1; }
 
 mkdir -p "$SRC_DIR" "$BUILD_DIR" "$PREFIX_DIR" "$INSTALL_DIR" "$LOG_DIR"
 
@@ -167,7 +173,7 @@ run_logged() {
   fi
 
   log_step "$label"
-  "$@"
+  "$@" 2>&1 | tee "$log_file"
 }
 
 clone_or_update() {
@@ -186,10 +192,11 @@ clone_or_update() {
 }
 
 android_api_level() {
-  if [[ "$ANDROID_PLATFORM" =~ android-([0-9]+) ]]; then
+  if [[ "$ANDROID_PLATFORM" =~ ^android-([0-9]+)$ ]]; then
     echo "${BASH_REMATCH[1]}"
   else
-    echo "29"
+    echo "ANDROID_PLATFORM must use the form android-29." >&2
+    return 1
   fi
 }
 
@@ -206,7 +213,8 @@ openssl_android_target() {
   esac
 }
 
-build_openssl() {
+build_openssl() (
+  set -euo pipefail
   local source_dir="$1"
   local prefix="$2"
   local target="$3"
@@ -233,56 +241,25 @@ build_openssl() {
   rm -rf "$prefix"
   mkdir -p "$prefix"
 
-  local log_file="$LOG_DIR/openssl-$ABI.log"
-  log_step "Building OpenSSL ($target, API $api_level)"
-  if quiet_enabled; then
-    (
-      cd "$source_dir"
-      export ANDROID_NDK_ROOT="$NDK_DIR"
-      export ANDROID_NDK_HOME="$NDK_DIR"
-      export PATH="$llvm_bin:$PATH"
+  cd "$source_dir"
+  export ANDROID_NDK_ROOT="$NDK_DIR"
+  export ANDROID_NDK_HOME="$NDK_DIR"
+  export PATH="$llvm_bin:$PATH"
 
-      if [[ -f Makefile ]]; then
-        make clean || true
-      fi
-
-      perl Configure "$target" no-shared no-tests no-unit-test no-apps \
-        "--prefix=$prefix" \
-        "--openssldir=$prefix/ssl" \
-        "-D__ANDROID_API__=$api_level"
-      make -j "$JOBS"
-      make install_sw
-    ) >"$log_file" 2>&1 &
-    local openssl_pid=$!
-    if wait_with_progress "Building OpenSSL ($target, API $api_level)" "$log_file" "$openssl_pid"; then
-      log_detail "Log" "$log_file"
-      return 0
-    fi
-
-    log_error "Build step failed: OpenSSL"
-    log_error "Last 120 log lines from $log_file:"
-    tail -n 120 "$log_file" >&2 || true
-    return 1
+  if [[ -f Makefile ]]; then
+    make distclean
   fi
 
-  (
-    cd "$source_dir"
-    export ANDROID_NDK_ROOT="$NDK_DIR"
-    export ANDROID_NDK_HOME="$NDK_DIR"
-    export PATH="$llvm_bin:$PATH"
-
-    if [[ -f Makefile ]]; then
-      make clean || true
-    fi
-
-    perl Configure "$target" no-shared no-tests no-unit-test no-apps \
-      "--prefix=$prefix" \
-      "--openssldir=$prefix/ssl" \
-      "-D__ANDROID_API__=$api_level"
-    make -j "$JOBS"
-    make install_sw
-  )
-}
+  # Android supplies OS entropy; these optional external libraries are unnecessary.
+  perl Configure "$target" no-shared no-tests no-unit-test no-apps no-jitter no-zstd \
+    --with-rand-seed=os --libdir=lib \
+    "--prefix=$prefix" \
+    "--openssldir=$prefix/ssl" \
+    "-D__ANDROID_API__=$api_level"
+  perl configdata.pm --dump
+  make -j "$JOBS"
+  make install_sw
+)
 
 log_step "Using Android toolchain"
 log_detail "Android SDK" "$ANDROID_SDK"
@@ -295,24 +272,32 @@ log_step "Restoring libuv ($LIBUV_REF)"
 clone_or_update "https://github.com/libuv/libuv.git" "$LIBUV_REF" "$SRC_DIR/libuv"
 
 rm -rf "$BUILD_DIR/libuv-$ABI"
+rm -rf "$PREFIX_DIR/libuv-$ABI"
 run_logged "Configuring libuv" "$LOG_DIR/libuv-configure-$ABI.log" cmake -G Ninja -S "$SRC_DIR/libuv" -B "$BUILD_DIR/libuv-$ABI" \
   -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
   -DANDROID_ABI="$ABI" \
   -DANDROID_PLATFORM="$ANDROID_PLATFORM" \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="$PREFIX_DIR/libuv-$ABI" \
+  -DCMAKE_INSTALL_LIBDIR=lib \
   -DBUILD_TESTING=OFF \
+  -DLIBUV_BUILD_SHARED=OFF \
   -DLIBUV_BUILD_TESTS=OFF
 run_logged "Building libuv" "$LOG_DIR/libuv-build-$ABI.log" cmake --build "$BUILD_DIR/libuv-$ABI" --target install --parallel "$JOBS"
 
 UV_INCLUDE="$PREFIX_DIR/libuv-$ABI/include"
-UV_LIBRARY="$(find "$PREFIX_DIR/libuv-$ABI" -name 'libuv*.a' | head -n 1)"
-if [[ -z "$UV_LIBRARY" ]]; then
+UV_LIBRARY="$PREFIX_DIR/libuv-$ABI/lib/libuv.a"
+if [[ ! -s "$UV_LIBRARY" ]]; then
   echo "Could not find built libuv static library." >&2
   exit 1
 fi
 
 OPENSSL_CMAKE_ARGS=()
+# FindOpenSSL reads pkg-config's static dependencies even with explicit archives.
+# Replace its host search paths instead of adding Android paths ahead of them.
+export PKG_CONFIG_PATH=""
+export PKG_CONFIG_LIBDIR="$PREFIX_DIR/libuv-$ABI/lib/pkgconfig"
+export PKG_CONFIG_SYSROOT_DIR=""
 if [[ "$WITH_TLS" == "ON" ]]; then
   OPENSSL_TARGET="$(openssl_android_target)"
   ANDROID_API="$(android_api_level)"
@@ -320,9 +305,15 @@ if [[ "$WITH_TLS" == "ON" ]]; then
   log_step "Restoring OpenSSL ($OPENSSL_REF)"
   clone_or_update "https://github.com/openssl/openssl.git" "$OPENSSL_REF" "$SRC_DIR/openssl"
 
-  build_openssl "$SRC_DIR/openssl" "$PREFIX_DIR/openssl-$ABI" "$OPENSSL_TARGET" "$ANDROID_API"
+  run_logged "Building OpenSSL ($OPENSSL_TARGET, API $ANDROID_API)" "$LOG_DIR/openssl.log" \
+    build_openssl "$SRC_DIR/openssl" "$PREFIX_DIR/openssl-$ABI" "$OPENSSL_TARGET" "$ANDROID_API"
+
+  export PKG_CONFIG_LIBDIR="$PREFIX_DIR/openssl-$ABI/lib/pkgconfig:$PKG_CONFIG_LIBDIR"
+  run_logged "Checking OpenSSL static dependencies" "$LOG_DIR/openssl-static-libs.log" \
+    pkg-config --static --libs openssl
 
   OPENSSL_CMAKE_ARGS=(
+    "-DXMRIG_DEPS=$PREFIX_DIR/openssl-$ABI"
     "-DOPENSSL_ROOT_DIR=$PREFIX_DIR/openssl-$ABI"
     "-DOPENSSL_USE_STATIC_LIBS=TRUE"
     "-DOPENSSL_INCLUDE_DIR=$PREFIX_DIR/openssl-$ABI/include"
@@ -379,11 +370,13 @@ XMRIG_CMAKE_ARGS=(
   -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN"
   -DANDROID_ABI="$ABI"
   -DANDROID_PLATFORM="$ANDROID_PLATFORM"
+  -DANDROID_STL=c++_static
   -DCMAKE_BUILD_TYPE=Release
+  -DPKG_CONFIG_USE_CMAKE_PREFIX_PATH=FALSE
   -DWITH_TLS="$WITH_TLS"
   -DWITH_HTTP=ON
   -DWITH_HWLOC=OFF
-  -DWITH_OP"ENCL=OFF"
+  -DWITH_OPENCL=OFF
   -DWITH_CUDA=OFF
   -DBUILD_STATIC=OFF
   -DUV_INCLUDE_DIR="$UV_INCLUDE"
@@ -401,13 +394,18 @@ if [[ "$THIN_LTO" == "1" ]]; then
 fi
 XMRIG_CMAKE_ARGS+=("${OPENSSL_CMAKE_ARGS[@]}")
 run_logged "Configuring XMRig" "$LOG_DIR/xmrig-configure-$ABI-$WITH_TLS.log" cmake "${XMRIG_CMAKE_ARGS[@]}"
+run_logged "Recording XMRig linker commands" "$LOG_DIR/xmrig-commands.log" \
+  ninja -C "$BUILD_DIR/xmrig-$ABI" -t commands
 run_logged "Building XMRig" "$LOG_DIR/xmrig-build-$ABI-$WITH_TLS.log" cmake --build "$BUILD_DIR/xmrig-$ABI" --parallel "$JOBS"
 
 BUILT_XMRIG="$(find "$BUILD_DIR/xmrig-$ABI" -type f \( -name xmrig -o -name xmrig-notls \) -perm -111 | head -n 1)"
-if [[ -z "$BUILT_XMRIG" ]]; then
+if [[ -z "$BUILT_XMRIG" || ! -s "$BUILT_XMRIG" ]]; then
   echo "XMRig build finished, but the xmrig executable was not found." >&2
   exit 1
 fi
+
+run_logged "Verifying Android miner" "$LOG_DIR/xmrig-elf.log" \
+  bash "$BUILDER_DIR/verify-android-binary.sh" "$BUILT_XMRIG" "$NDK_DIR" "$ABI" "$WITH_TLS"
 
 log_success "Built Android miner"
 log_detail "Output" "$BUILT_XMRIG"

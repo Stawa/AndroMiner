@@ -9,7 +9,7 @@ Build locally when you need a different XMRig version or build configuration.
 
 ## Requirements
 
-- Android SDK and NDK, Git, CMake, and Ninja.
+- Android SDK and NDK, Git, CMake, and Ninja. The Bash builder also requires pkg-config.
 - TLS builds also need `make` and a full Perl installation. On Windows, use MSYS2
   Perl; Git for Windows Perl and Strawberry Perl are not supported by this TLS build.
 
@@ -40,9 +40,14 @@ bash miner-builder/build-xmrig-android.sh
 | Limit parallel build jobs                      | `-Jobs 4`          | `JOBS=4`          |
 | Select an XMRig tag or branch                  | `-XmrigRef <ref>`  | `XMRIG_REF=<ref>` |
 
-XMRig defaults to `master`; libuv defaults to `v1.48.0`, and OpenSSL to
+The Bash builder pins XMRig to `v6.26.0` (the PowerShell builder defaults to `master`);
+libuv defaults to `v1.48.0`, and OpenSSL to
 `openssl-4.0.0`. TLS builds link OpenSSL statically. A no-TLS binary cannot connect
 to encrypted pools.
+
+CI uses Ubuntu 24.04, NDK `27.2.12479018`, `arm64-v8a`, and API 29 for both miners.
+Native build directories and dependency installation prefixes are rebuilt rather
+than cached. Only the release job's Gradle dependencies are cached.
 
 ## Output
 
@@ -75,8 +80,22 @@ default and requires release signing credentials; see the [project README](../RE
 
 ## Build failures
 
-Quiet builds save logs in `miner-builder/work/logs/` and print the last 120 lines
-when a build step fails. Use `-ShowBuildOutput` or `QUIET=OFF` to stream output.
+The Bash builder saves logs in `miner-builder/work/logs/<ABI>-<ON|OFF>/`;
+the PowerShell builder uses `miner-builder/work/logs/`. Quiet builds print the last
+120 lines when a build step fails. Use `-ShowBuildOutput` or `QUIET=OFF` to stream output.
+
+The Bash builder restricts pkg-config to the Android dependency prefixes. CMake's
+`FindOpenSSL` otherwise reads host `openssl.pc` metadata even when Android archives
+are supplied explicitly. This can add Ubuntu-only static dependencies such as
+`libjitterentropy.a` and `libzstd` to the Android link command.
+
+OpenSSL is configured with `no-jitter no-zstd` and `--with-rand-seed=os`.
+Android's OS entropy seeds the random generator; TLS, certificate verification,
+and the default cryptographic algorithms remain available. The builder records
+OpenSSL configuration, static dependency flags, and Ninja commands, then uses the
+NDK's LLVM tools to check the executable's architecture, Android loader, runtime
+dependencies, and TLS symbols before copying it into the app. Both CI workflows
+upload these diagnostics on failure.
 
 If Windows blocks the final copy, rerun with `-SkipInstall` to keep the build
 separate from the Android project. Check the antivirus detection and confirm
