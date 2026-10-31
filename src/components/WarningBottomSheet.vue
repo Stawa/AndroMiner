@@ -41,8 +41,8 @@ useDialogFocus(
       tabindex="-1"
     >
       <div class="section-heading">
-        <h2 id="guard-title" class="dialog-title">Mining is paused</h2>
-        <button class="outline-button" aria-label="Dismiss safety warning" @click="emit('dismiss')">
+        <h2 id="guard-title" class="dialog-title">{{ $t('guard.title') }}</h2>
+        <button class="outline-button" :aria-label="$t('guard.dismiss')" @click="emit('dismiss')">
           <MaterialIcon name="close" :size="20" />
         </button>
       </div>
@@ -55,20 +55,19 @@ useDialogFocus(
           {{
             message ||
             (type === 'thermal'
-              ? `Temperature reached the configured limit (${threshold} °C). Let the phone cool before continuing.`
-              : `Battery fell below the configured limit (${threshold}%). Charge the phone before continuing.`)
+              ? $t('guard.thermal', { threshold })
+              : $t('guard.battery', { threshold }))
           }}
         </p>
       </div>
       <p class="section-copy">
-        Native protection checks all limits before starting again. Resume requires your
-        confirmation.
+        {{ $t('guard.note') }}
       </p>
       <div class="guard-actions">
         <button v-if="type === 'thermal'" class="primary-button" @click="emit('lowerPerformance')">
-          Switch to Battery Saver</button
-        ><button class="outline-button" @click="emit('resume')">Resume mining</button
-        ><button class="text-button" @click="emit('dismiss')">Keep paused</button>
+          {{ $t('guard.switchSaver') }}</button
+        ><button class="outline-button" @click="emit('resume')">{{ $t('guard.resume') }}</button
+        ><button class="text-button" @click="emit('dismiss')">{{ $t('guard.keepPaused') }}</button>
       </div>
     </section>
   </div>

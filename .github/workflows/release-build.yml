@@ -87,22 +87,8 @@ jobs:
             key_alias="$ANDROID_KEY_ALIAS_SECRET"
             key_password="${ANDROID_KEY_PASSWORD_SECRET:-$ANDROID_KEYSTORE_PASSWORD_SECRET}"
           else
-            store_password="$(openssl rand -base64 32)"
-            key_alias="androminer-release"
-            key_password="$store_password"
-
-            keytool -genkeypair \
-              -v \
-              -keystore "$keystore_file" \
-              -storepass "$store_password" \
-              -keypass "$key_password" \
-              -alias "$key_alias" \
-              -keyalg RSA \
-              -keysize 4096 \
-              -validity 10000 \
-              -dname "CN=AndroMiner, OU=Release, O=AndroMiner, L=Unknown, ST=Unknown, C=US"
-
-            echo "::warning::ANDROID_KEYSTORE_BASE64 is not configured. Generated a temporary signing key; users may need to uninstall older builds before installing future releases."
+            echo "::error::Release signing credentials are required. Refusing to publish with a temporary key."
+            exit 1
           fi
 
           {
@@ -129,23 +115,25 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Check formatting
-        if: github.event_name == 'workflow_dispatch'
         run: npm run format:check
 
+      - name: Lint frontend
+        run: npm run lint
+
+      - name: Run frontend unit tests
+        run: npm test
+
       - name: Build web app
-        if: github.event_name == 'workflow_dispatch'
         run: npm run build
 
       - name: Sync Android project
-        if: github.event_name == 'workflow_dispatch'
         run: npx cap sync android
 
-      - name: Run Android unit tests
-        if: github.event_name == 'workflow_dispatch'
+      - name: Run Android unit tests and lint
         working-directory: android
         run: |
           chmod +x ./gradlew
-          ./gradlew testDebugUnitTest --stacktrace
+          ./gradlew testDebugUnitTest lintDebug --stacktrace
 
       - name: Build web app and sync Android project
         if: github.event_name == 'release'
@@ -229,6 +217,10 @@ jobs:
           test -f "release-assets/androminer-tls-${{ github.event.release.tag_name }}.apk"
           test -f "release-assets/androminer-notls-${{ github.event.release.tag_name }}.apk"
           test -f "release-assets/androminer-web-${{ github.event.release.tag_name }}.zip"
+
+      - name: Write downloadable checksums
+        if: github.event_name == 'release'
+        run: (cd release-assets && sha256sum *.apk *.zip > SHA256SUMS)
 
       - name: Upload workflow artifacts
         if: github.event_name == 'release'

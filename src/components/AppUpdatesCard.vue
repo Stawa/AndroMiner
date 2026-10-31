@@ -5,6 +5,7 @@ import ToggleRow from './ToggleRow.vue';
 import { useSettingsStore } from '../stores/settings';
 import { useNativeMinerInfo } from '../composables/useNativeMinerInfo';
 import { useGitHubReleaseUpdater } from '../composables/useGitHubReleaseUpdater';
+import { formatDate, formatNumber, t } from '../i18n';
 
 const settings = useSettingsStore();
 const { apkVariant } = useNativeMinerInfo();
@@ -38,11 +39,11 @@ const otherAssets = computed(() =>
 const heading = computed(
   () =>
     ({
-      idle: 'Keep your miner current',
-      checking: 'Checking for updates',
-      ready: 'A release is available',
-      'up-to-date': 'You’re up to date',
-      error: 'Couldn’t check for updates'
+      idle: t('updates.headingIdle'),
+      checking: t('updates.headingChecking'),
+      ready: t('updates.headingReady'),
+      'up-to-date': t('updates.headingUpToDate'),
+      error: t('updates.headingError')
     })[status.value]
 );
 const statusIcon = computed(
@@ -58,10 +59,10 @@ const statusIcon = computed(
 const description = computed(
   () =>
     ({
-      idle: 'Check for the latest version of AndroMiner.',
-      checking: 'Looking for the latest release on GitHub…',
-      ready: `Version ${availableVersion.value.replace(/^v/i, '')}${releaseDate.value ? ' · ' + releaseDate.value : ''}`,
-      'up-to-date': 'Your installed version is current with the latest release.',
+      idle: t('updates.descIdle'),
+      checking: t('updates.descChecking'),
+      ready: `${t('updates.descReady', { version: availableVersion.value.replace(/^v/i, '') })}${releaseDate.value ? ' · ' + releaseDate.value : ''}`,
+      'up-to-date': t('updates.descUpToDate'),
       error: message.value
     })[status.value]
 );
@@ -69,28 +70,30 @@ const releaseDate = computed(() => {
   const date = new Date(releasedAt.value);
   return Number.isNaN(date.getTime())
     ? ''
-    : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    : formatDate(date, { month: 'short', day: 'numeric', year: 'numeric' });
 });
 const checked = computed(() =>
   lastCheckedAt.value
-    ? new Date(lastCheckedAt.value).toLocaleString(undefined, {
+    ? formatDate(lastCheckedAt.value, {
         month: 'short',
         day: 'numeric',
         hour: 'numeric',
         minute: '2-digit'
       })
-    : 'Not checked yet'
+    : t('updates.notChecked')
 );
 const assetSize = (bytes: number) =>
-  Number.isFinite(bytes) && bytes > 0 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : '';
+  Number.isFinite(bytes) && bytes > 0
+    ? `${formatNumber(bytes / 1024 / 1024, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} MB`
+    : '';
 const assetDescription = (name: string) =>
   name.toLowerCase().includes('-notls-')
-    ? 'Miner included · plain TCP pools'
+    ? t('updates.miner.notls')
     : name.toLowerCase().includes('-tls-')
-      ? 'Miner included · encrypted pools supported'
+      ? t('updates.miner.tls')
       : name.toLowerCase().includes('-download-')
-        ? 'Download the mining engine on first use'
-        : 'Android installation package';
+        ? t('updates.miner.download')
+        : t('updates.miner.other');
 const openDownload = async (action: () => Promise<void>) => {
   if (opening.value) return;
   openError.value = '';
@@ -98,7 +101,7 @@ const openDownload = async (action: () => Promise<void>) => {
   try {
     await action();
   } catch {
-    openError.value = 'Could not open the download page. Please try again.';
+    openError.value = t('updates.openFailed');
   } finally {
     opening.value = false;
   }
@@ -111,8 +114,10 @@ onMounted(() => {
 <template>
   <section class="surface updates-card" aria-labelledby="updates-title" :data-status="status">
     <header class="updates-header">
-      <h3 id="updates-title">App updates</h3>
-      <span class="updates-source"><MaterialIcon name="code" :size="15" />GitHub releases</span>
+      <h3 id="updates-title">{{ $t('updates.title') }}</h3>
+      <span class="updates-source"
+        ><MaterialIcon name="code" :size="15" />{{ $t('updates.source') }}</span
+      >
     </header>
 
     <div class="updates-status" role="status" aria-live="polite" aria-atomic="true">
@@ -126,7 +131,8 @@ onMounted(() => {
     </div>
 
     <div class="updates-installed">
-      <span>Installed version</span><strong>{{ currentVersionDisplay }}</strong>
+      <span>{{ $t('updates.installed') }}</span
+      ><strong>{{ currentVersionDisplay }}</strong>
     </div>
 
     <div class="updates-actions">
@@ -136,10 +142,8 @@ onMounted(() => {
           :disabled="opening"
           @click="openDownload(() => openAsset(preferredAsset!))"
         >
-          <MaterialIcon name="download" :size="20" />Download APK<MaterialIcon
-            name="open_in_new"
-            :size="16"
-          />
+          <MaterialIcon name="download" :size="20" />{{ $t('updates.downloadApk')
+          }}<MaterialIcon name="open_in_new" :size="16" />
         </button>
         <p class="updates-download-caption">
           {{ formatAssetLabel(preferredAsset)
@@ -147,7 +151,7 @@ onMounted(() => {
             · {{ assetSize(preferredAsset.size) }}</span
           >
         </p>
-        <p class="updates-download-caption">Opens in your browser · install manually</p>
+        <p class="updates-download-caption">{{ $t('updates.opensBrowser') }}</p>
       </template>
       <button
         v-else
@@ -157,15 +161,19 @@ onMounted(() => {
         @click="checkForUpdates()"
       >
         <MaterialIcon :name="status === 'error' ? 'refresh' : 'sync'" :size="19" />{{
-          checking ? 'Checking…' : status === 'error' ? 'Try again' : 'Check for updates'
+          checking
+            ? $t('updates.checking')
+            : status === 'error'
+              ? $t('updates.tryAgain')
+              : $t('updates.check')
         }}
       </button>
       <div v-if="hasRelease && releaseUrl" class="updates-links">
         <button class="text-button" :disabled="opening" @click="openDownload(openRelease)">
-          Release notes<MaterialIcon name="arrow_outward" :size="16" />
+          {{ $t('updates.releaseNotes') }}<MaterialIcon name="arrow_outward" :size="16" />
         </button>
         <button v-if="status === 'ready'" class="text-button" @click="checkForUpdates()">
-          Check again
+          {{ $t('updates.checkAgain') }}
         </button>
       </div>
       <p v-if="openError" class="field-error" role="alert">{{ openError }}</p>
@@ -176,9 +184,9 @@ onMounted(() => {
       class="updates-builds"
     >
       <summary>
-        {{ status === 'ready' ? 'Other download options' : 'Download this release' }}
+        {{ status === 'ready' ? $t('updates.otherOptions') : $t('updates.downloadRelease') }}
       </summary>
-      <p>APK downloads open in your browser. Install the file manually to finish.</p>
+      <p>{{ $t('updates.browserNote') }}</p>
       <button
         v-for="asset in status === 'ready' ? otherAssets : apkAssets"
         :key="asset.id"
@@ -198,13 +206,13 @@ onMounted(() => {
     <footer class="updates-footer">
       <ToggleRow
         v-model="settings.updates.autoUpdate"
-        label="Check automatically"
-        supporting-text="On launch and when you return to the app"
+        :label="$t('updates.auto')"
+        :supporting-text="$t('updates.autoHint')"
       />
       <p class="updates-checked">
-        <MaterialIcon name="schedule" :size="14" /><span
-          >{{ lastCheckedAt ? 'Last successful check · ' : '' }}{{ checked }}</span
-        >
+        <MaterialIcon name="schedule" :size="14" /><span>{{
+          lastCheckedAt ? $t('updates.lastSuccess', { when: checked }) : checked
+        }}</span>
       </p>
     </footer>
   </section>

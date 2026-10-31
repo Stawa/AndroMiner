@@ -59,10 +59,10 @@ useDialogFocus(
       tabindex="-1"
     >
       <div class="section-heading">
-        <h2 id="download-title" class="dialog-title">Download mining engine</h2>
+        <h2 id="download-title" class="dialog-title">{{ $t('download.title') }}</h2>
         <button
           class="outline-button"
-          aria-label="Close download warning"
+          :aria-label="$t('download.close')"
           :disabled="downloading"
           @click="emit('cancel')"
         >
@@ -70,14 +70,12 @@ useDialogFocus(
         </button>
       </div>
       <p class="section-copy">
-        This APK needs an ARM64 XMRig executable. It downloads from the AndroMiner project's GitHub
-        miner-builder branch and runs locally on your phone.
+        {{ $t('download.copy') }}
       </p>
       <div class="notice">
         <MaterialIcon name="info" :size="20" />
         <p>
-          Continue only if you trust this source. Security apps may flag mining software. Downloaded
-          binaries need the compatible download APK.
+          {{ $t('download.notice') }}
         </p>
       </div>
       <div class="variant-picker">
@@ -87,29 +85,32 @@ useDialogFocus(
           @click="selectedVariant = 'tls'"
         >
           <MaterialIcon name="lock" :size="20" /><strong>TLS</strong
-          ><small>Encrypted pools supported</small></button
+          ><small>{{ $t('download.tlsHint') }}</small></button
         ><button
           :aria-pressed="selectedVariant === 'notls'"
           :disabled="downloading"
           @click="selectedVariant = 'notls'"
         >
           <MaterialIcon name="lock_open" :size="20" /><strong>No TLS</strong
-          ><small>Plain TCP only</small>
+          ><small>{{ $t('download.noTlsHint') }}</small>
         </button>
       </div>
       <div v-if="downloading" class="download-progress" role="status" aria-live="polite">
         <strong>{{
-          progress.totalBytes ? Math.round(progress.percent) + '%' : 'Downloading…'
+          progress.totalBytes ? Math.round(progress.percent) + '%' : $t('download.downloading')
         }}</strong
         ><progress
           v-if="progress.totalBytes"
           :value="progress.percent"
           max="100"
-          aria-label="Miner download progress"
-        /><progress v-else aria-label="Miner download progress" />
+          :aria-label="$t('download.progress')"
+        /><progress v-else :aria-label="$t('download.progress')" />
         <p>
-          {{ formatBytes(progress.downloadedBytes)
-          }}{{ progress.totalBytes ? ' / ' + formatBytes(progress.totalBytes) : ' downloaded' }}
+          {{
+            progress.totalBytes
+              ? formatBytes(progress.downloadedBytes) + ' / ' + formatBytes(progress.totalBytes)
+              : $t('download.bytesDownloaded', { size: formatBytes(progress.downloadedBytes) })
+          }}
         </p>
       </div>
       <div v-if="error" class="notice notice-error" role="alert">
@@ -117,13 +118,13 @@ useDialogFocus(
       </div>
       <div class="action-row dialog-actions">
         <button class="outline-button" :disabled="downloading" @click="emit('cancel')">
-          Cancel</button
+          {{ $t('common.cancel') }}</button
         ><button
           class="primary-button"
           :disabled="downloading"
           @click="emit('confirm', selectedVariant)"
         >
-          {{ downloading ? 'Downloading…' : 'Download & continue' }}
+          {{ downloading ? $t('download.downloading') : $t('download.confirm') }}
         </button>
       </div>
     </section>

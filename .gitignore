@@ -3,12 +3,19 @@ node_modules/
 
 # Build and generated output
 dist/
+dist-stats/
 build/
 /types/
 coverage/
 .sourcemaps/
 *.map
 *.tsbuildinfo
+# Keep source tests tracked despite the broad pattern above
+!tests/
+!tests/**
+!server/tests/
+!server/tests/**
+*test*
 
 # Capacitor / Android generated files
 android/.gradle/
@@ -66,3 +73,6 @@ xcuserdata/
 Pods/
 Carthage/
 *.xcframework.zip
+
+# Statistics service data
+server/data/*.sqlite*

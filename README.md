@@ -67,6 +67,10 @@ existing runs. The wallet is a placeholder. Tap any image for full size.
 - Follow measured hashrate, accepted and rejected shares, and miner output.
 - Monitor available temperature and battery readings, with native protection rules.
 - Save mining setups and session history locally; import or export configuration.
+- Set a native session deadline, recover interrupted runs, and retain protection stop reasons.
+- Test pool DNS/TCP/TLS reachability without sending a wallet or password.
+- Filter session history and preview a JSON results export with pool identifiers excluded by default.
+- Use the app in English, Bahasa Indonesia, or 简体中文 (Settings → General → Language), or follow the device language.
 - Use light or dark mode and swipe between the main pages.
 - Install a bundled TLS or no-TLS miner, or download one after confirmation.
 
@@ -124,6 +128,11 @@ The browser preview cannot mine. To typecheck and build the frontend into `dist/
 ```sh
 npm run build
 ```
+
+Validation commands: `npm run lint`, `npm test`, `npm run i18n:check`, `npm run format:check`, and
+`npm run test:ui` (requires a running preview and installed Chromium/Edge).
+Android checks: `android/gradlew -p android :app:testDebugUnitTest :app:lintDebug spotlessCheck`.
+See [implementation and validation notes](docs/ROADMAP-IMPLEMENTATION.md) for device test setup.
 
 ## Building Android APKs
 
@@ -205,6 +214,35 @@ Existing environment variables take precedence over values in the file.
   These preferences are disabled in Settings; the ongoing mining notification is implemented.
 - Clearing app data removes saved setups and history. Configuration exports
   include wallet and pool settings, so review them before sharing.
+- Native history retains up to 100 runs and 50 state events per run. After an
+  interruption, the end time is the last saved observation, not an exact crash time.
+  Automatic Android app backup is disabled; export configurations you want to keep.
+- Pool testing checks reachability and TLS certificates, not wallet authentication.
+  The connection report excludes identifiers and raw logs. History results exports
+  are separate from configuration exports and omit pool identifiers unless selected.
+
+### Session limits and background operation
+
+In **Miner → Safety**, set a maximum duration from 1 to 1440 minutes; 0 means no
+deadline. Android enforces the countdown even while the interface is hidden.
+Protection and charging-only rules take precedence. Timer, manual, and protection
+stops never resume automatically. Reopening the interface reconnects to the native
+run; removing the app from recents ends it. See **Help → Background operation** for
+Doze, battery saver, and manufacturer restrictions.
+
+### Verify downloads
+
+Release assets include `SHA256SUMS`. After downloading the listed artifacts, use
+`sha256sum -c SHA256SUMS` on Linux, or compare `Get-FileHash <apk> -Algorithm SHA256`
+with the published value in PowerShell. Checksums detect changed files; APK signing
+key continuity is also needed to authenticate updates.
+
+Downloader APKs accept only the miner revision and SHA-256 hashes embedded in that
+APK. Downloads are checked before execution and atomically installed; failed checks
+keep the previous file. Legacy unverified files require downloading the approved
+version again. This makes engine updates depend on reviewed app updates. Details,
+network disclosures, and known validation limits are in the
+[implementation notes](docs/ROADMAP-IMPLEMENTATION.md).
 
 ## Safety
 
@@ -216,6 +254,8 @@ status. A battery reading of 45 °C or severe thermal throttling stops mining.
 Configured limits and protection checks reduce risk; they are not guarantees.
 
 ## Contributing & issues
+
+Translations are welcome; see [localization](docs/localization.md) for how to add a language.
 
 [Report a problem](https://github.com/Stawa/AndroMiner/issues) with your device
 model, Android version, APK variant, steps to reproduce, and relevant diagnostic

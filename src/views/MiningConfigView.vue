@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import ConfigInput from '../components/ConfigInput.vue';
+import PoolConnectionTest from '../components/PoolConnectionTest.vue';
 import ConfigSelect from '../components/ConfigSelect.vue';
 import MaterialIcon from '../components/MaterialIcon.vue';
 import SavedSetupPicker from '../components/SavedSetupPicker.vue';
@@ -11,6 +12,7 @@ import { cryptocurrencies } from '../data/miningCatalog';
 import { validateMiningSetup } from '../utils/configValidation';
 import { useProfilesStore } from '../stores/profiles';
 import { useSettingsStore } from '../stores/settings';
+import { t } from '../i18n';
 import type {
   CpuAffinity,
   CpuPriority,
@@ -56,36 +58,29 @@ const setupSection = ref<SetupSection>('setup');
 const saveFeedbackVisible = ref(false);
 const validationVisible = ref(false);
 const errors = computed(() => validateMiningSetup(props.config));
+const errorText = (key: string): string => (key ? t(key) : '');
 const savedProfiles = useProfilesStore();
 const settings = useSettingsStore();
 let saveFeedbackTimer = 0;
 
 const setupSections: Array<{ id: SetupSection; label: string; icon: string }> = [
-  { id: 'setup', label: 'Setup', icon: 'folder_managed' },
-  { id: 'pool', label: 'Pool', icon: 'hub' },
-  { id: 'performance', label: 'Engine', icon: 'memory' },
-  { id: 'safety', label: 'Safety', icon: 'health_and_safety' }
+  { id: 'setup', label: 'config.sec.setup', icon: 'folder_managed' },
+  { id: 'pool', label: 'config.sec.pool', icon: 'hub' },
+  { id: 'performance', label: 'config.sec.performance', icon: 'memory' },
+  { id: 'safety', label: 'config.sec.safety', icon: 'health_and_safety' }
 ];
 
-const formatThreadCount = (threads: number): string =>
-  `${threads} ${threads === 1 ? 'thread' : 'threads'}`;
+const formatThreadCount = (threads: number): string => t('unit.threads', { n: threads }, threads);
 
 const profileCoreShortLabel = (affinity: CpuAffinity): string => {
-  const labels: Record<CpuAffinity, string> = {
-    auto: 'All cores',
-    little: 'Eco cores',
-    big: 'Fast cores',
-    custom: 'Manual cores'
+  const keys: Record<CpuAffinity, string> = {
+    auto: 'affinity.shortAuto',
+    little: 'affinity.shortLittle',
+    big: 'affinity.shortBig',
+    custom: 'affinity.shortCustom'
   };
 
-  return labels[affinity];
-};
-
-const profileDescriptions: Record<MiningProfile, string> = {
-  battery_saver: 'Cooler phone, slower hashrate',
-  balanced: 'A moderate starting point',
-  performance: 'Faster mining, more heat',
-  custom: 'Manual thread tuning'
+  return t(keys[affinity]);
 };
 
 const profileIcons: Record<MiningProfile, string> = {
@@ -102,8 +97,8 @@ const profiles = computed(() =>
 
     return {
       id: preset.id,
-      label: preset.label,
-      supportingText: profileDescriptions[preset.id],
+      label: t(`profile.${preset.id}`),
+      supportingText: t(`profile.short.${preset.id}`),
       icon: profileIcons[preset.id],
       threadLabel: formatThreadCount(threadCount),
       coreLabel: profileCoreShortLabel(affinity)
@@ -111,35 +106,37 @@ const profiles = computed(() =>
   })
 );
 
-const priorityOptions: Array<{ value: CpuPriority; label: string }> = [
-  { value: 'low', label: 'Low' },
-  { value: 'normal', label: 'Normal' },
-  { value: 'high', label: 'High' }
-];
+const priorityValues: CpuPriority[] = ['low', 'normal', 'high'];
+const affinityValues: CpuAffinity[] = ['auto', 'little', 'big', 'custom'];
+const priorityHints: Record<CpuPriority, string> = {
+  low: 'priority.hintLow',
+  normal: 'priority.hintNormal',
+  high: 'priority.hintHigh'
+};
+const affinityHints: Record<CpuAffinity, string> = {
+  auto: 'affinity.hintAuto',
+  little: 'affinity.hintLittle',
+  big: 'affinity.hintBig',
+  custom: 'affinity.hintCustom'
+};
 
-const affinityOptions: Array<{ value: CpuAffinity; label: string }> = [
-  { value: 'auto', label: 'All cores' },
-  { value: 'little', label: 'Efficiency cores' },
-  { value: 'big', label: 'Performance cores' },
-  { value: 'custom', label: 'Custom affinity' }
-];
-
-const protocolOptions: Array<{ value: MiningProtocol; label: string; supportingText: string }> = [
-  { value: 'stratum', label: 'Stratum', supportingText: 'Standard pool connection' },
-  { value: 'stratum+tcp', label: 'Stratum TCP', supportingText: 'Plain TCP transport' },
-  { value: 'stratum+ssl', label: 'Stratum SSL', supportingText: 'Encrypted SSL transport' },
-  { value: 'stratum+tls', label: 'Stratum TLS', supportingText: 'Encrypted TLS transport' },
-  { value: 'daemon', label: 'Daemon RPC', supportingText: 'Direct daemon mining endpoint' },
-  { value: 'daemon+ssl', label: 'Daemon RPC SSL', supportingText: 'Encrypted daemon RPC' },
-  { value: 'self-select', label: 'Self-select', supportingText: 'Miner selects block template' },
-  { value: 'xmrig-proxy', label: 'XMRig proxy', supportingText: 'Proxy-based mining endpoint' },
-  { value: 'ssl', label: 'SSL', supportingText: 'Generic SSL endpoint' },
-  { value: 'tls', label: 'TLS', supportingText: 'Generic TLS endpoint' },
-  { value: 'tcp', label: 'TCP', supportingText: 'Generic TCP endpoint' },
-  { value: 'http', label: 'HTTP', supportingText: 'HTTP endpoint' },
-  { value: 'https', label: 'HTTPS', supportingText: 'HTTPS endpoint' },
-  { value: 'solo', label: 'Solo', supportingText: 'Solo mining endpoint' },
-  { value: 'nicehash', label: 'NiceHash', supportingText: 'NiceHash compatible mode' }
+// Protocol names are wire-format identifiers and stay untranslated; only their descriptions are localized.
+const protocolOptions: Array<{ value: MiningProtocol; label: string }> = [
+  { value: 'stratum', label: 'Stratum' },
+  { value: 'stratum+tcp', label: 'Stratum TCP' },
+  { value: 'stratum+ssl', label: 'Stratum SSL' },
+  { value: 'stratum+tls', label: 'Stratum TLS' },
+  { value: 'daemon', label: 'Daemon RPC' },
+  { value: 'daemon+ssl', label: 'Daemon RPC SSL' },
+  { value: 'self-select', label: 'Self-select' },
+  { value: 'xmrig-proxy', label: 'XMRig proxy' },
+  { value: 'ssl', label: 'SSL' },
+  { value: 'tls', label: 'TLS' },
+  { value: 'tcp', label: 'TCP' },
+  { value: 'http', label: 'HTTP' },
+  { value: 'https', label: 'HTTPS' },
+  { value: 'solo', label: 'Solo' },
+  { value: 'nicehash', label: 'NiceHash' }
 ];
 
 const coinOptions = computed<ConfigSelectOption[]>(() =>
@@ -149,80 +146,68 @@ const coinOptions = computed<ConfigSelectOption[]>(() =>
     supportingText:
       coin.supportStatus === 'bundled'
         ? `${coin.algorithm} / ${coin.xmrigAlgo}`
-        : `${coin.algorithm} · ${coin.supportNote || 'Custom miner required'}`,
+        : `${coin.algorithm} · ${coin.supportNote || t('config.customMiner')}`,
     coinSymbol: coin.symbol,
     coinName: coin.name,
     disabled: coin.supportStatus !== 'bundled'
   }))
 );
 
-const prioritySelectOptions: ConfigSelectOption[] = priorityOptions.map((option) => ({
-  value: option.value,
-  label: option.label,
-  supportingText:
-    option.value === 'low'
-      ? 'Lower heat and battery use'
-      : option.value === 'high'
-        ? 'Higher CPU scheduling priority'
-        : 'Recommended default'
-}));
-
-const affinitySelectOptions: ConfigSelectOption[] = affinityOptions.map((option) => ({
-  value: option.value,
-  label: option.label,
-  supportingText:
-    option.value === 'little'
-      ? 'Best for Battery Saver. Uses lower-power cores when Android exposes them; cooler but usually lower H/s.'
-      : option.value === 'big'
-        ? 'Best for speed tests. Uses the fastest cores when available; expect more heat and battery drain.'
-        : option.value === 'custom'
-          ? 'Advanced/manual option for exact core masks. Until masks are exposed here, Android scheduling is used.'
-          : 'Default for beginners and a clean baseline for advanced tuning. Android can move workers across all cores.'
-}));
-
-const donateOverProxySelectOptions: ConfigSelectOption[] = [
-  { value: '0', label: 'Off', supportingText: 'Do not donate over proxy' },
-  { value: '1', label: 'Auto', supportingText: 'Use XMRig default proxy donation mode' },
-  { value: '2', label: 'Always', supportingText: 'Always donate over proxy when applicable' }
-];
-
-const protocolSelectOptions: ConfigSelectOption[] = protocolOptions.map((option) => ({
-  value: option.value,
-  label: option.label,
-  supportingText: option.supportingText
-}));
-
-const activeSavedProfile = computed(() => savedProfiles.activeProfile);
-const cpuHardwareName = computed(() => props.device.cpuName || props.device.model || 'Android CPU');
-const cpuClockLabel = computed(() => props.device.cpuClockLabel || '-');
-const activeThreadLabel = computed(
-  () => `${props.config.threadCount}/${props.config.totalDetectedThreads}`
+const prioritySelectOptions = computed<ConfigSelectOption[]>(() =>
+  priorityValues.map((value) => ({
+    value,
+    label: t(`priority.${value}`),
+    supportingText: t(priorityHints[value])
+  }))
 );
+const affinitySelectOptions = computed<ConfigSelectOption[]>(() =>
+  affinityValues.map((value) => ({
+    value,
+    label: t(`affinity.${value}`),
+    supportingText: t(affinityHints[value])
+  }))
+);
+const donateOverProxySelectOptions = computed<ConfigSelectOption[]>(() => [
+  { value: '0', label: t('donate.off'), supportingText: t('donate.hintOff') },
+  { value: '1', label: t('donate.auto'), supportingText: t('donate.hintAuto') },
+  { value: '2', label: t('donate.always'), supportingText: t('donate.hintAlways') }
+]);
+const protocolSelectOptions = computed<ConfigSelectOption[]>(() =>
+  protocolOptions.map((option) => ({
+    value: option.value,
+    label: option.label,
+    supportingText: t(`protocol.${option.value}`)
+  }))
+);
+const activeSavedProfile = computed(() => savedProfiles.activeProfile);
+const cpuHardwareName = computed(
+  () => props.device.cpuName || props.device.model || t('device.androidCpu')
+);
+const cpuClockLabel = computed(() => props.device.cpuClockLabel || '-');
 const detectedThreadCount = computed(() =>
   Math.max(
     1,
     props.config.totalDetectedThreads || props.device.cpuThreads || props.config.threadCount
   )
 );
-const selectedProfileLabel = computed(
-  () => profilePresets.find((preset) => preset.id === props.config.profile)?.label || 'Custom'
-);
+const selectedProfileLabel = computed(() => t(`profile.${props.config.profile}`));
 const engineDescription = computed(
-  () => `${cpuHardwareName.value} · ${cpuClockLabel.value} · ${activeThreadLabel.value} threads`
+  () =>
+    `${cpuHardwareName.value} · ${cpuClockLabel.value} · ${formatThreadCount(props.config.threadCount)}`
 );
 
 const backendStatus = computed(() => {
   const labels: Record<MinerBackendState, { label: string; icon: string; tone: string }> = {
-    checking: { label: 'Checking backend', icon: 'sync', tone: 'text-app-muted' },
-    ready: { label: 'Miner ready', icon: 'check_circle', tone: 'text-app-green' },
-    missing: { label: 'Miner download required', icon: 'download', tone: 'text-app-yellow' },
-    downloading: { label: 'Downloading miner', icon: 'downloading', tone: 'text-app-yellow' },
+    checking: { label: t('config.checking'), icon: 'sync', tone: 'text-app-muted' },
+    ready: { label: t('config.minerReady'), icon: 'check_circle', tone: 'text-app-green' },
+    missing: { label: t('backend.missing'), icon: 'download', tone: 'text-app-yellow' },
+    downloading: { label: t('backend.downloading'), icon: 'downloading', tone: 'text-app-yellow' },
     'web-unavailable': {
-      label: 'Android app required',
+      label: t('backend.webUnavailable'),
       icon: 'phone_android',
       tone: 'text-app-yellow'
     },
-    error: { label: 'Backend error', icon: 'error', tone: 'text-red-300' }
+    error: { label: t('config.backendError'), icon: 'error', tone: 'text-red-300' }
   };
 
   return labels[props.backendState];
@@ -237,30 +222,34 @@ const canStartMining = computed(
 
 const startButtonLabel = computed(() =>
   props.backendState === 'missing'
-    ? 'Save & Download'
+    ? t('config.saveDownload')
     : props.backendState === 'error'
-      ? 'Save & Start Again'
-      : 'Save & Start Mining'
+      ? t('config.saveAgain')
+      : t('config.saveStart')
 );
 
 const saveButtonLabel = computed(() =>
-  savedProfiles.storageError ? 'Retry save' : saveFeedbackVisible.value ? 'Saved' : 'Save changes'
+  savedProfiles.storageError
+    ? t('config.retrySave')
+    : saveFeedbackVisible.value
+      ? t('config.saved')
+      : t('config.saveChanges')
 );
 const hasTasksetMaskError = computed(() => /taskset|tasket|bad mask/i.test(props.backendMessage));
 const setupNoticeTitle = computed(() => {
   if (props.backendState === 'error' && hasTasksetMaskError.value) {
-    return 'CPU affinity failed';
+    return t('config.affinityFailed');
   }
 
   if (props.backendState === 'error') {
-    return 'Miner needs attention';
+    return t('config.needsAttention');
   }
 
   return backendStatus.value.label;
 });
 const setupNoticeText = computed(() => {
   if (props.backendState === 'error' && hasTasksetMaskError.value) {
-    return `${props.backendMessage}\n\nChoose All cores and retry. This device may not allow CPU core pinning.`;
+    return t('config.affinityHint', { message: props.backendMessage });
   }
 
   return props.backendMessage;
@@ -276,7 +265,7 @@ const showSaveFeedback = (): void => {
 
 const addSavedProfile = (): void => {
   const profile = savedProfiles.saveFromConfig(
-    `Profile ${savedProfiles.profiles.length + 1}`,
+    t('config.profileDefault', { n: savedProfiles.profiles.length + 1 }),
     props.config
   );
   emit('applyProfile', profile);
@@ -328,7 +317,7 @@ const deleteActiveProfile = (): void => {
   }
 
   const confirmed = window.confirm(
-    `Delete "${activeSavedProfile.value.name}"? This saved mining profile cannot be restored.`
+    t('config.deleteConfirm', { name: activeSavedProfile.value.name })
   );
   if (!confirmed) {
     return;
@@ -400,8 +389,8 @@ onBeforeUnmount(() => {
 <template>
   <div class="app-page phone-page config-page">
     <header class="screen-heading">
-      <h1>Mining setup</h1>
-      <p>Wallet, pool connection, CPU settings, and device protection.</p>
+      <h1>{{ $t('config.title') }}</h1>
+      <p>{{ $t('config.subtitle') }}</p>
     </header>
     <div v-if="backendState !== 'ready'" class="notice">
       <MaterialIcon :name="backendStatus.icon" :size="20" />
@@ -410,18 +399,18 @@ onBeforeUnmount(() => {
         <p>{{ setupNoticeText }}</p>
       </div>
     </div>
-    <div class="setup-tabs" role="group" aria-label="Setup sections">
+    <div class="setup-tabs" role="group" :aria-label="$t('config.sections')">
       <button
         v-for="section in setupSections"
         :key="section.id"
         :aria-pressed="setupSection === section.id"
         @click="setupSection = section.id"
       >
-        {{ section.label }}
+        {{ $t(section.label) }}
       </button>
     </div>
     <div v-if="locked" class="notice">
-      <p>A run is active. Stop it from the dashboard before editing this setup.</p>
+      <p>{{ $t('config.locked') }}</p>
     </div>
     <fieldset :disabled="locked" class="config-fields">
       <section
@@ -430,23 +419,23 @@ onBeforeUnmount(() => {
       >
         <section class="surface setup-identity-fields">
           <div>
-            <h3 class="section-title">Mining currency</h3>
+            <h3 class="section-title">{{ $t('config.currency') }}</h3>
             <ConfigSelect
               :model-value="config.coin.id"
-              label="Coin"
+              :label="$t('config.coin')"
               :options="coinOptions"
-              :supporting-text="`Algorithm: ${config.algorithm}`"
+              :supporting-text="$t('config.algorithmLine', { algorithm: config.algorithm })"
               @update:model-value="handleCoinChange"
             />
           </div>
           <div>
-            <h3 class="section-title">Your wallet & worker</h3>
+            <h3 class="section-title">{{ $t('config.walletWorker') }}</h3>
             <ConfigInput
               v-model="config.walletAddress"
-              :error="validationVisible ? errors.wallet : ''"
-              :label="config.coin.symbol + ' wallet address'"
-              supporting-text="Use an address for the selected coin; your pool may accept a username."
-            /><ConfigInput v-model="config.workerName" label="Worker name" />
+              :error="validationVisible ? errorText(errors.wallet) : ''"
+              :label="$t('config.walletLabel', { symbol: config.coin.symbol })"
+              :supporting-text="$t('config.walletHint')"
+            /><ConfigInput v-model="config.workerName" :label="$t('config.workerName')" />
           </div>
         </section>
         <SavedSetupPicker
@@ -465,7 +454,9 @@ onBeforeUnmount(() => {
         <div class="flex min-h-14 items-center gap-3 px-4">
           <MaterialIcon class="text-app-green" name="hub" :size="21" />
           <div class="min-w-0">
-            <h2 class="text-[0.9375rem] font-semibold leading-5 text-app-on">Pool connection</h2>
+            <h2 class="text-[0.9375rem] font-semibold leading-5 text-app-on">
+              {{ $t('config.poolConnection') }}
+            </h2>
             <p class="mt-0.5 text-[0.75rem] leading-4 text-app-muted">{{ config.protocol }}</p>
           </div>
         </div>
@@ -473,31 +464,32 @@ onBeforeUnmount(() => {
           <div class="grid grid-cols-[1fr_96px] gap-2">
             <ConfigInput
               v-model="config.poolUrl"
-              label="Pool URL"
+              :label="$t('config.poolUrl')"
               inputmode="url"
-              :error="validationVisible ? errors.pool : ''"
+              :error="validationVisible ? errorText(errors.pool) : ''"
             />
             <ConfigInput
               v-model="config.poolPort"
-              label="Port"
+              :label="$t('config.port')"
               type="number"
               inputmode="numeric"
-              :error="validationVisible ? errors.port : ''"
+              :error="validationVisible ? errorText(errors.port) : ''"
             />
           </div>
           <ConfigInput
             v-model="config.password"
-            label="Password"
+            :label="$t('config.password')"
             type="password"
-            supporting-text="Leave blank if your pool does not require one"
+            :supporting-text="$t('config.passwordHint')"
             revealable
           />
           <ConfigSelect
             :model-value="config.protocol"
-            label="Protocol"
+            :label="$t('config.protocol')"
             :options="protocolSelectOptions"
             @update:model-value="handleProtocolChange"
           />
+          <PoolConnectionTest :config="config" />
         </div>
       </section>
 
@@ -507,19 +499,18 @@ onBeforeUnmount(() => {
       >
         <section class="surface">
           <div class="section-heading">
-            <h3>CPU allocation</h3>
-            <span class="supporting-label"
-              >{{ config.threadCount }} / {{ detectedThreadCount }} THREADS</span
-            >
+            <h3>{{ $t('config.cpuAllocation') }}</h3>
+            <span class="supporting-label">{{
+              $t('config.threadsBadge', { count: config.threadCount, total: detectedThreadCount })
+            }}</span>
           </div>
           <p class="section-copy">
-            {{ engineDescription }}. A lower thread count leaves more room for Android and usually
-            reduces heat.
+            {{ $t('config.cpuCopy', { engine: engineDescription }) }}
           </p>
           <div class="thread-stepper">
             <button
               class="outline-button"
-              aria-label="Decrease thread count"
+              :aria-label="$t('config.decreaseThreads')"
               :disabled="config.threadCount <= 1"
               @click="adjustThreads(-1)"
             >
@@ -527,11 +518,11 @@ onBeforeUnmount(() => {
             </button>
             <div>
               <strong>{{ config.threadCount }}</strong
-              ><small>worker threads</small>
+              ><small>{{ $t('config.workerThreads') }}</small>
             </div>
             <button
               class="outline-button"
-              aria-label="Increase thread count"
+              :aria-label="$t('config.increaseThreads')"
               :disabled="config.threadCount >= detectedThreadCount"
               @click="adjustThreads(1)"
             >
@@ -539,7 +530,7 @@ onBeforeUnmount(() => {
             </button>
           </div>
           <div class="section-heading">
-            <h3>Power profile</h3>
+            <h3>{{ $t('config.powerProfile') }}</h3>
             <span class="supporting-label">{{ selectedProfileLabel }}</span>
           </div>
           <div class="profile-options">
@@ -558,41 +549,39 @@ onBeforeUnmount(() => {
           </div>
         </section>
         <section class="surface">
-          <h3 class="section-title">CPU scheduling</h3>
+          <h3 class="section-title">{{ $t('config.scheduling') }}</h3>
           <ConfigSelect
             :model-value="config.priority"
-            label="Priority"
+            :label="$t('config.priority')"
             :options="prioritySelectOptions"
             @update:model-value="handlePriorityChange"
           /><ConfigSelect
             :model-value="config.affinity"
-            label="Core selection"
+            :label="$t('config.coreSelection')"
             :options="affinitySelectOptions"
             @update:model-value="handleAffinityChange"
           /><ToggleRow
             v-model="config.backgroundMining"
-            label="Allow background mining"
-            supporting-text="Keep the native protection service and Stop notification active when the app is hidden"
+            :label="$t('config.background')"
+            :supporting-text="$t('config.backgroundHint')"
           /><ToggleRow
             v-model="settings.performance.liteSessionMode"
-            label="Lite session view"
-            supporting-text="Hide secondary panels during a run"
+            :label="$t('settings.lite')"
+            :supporting-text="$t('config.liteHint')"
           />
         </section>
         <details class="surface">
-          <summary>XMRig donation options</summary>
-          <p class="section-copy">
-            These values are passed to XMRig; the installed binary controls its donation behavior.
-          </p>
+          <summary>{{ $t('config.donation') }}</summary>
+          <p class="section-copy">{{ $t('config.donationCopy') }}</p>
           <ConfigInput
             v-model="config.donateLevel"
-            label="Donation level"
+            :label="$t('config.donationLevel')"
             type="number"
             inputmode="numeric"
             suffix="%"
           /><ConfigSelect
             :model-value="String(config.donateOverProxy)"
-            label="Donate over proxy"
+            :label="$t('config.donateOverProxy')"
             :options="donateOverProxySelectOptions"
             @update:model-value="handleDonateOverProxyChange"
           />
@@ -603,50 +592,36 @@ onBeforeUnmount(() => {
         <div class="flex min-h-14 items-center gap-3 px-4">
           <MaterialIcon class="text-app-green" name="health_and_safety" :size="21" />
           <div class="min-w-0">
-            <h2 class="text-[0.9375rem] font-semibold leading-5 text-app-on">Device protection</h2>
+            <h2 class="text-[0.9375rem] font-semibold leading-5 text-app-on">
+              {{ $t('config.protection') }}
+            </h2>
             <p class="mt-0.5 text-[0.75rem] leading-4 text-app-muted">
-              Temperature and pause rules
+              {{ $t('config.protectionSub') }}
             </p>
           </div>
         </div>
         <div class="space-y-3 border-t border-app-line p-4">
-          <p class="section-copy">
-            The selected device sensor controls this limit. A separate battery reading of 45 °C or
-            Android severe thermal throttling always stops mining. If temperature or battery
-            readings are unavailable, mining cannot start.
-          </p>
-          <div class="rounded-lg bg-app-elevated p-3">
-            <div class="mb-2 flex items-center justify-between gap-3">
-              <span class="text-[0.875rem] leading-5 text-app-muted">Temperature limit</span>
-              <strong class="text-[0.9375rem] text-app-on">{{ config.thermalThreshold }} °C</strong>
-            </div>
-            <input
-              v-model.number="config.thermalThreshold"
-              aria-label="Temperature limit"
-              class="android-slider"
-              type="range"
-              min="20"
-              max="85"
-              step="1"
-            />
-            <p class="section-copy">
-              Current {{ device.thermalSource === 'battery' ? 'battery' : 'device' }} sensor:
-              {{ device.temperatureC === null ? 'Unavailable' : device.temperatureC + ' °C' }}. A
-              battery reading is not CPU temperature.
-            </p>
-            <div class="mt-1 flex justify-between text-caption text-app-muted" aria-hidden="true">
-              <span>20 °C</span><span>85 °C</span>
-            </div>
-          </div>
+          <p class="section-copy">{{ $t('config.protectionCopy') }}</p>
+          <p class="section-copy">{{ $t('config.limitsInSettings') }}</p>
+          <ConfigInput
+            v-model.number="config.maxDurationMinutes"
+            :label="$t('config.maxDuration')"
+            type="number"
+            :min="0"
+            :max="1440"
+            :error="errorText(errors.duration)"
+            inputmode="numeric"
+          />
+          <p class="section-copy">{{ $t('config.durationCopy') }}</p>
           <ToggleRow
             v-model="config.autoPauseScreenOff"
-            label="Pause when app is hidden"
-            supporting-text="Pause on app backgrounding, including screen lock"
+            :label="$t('config.pauseHidden')"
+            :supporting-text="$t('config.pauseHiddenHint')"
           />
           <ToggleRow
             v-model="config.autoPauseOnBattery"
-            label="Require external power for this setup"
-            supporting-text="Pause when unplugged; the charging-only rule in Settings also applies"
+            :label="$t('config.requirePower')"
+            :supporting-text="$t('config.requirePowerHint')"
           />
         </div>
       </section>

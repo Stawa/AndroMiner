@@ -6,6 +6,7 @@ import CoinIcon from '../components/CoinIcon.vue';
 import RecentRunCard from '../components/RecentRunCard.vue';
 import { formatSensor, formatHashrate } from '../utils/miningTelemetry';
 import { validateMiningSetup } from '../utils/configValidation';
+import { formatDate, formatDuration, t } from '../i18n';
 import type {
   DeviceTelemetry,
   MiningConfig,
@@ -37,33 +38,34 @@ const setupReady = computed(() => !Object.values(validateMiningSetup(props.confi
 const canStart = computed(() => ['ready', 'missing', 'error'].includes(props.backendState));
 const action = computed(() =>
   !setupReady.value
-    ? 'Complete setup'
+    ? t('dashboard.completeSetup')
     : props.backendState === 'missing'
-      ? 'Download & start'
+      ? t('dashboard.downloadStart')
       : props.backendState === 'error'
-        ? 'Try again'
-        : 'Start mining'
+        ? t('dashboard.tryAgain')
+        : t('dashboard.startMining')
 );
 const stateLabel = computed(
   () =>
     ({
-      checking: 'Checking engine',
-      ready: 'Ready',
-      missing: 'Download needed',
-      downloading: 'Downloading',
-      error: 'Needs attention',
-      'web-unavailable': 'Android required'
+      checking: t('dashboard.engineChecking'),
+      ready: t('dashboard.engineReady'),
+      missing: t('dashboard.engineMissing'),
+      downloading: t('dashboard.engineDownloading'),
+      error: t('dashboard.engineError'),
+      'web-unavailable': t('dashboard.engineWeb')
     })[props.backendState]
 );
-const duration = (s: number) => (s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`);
+const dateTime = (value: number | string): string =>
+  formatDate(value, { dateStyle: 'medium', timeStyle: 'short' });
 const remove = () => {
-  if (selected.value && window.confirm('Delete this completed session?')) {
+  if (selected.value && window.confirm(t('dashboard.confirmDelete'))) {
     emit('deleteSession', selected.value.id);
     selected.value = null;
   }
 };
 const clear = () => {
-  if (window.confirm('Clear all completed mining sessions?')) emit('clearSessions');
+  if (window.confirm(t('dashboard.confirmClear'))) emit('clearSessions');
 };
 const panel = ref<HTMLElement | null>(null);
 useDialogFocus(
@@ -80,7 +82,7 @@ useDialogFocus(
   >
     <header class="screen-heading overview-heading">
       <div>
-        <h1>Overview</h1>
+        <h1>{{ $t('nav.overview') }}</h1>
         <p>{{ config.coin.symbol }} · {{ config.algorithm }} · {{ config.workerName }}</p>
       </div>
       <span
@@ -92,21 +94,21 @@ useDialogFocus(
         >{{ stateLabel }}</span
       >
     </header>
-    <section class="overview-miner" aria-label="Mining control">
+    <section class="overview-miner" :aria-label="$t('dashboard.miningControl')">
       <div class="overview-coin">
         <CoinIcon :symbol="config.coin.symbol" :name="config.coin.name" :size="44" />
         <div>
           <h3>{{ config.coin.name }}</h3>
-          <p>{{ config.algorithm }} · CPU mining</p>
+          <p>{{ $t('dashboard.cpuMining', { algorithm: config.algorithm }) }}</p>
         </div>
       </div>
       <div class="overview-speed">
         <div>
-          <p class="metric-label">Current hashrate</p>
+          <p class="metric-label">{{ $t('dashboard.currentHashrate') }}</p>
           <strong>— <span>H/s</span></strong>
         </div>
         <div class="idle-explanation">
-          <span>No active session</span>
+          <span>{{ $t('dashboard.noSession') }}</span>
         </div>
       </div>
       <div class="action-row overview-actions">
@@ -116,126 +118,147 @@ useDialogFocus(
           @click="setupReady ? emit('start') : emit('configure')"
         >
           <MaterialIcon name="play_arrow" :size="21" />{{ action }}</button
-        ><button class="outline-button" aria-label="Edit mining setup" @click="emit('configure')">
+        ><button
+          class="outline-button"
+          :aria-label="$t('dashboard.editSetup')"
+          @click="emit('configure')"
+        >
           <MaterialIcon name="tune" :size="21" />
         </button>
       </div>
       <p class="overview-hint">
         {{
           !setupReady
-            ? 'Add your wallet and review the pool to get started.'
+            ? $t('dashboard.hintSetup')
             : backendState === 'web-unavailable'
-              ? 'Preview mode. Mining runs in the Android app.'
-              : 'Starting requires confirmation. Mining stays visible in Android notifications.'
+              ? $t('dashboard.hintPreview')
+              : $t('dashboard.hintStart')
         }}
       </p>
       <div v-if="backendState === 'error'" class="notice notice-error" role="alert">
         <MaterialIcon name="error" :size="19" />
         <div>
-          <strong>Miner needs attention</strong>
+          <strong>{{ $t('dashboard.minerAttention') }}</strong>
           <p>{{ backendMessage }}</p>
           <details v-if="logs.length">
-            <summary>Latest miner output</summary>
+            <summary>{{ $t('dashboard.latestOutput') }}</summary>
             <pre class="terminal">{{ logs.slice(-8).join('\n') }}</pre>
           </details>
         </div>
       </div>
     </section>
-    <section class="overview-device" aria-label="Device readings">
+    <section class="overview-device" :aria-label="$t('dashboard.deviceReadings')">
       <div class="section-heading">
-        <h3>Device</h3>
+        <h3>{{ $t('dashboard.device') }}</h3>
         <span class="supporting-label">{{
-          device.platform === 'web' ? 'Browser readings' : 'Native readings'
+          device.platform === 'web'
+            ? $t('dashboard.browserReadings')
+            : $t('dashboard.nativeReadings')
         }}</span>
       </div>
       <div class="device-tiles">
         <article>
-          <p>{{ device.thermalSource === 'battery' ? 'Battery temp' : 'Temperature' }}</p>
+          <p>
+            {{
+              device.thermalSource === 'battery'
+                ? $t('metric.batteryTemp')
+                : $t('metric.temperature')
+            }}
+          </p>
           <strong :data-unavailable="device.temperatureC === null">{{
             formatSensor(device.temperatureC, ' °C')
           }}</strong
           ><small>{{
-            device.temperatureC === null ? 'Sensor not available' : 'Device reading'
+            device.temperatureC === null
+              ? $t('dashboard.sensorMissing')
+              : $t('dashboard.deviceReading')
           }}</small>
         </article>
         <article>
-          <p>Battery</p>
+          <p>{{ $t('metric.battery') }}</p>
           <strong :data-unavailable="device.batteryLevel === null">{{
             formatSensor(device.batteryLevel, '%')
           }}</strong
           ><small>{{
             device.batteryLevel === null
-              ? 'No reading'
+              ? $t('dashboard.noReading')
               : device.isCharging
-                ? 'Charging'
-                : 'On battery'
+                ? $t('metric.charging')
+                : $t('dashboard.onBattery')
           }}</small>
         </article>
         <article>
-          <p>CPU threads</p>
+          <p>{{ $t('metric.cpuThreads') }}</p>
           <strong
             >{{ config.threadCount }} <span>/ {{ config.totalDetectedThreads }}</span></strong
-          ><small>Configured / detected</small>
+          ><small>{{ $t('dashboard.configuredDetected') }}</small>
         </article>
       </div>
     </section>
     <section class="setup-surface open-section">
       <div class="section-heading">
-        <h3>Connection setup</h3>
+        <h3>{{ $t('dashboard.connectionSetup') }}</h3>
         <button class="text-button" @click="emit('profiles')">
-          Profiles<MaterialIcon name="chevron_right" :size="18" />
+          {{ $t('nav.profiles') }}<MaterialIcon name="chevron_right" :size="18" />
         </button>
       </div>
       <div class="configuration-name">
         <div>
-          <strong>{{ activeProfile?.name || 'Unsaved setup' }}</strong>
-          <p>{{ config.threadCount }} CPU threads · {{ config.algorithm }}</p>
+          <strong>{{ activeProfile?.name || $t('dashboard.unsavedSetup') }}</strong>
+          <p>
+            {{
+              $t('dashboard.threadsAlgo', {
+                threads: config.threadCount,
+                algorithm: config.algorithm
+              })
+            }}
+          </p>
         </div>
       </div>
       <dl class="configuration-list">
         <div>
-          <dt>Pool</dt>
+          <dt>{{ $t('metric.pool') }}</dt>
           <dd>
             {{ config.poolUrl }}:{{ config.poolPort
-            }}<small>{{ connected ? 'Connected' : 'Not connected' }}</small>
+            }}<small>{{ connected ? $t('metric.connected') : $t('dashboard.notConnected') }}</small>
           </dd>
         </div>
         <div>
-          <dt>Wallet</dt>
+          <dt>{{ $t('metric.wallet') }}</dt>
           <dd>
             {{
               walletReady
                 ? config.walletAddress.length > 18
                   ? config.walletAddress.slice(0, 7) + '…' + config.walletAddress.slice(-6)
                   : config.walletAddress
-                : 'Add a wallet'
-            }}<small v-if="!walletReady">Required before mining</small>
+                : $t('dashboard.addWallet')
+            }}<small v-if="!walletReady">{{ $t('dashboard.walletRequired') }}</small>
           </dd>
         </div>
         <div>
-          <dt>Worker</dt>
+          <dt>{{ $t('metric.worker') }}</dt>
           <dd>{{ config.workerName }}</dd>
         </div>
       </dl>
       <button class="text-button configuration-edit" @click="emit('configure')">
-        Review configuration<MaterialIcon name="arrow_forward" :size="18" />
+        {{ $t('dashboard.reviewConfig') }}<MaterialIcon name="arrow_forward" :size="18" />
       </button>
     </section>
     <section class="open-section recent-surface" aria-labelledby="recent-runs-title">
       <div class="section-heading">
         <div>
-          <h3 id="recent-runs-title">Recent runs</h3>
-          <p class="mt-1 text-caption text-app-muted">Your latest completed mining sessions.</p>
+          <h3 id="recent-runs-title">{{ $t('dashboard.recentRuns') }}</h3>
+          <p class="mt-1 text-caption text-app-muted">{{ $t('dashboard.recentSub') }}</p>
         </div>
         <button class="text-button" @click="emit('statistics')">
-          All runs <MaterialIcon name="arrow_forward" :size="18" />
+          {{ $t('dashboard.allRuns') }} <MaterialIcon name="arrow_forward" :size="18" />
         </button>
       </div>
       <div v-if="!sessionHistory.length" class="empty-run-message">
         <div class="min-w-0">
-          <strong class="text-sm font-semibold">No completed runs yet</strong>
+          <strong class="text-sm font-semibold">{{ $t('dashboard.noRuns') }}</strong>
           <p class="mt-1 max-w-prose text-caption text-app-muted">
-            Stop a mining session to save its duration, measured speed, and share results here.
+            {{ $t('dashboard.noRunsBody') }}
           </p>
         </div>
       </div>
@@ -252,10 +275,15 @@ useDialogFocus(
           class="mt-4 flex flex-wrap items-center justify-between gap-x-4 border-t border-app-line pt-2"
         >
           <p class="text-[0.75rem] text-app-muted">
-            Showing {{ Math.min(sessionHistory.length, 3) }} of {{ sessionHistory.length }} runs
+            {{
+              $t('dashboard.showing', {
+                shown: Math.min(sessionHistory.length, 3),
+                total: sessionHistory.length
+              })
+            }}
           </p>
           <button class="text-button text-app-muted" @click="clear">
-            <MaterialIcon name="delete_sweep" :size="18" />Clear history
+            <MaterialIcon name="delete_sweep" :size="18" />{{ $t('dashboard.clearHistory') }}
           </button>
         </div>
       </template>
@@ -272,38 +300,52 @@ useDialogFocus(
         class="detail-sheet"
         role="dialog"
         aria-modal="true"
-        aria-label="Session details"
+        :aria-label="$t('run.details')"
       >
         <div class="section-heading">
-          <h3>{{ selected.coinSymbol }} session</h3>
+          <h3>{{ $t('run.sessionTitle', { symbol: selected.coinSymbol }) }}</h3>
           <button
             class="outline-button"
-            aria-label="Close session details"
+            :aria-label="$t('run.closeDetails')"
             autofocus
             @click="selected = null"
           >
             <MaterialIcon name="close" :size="20" />
           </button>
         </div>
+        <p v-if="selected.endReason" class="section-copy" role="status">{{ selected.endReason }}</p>
         <dl class="definition-list">
           <div>
-            <dt>Ended</dt>
-            <dd>{{ new Date(selected.endedAt).toLocaleString() }}</dd>
+            <dt>{{ $t('run.ended') }}</dt>
+            <dd>{{ dateTime(selected.endedAt) }}</dd>
           </div>
           <div>
-            <dt>Duration</dt>
-            <dd>{{ duration(selected.durationSeconds) }}</dd>
+            <dt>{{ $t('run.duration') }}</dt>
+            <dd>{{ formatDuration(selected.durationSeconds) }}</dd>
           </div>
           <div>
-            <dt>Average</dt>
-            <dd>{{ formatHashrate(selected.averageHashrate) }}</dd>
+            <dt>{{ $t('run.avgRecorded') }}</dt>
+            <dd>
+              {{ formatHashrate(selected.averageHashrate)
+              }}<small v-if="selected.sampleCount !== undefined">
+                ·
+                {{
+                  $t('run.samplesWindow', {
+                    count: selected.sampleCount,
+                    seconds: selected.sampleWindowSeconds
+                  })
+                }}</small
+              >
+            </dd>
           </div>
           <div>
-            <dt>Accepted / rejected</dt>
+            <dt>{{ $t('run.acceptedRejected') }}</dt>
             <dd>{{ selected.acceptedShares }} / {{ selected.rejectedShares }}</dd>
           </div>
         </dl>
-        <button class="outline-button danger-text" @click="remove">Delete session</button>
+        <button class="outline-button danger-text" @click="remove">
+          {{ $t('dashboard.deleteSession') }}
+        </button>
       </section>
     </div>
   </div>

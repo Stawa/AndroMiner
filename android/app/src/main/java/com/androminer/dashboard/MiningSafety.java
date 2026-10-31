@@ -13,7 +13,12 @@ final class MiningSafety {
             boolean chargingOnly) {
         if (thermalStatus >= 3)
             return "Android reports severe thermal throttling. Let the device cool.";
-        if (temperature == null || batteryPercent == null)
+        if (temperature == null
+                || !Double.isFinite(temperature)
+                || batteryPercent == null
+                || !Double.isFinite(batteryPercent)
+                || batteryPercent < 0
+                || batteryPercent > 100)
             return "Required temperature or battery reading is unavailable. Mining stopped for protection.";
         if (temperature >= threshold) return "Temperature limit reached (" + threshold + " °C).";
         // A CPU or case sensor must never mask an overheating battery.

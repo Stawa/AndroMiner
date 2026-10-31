@@ -2,6 +2,7 @@ import { computed, readonly, ref } from 'vue';
 import { Browser } from '@capacitor/browser';
 import { Capacitor } from '@capacitor/core';
 import { useAppVersion } from './useAppVersion';
+import { t } from '../i18n';
 
 type GitHubUpdateStatus = 'idle' | 'checking' | 'ready' | 'up-to-date' | 'error';
 
@@ -32,7 +33,7 @@ const {
   version: currentVersion
 } = useAppVersion();
 const status = ref<GitHubUpdateStatus>('idle');
-const message = ref('Ready to check GitHub releases.');
+const message = ref(t('updates.msgReady'));
 const availableVersion = ref('');
 const releaseUrl = ref('');
 const releaseName = ref('');
@@ -51,7 +52,7 @@ const getErrorMessage = (error: unknown): string => {
     return error;
   }
 
-  return 'Unable to check GitHub releases.';
+  return t('updates.msgUnable');
 };
 
 const normalizeVersion = (value: string): string => value.trim().replace(/^v/i, '');
@@ -119,15 +120,15 @@ const formatAssetLabel = (asset: GitHubReleaseAsset): string => {
   const name = asset.name.toLowerCase();
 
   if (name.includes('-tls-')) {
-    return 'TLS bundled APK';
+    return t('updates.assetTls');
   }
 
   if (name.includes('-notls-')) {
-    return 'No-TLS bundled APK';
+    return t('updates.assetNoTls');
   }
 
   if (name.includes('-download-')) {
-    return 'Downloader APK';
+    return t('updates.assetDownloader');
   }
 
   return asset.name;
@@ -141,7 +142,7 @@ const fetchLatestRelease = async (): Promise<GitHubRelease> => {
   });
 
   if (!response.ok) {
-    throw new Error(`GitHub returned HTTP ${response.status}.`);
+    throw new Error(t('updates.msgHttp', { status: response.status }));
   }
 
   return (await response.json()) as GitHubRelease;
@@ -149,7 +150,7 @@ const fetchLatestRelease = async (): Promise<GitHubRelease> => {
 
 const performUpdateCheck = async (): Promise<void> => {
   status.value = 'checking';
-  message.value = 'Checking GitHub releases...';
+  message.value = t('updates.msgChecking');
 
   try {
     await refreshAppVersion();
@@ -165,7 +166,7 @@ const performUpdateCheck = async (): Promise<void> => {
 
     if (assets.length === 0) {
       status.value = 'error';
-      message.value = `GitHub release ${release.tag_name} does not include APK assets.`;
+      message.value = t('updates.msgNoApk', { tag: release.tag_name });
       return;
     }
 
@@ -175,18 +176,18 @@ const performUpdateCheck = async (): Promise<void> => {
 
     if (comparison === null) {
       status.value = 'ready';
-      message.value = `Latest GitHub release is ${release.tag_name}.`;
+      message.value = t('updates.msgLatest', { tag: release.tag_name });
       return;
     }
 
     if (comparison > 0) {
       status.value = 'ready';
-      message.value = `Version ${release.tag_name} is available on GitHub.`;
+      message.value = t('updates.msgAvailable', { tag: release.tag_name });
       return;
     }
 
     status.value = 'up-to-date';
-    message.value = `AndroMiner is up to date with ${release.tag_name}.`;
+    message.value = t('updates.msgUpToDate', { tag: release.tag_name });
   } catch (error: unknown) {
     status.value = 'error';
     message.value = getErrorMessage(error);

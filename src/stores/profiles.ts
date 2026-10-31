@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { t } from '../i18n';
 import { getCryptocurrencyById } from '../data/miningCatalog';
 import type {
   CpuAffinity,
@@ -27,6 +28,7 @@ const cloneConfig = (config: MiningConfig): MiningConfig => {
 
   return {
     ...config,
+    maxDurationMinutes: config.maxDurationMinutes ?? 0,
     hardwareMode: normalizeHardwareMode(config.hardwareMode),
     affinity: normalizeCpuAffinity(config.affinity),
     coin: { ...catalogCoin, poolExamples: [...(catalogCoin.poolExamples || [])] }
@@ -83,8 +85,7 @@ export const useProfilesStore = defineStore('profiles', {
         localStorage.setItem(`${profilesKey}:active`, this.activeProfileId);
         this.storageError = '';
       } catch {
-        this.storageError =
-          'Could not save your setup on this device. Export a copy before closing the app.';
+        this.storageError = t('profiles.storageError');
       }
     },
     saveFromConfig(name: string, config: MiningConfig): SavedMiningProfile {

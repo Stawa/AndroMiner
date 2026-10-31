@@ -74,6 +74,21 @@ public class DeviceStatusPlugin extends Plugin {
 
     static String safetyViolation(
             Context context, JSObject config, int batteryFloor, boolean chargingOnly) {
+        return safetyObservation(context, config, batteryFloor, chargingOnly).reason;
+    }
+
+    static final class SafetyObservation {
+        final String reason;
+        final JSObject details;
+
+        SafetyObservation(String reason, JSObject details) {
+            this.reason = reason;
+            this.details = details;
+        }
+    }
+
+    static SafetyObservation safetyObservation(
+            Context context, JSObject config, int batteryFloor, boolean chargingOnly) {
         DeviceStatusPlugin reader = new DeviceStatusPlugin();
         Intent battery =
                 context.registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
@@ -82,18 +97,40 @@ public class DeviceStatusPlugin extends Plugin {
         PowerManager power = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
         int severity =
                 Build.VERSION.SDK_INT >= 29 && power != null ? power.getCurrentThermalStatus() : 0;
-        if (config.optBoolean("autoPauseScreenOff", false)
+        String reason =
+                MiningSafety.violation(
+                        reading == null ? null : reading.valueC,
+                        reader.getBatteryTemperatureC(battery),
+                        level == null ? null : level * 100,
+                        reader.isCharging(battery),
+                        severity,
+                        Math.max(20, Math.min(85, config.getInteger("thermalThreshold", 42))),
+                        Math.max(10, Math.min(60, batteryFloor)),
+                        chargingOnly);
+        if (reason == null
+                && config.optBoolean("autoPauseScreenOff", false)
                 && power != null
-                && !power.isInteractive()) return "Mining paused when the screen turned off.";
-        return MiningSafety.violation(
-                reading == null ? null : reading.valueC,
-                reader.getBatteryTemperatureC(battery),
-                level == null ? null : level * 100,
-                reader.isCharging(battery),
-                severity,
-                Math.max(20, Math.min(85, config.getInteger("thermalThreshold", 42))),
-                Math.max(10, Math.min(60, batteryFloor)),
-                chargingOnly);
+                && !power.isInteractive()) reason = "Mining paused when the screen turned off.";
+        JSObject details = new JSObject();
+        details.put("at", System.currentTimeMillis());
+        details.put("temperatureC", reading == null ? org.json.JSONObject.NULL : reading.valueC);
+        details.put("temperatureSource", reading == null ? "unavailable" : reading.source);
+        details.put("sensorName", reading == null ? org.json.JSONObject.NULL : reading.sensorName);
+        Double batteryTemperature = reader.getBatteryTemperatureC(battery);
+        details.put(
+                "batteryTemperatureC",
+                batteryTemperature == null ? org.json.JSONObject.NULL : batteryTemperature);
+        details.put("batteryPercent", level == null ? org.json.JSONObject.NULL : level * 100);
+        details.put("charging", reader.isCharging(battery));
+        details.put(
+                "thermalStatus", Build.VERSION.SDK_INT >= 29 ? severity : org.json.JSONObject.NULL);
+        details.put(
+                "temperatureLimitC",
+                Math.max(20, Math.min(85, config.optInt("thermalThreshold", 42))));
+        details.put("batteryFloorPercent", Math.max(10, Math.min(60, batteryFloor)));
+        details.put("chargingOnly", chargingOnly);
+        details.put("action", reason == null ? "continue" : "stop");
+        return new SafetyObservation(reason, details);
     }
 
     private boolean isCharging(Intent batteryIntent) {

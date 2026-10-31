@@ -19,10 +19,19 @@ import java.util.concurrent.TimeUnit;
 
 /** Keeps protection and the emergency stop available when the WebView is suspended. */
 public class MiningGuardService extends Service {
+    private static NativeMiningRuntime runtime;
+
+    static synchronized NativeMiningRuntime runtime(Context context) {
+        if (runtime == null) runtime = new NativeMiningRuntime(context);
+        return runtime;
+    }
+
     interface Session {
         String check();
 
         void stop(String reason);
+
+        String label();
     }
 
     private static final String CHANNEL = "androminer_session_guard";
@@ -35,6 +44,8 @@ public class MiningGuardService extends Service {
     private ScheduledExecutorService watchdog;
     private Session owner;
     private boolean watching;
+    private NotificationCompat.Builder notification;
+    private String lastLabel = "Starting";
 
     static boolean notificationsEnabled(Context context) {
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return false;
@@ -111,21 +122,21 @@ public class MiningGuardService extends Service {
                             1,
                             new Intent(this, MiningGuardService.class).setAction(STOP),
                             PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
-            android.app.Notification notification =
+            notification =
                     new NotificationCompat.Builder(this, CHANNEL)
                             .setSmallIcon(R.drawable.ic_mining_notification)
-                            .setContentTitle("AndroMiner · mining active")
+                            .setContentTitle("AndroMiner · Starting")
                             .setContentText(
                                     "CPU mining with native device protection. Tap Stop to end the run.")
                             .setContentIntent(open)
                             .setOngoing(true)
                             .setSilent(true)
-                            .addAction(R.drawable.ic_mining_notification, "Stop mining", stop)
-                            .build();
+                            .addAction(R.drawable.ic_mining_notification, "Stop mining", stop);
             if (Build.VERSION.SDK_INT >= 34) {
-                startForeground(ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+                startForeground(
+                        ID, notification.build(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
             } else {
-                startForeground(ID, notification);
+                startForeground(ID, notification.build());
             }
             CompletableFuture<Void> pending = ready;
             if (pending != null) pending.complete(null);
@@ -138,6 +149,15 @@ public class MiningGuardService extends Service {
                             try {
                                 String reason = owner.check();
                                 if (reason != null) requestStop(reason);
+                                String label = owner.label();
+                                if (session == owner && !lastLabel.equals(label)) {
+                                    lastLabel = label;
+                                    manager.notify(
+                                            ID,
+                                            notification
+                                                    .setContentTitle("AndroMiner · " + label)
+                                                    .build());
+                                }
                             } catch (RuntimeException failure) {
                                 requestStop(
                                         "Device protection could not read sensors. Mining stopped.");

@@ -21,20 +21,20 @@ const emit = defineEmits<{
 }>();
 
 const items: NavItem[] = [
-  { id: 'dashboard', label: 'Overview', icon: 'speed' },
-  { id: 'mining', label: 'Miner', icon: 'tune' },
-  { id: 'statistics', label: 'History', icon: 'history' },
-  { id: 'settings', label: 'Settings', icon: 'settings' }
+  { id: 'dashboard', label: 'nav.overview', icon: 'speed' },
+  { id: 'mining', label: 'nav.miner', icon: 'tune' },
+  { id: 'statistics', label: 'nav.history', icon: 'history' },
+  { id: 'settings', label: 'nav.settings', icon: 'settings' }
 ];
 const secondaryItems: NavItem[] = [
-  { id: 'profiles', label: 'Profiles', icon: 'tune' },
-  { id: 'help', label: 'Help', icon: 'help' },
-  { id: 'about', label: 'About', icon: 'info' }
+  { id: 'profiles', label: 'nav.profiles', icon: 'tune' },
+  { id: 'help', label: 'nav.help', icon: 'help' },
+  { id: 'about', label: 'nav.about', icon: 'info' }
 ];
 </script>
 
 <template>
-  <nav class="app-bottom-nav" aria-label="Main navigation">
+  <nav class="app-bottom-nav" :aria-label="$t('nav.main')">
     <div
       class="nav-primary mx-auto grid h-18 max-w-phone grid-cols-4 px-2 md:flex md:h-auto md:flex-col md:gap-1.5"
     >
@@ -50,7 +50,7 @@ const secondaryItems: NavItem[] = [
         <span class="bottom-nav-icon grid h-8 w-14 place-items-center rounded-control md:w-12">
           <MaterialIcon :name="item.icon" :size="21" :filled="modelValue === item.id" />
         </span>
-        <span class="max-w-full break-words text-center">{{ item.label }}</span>
+        <span class="max-w-full break-words text-center">{{ $t(item.label) }}</span>
       </button>
     </div>
     <div
@@ -66,7 +66,7 @@ const secondaryItems: NavItem[] = [
       >
         <span class="bottom-nav-icon grid h-8 w-14 place-items-center rounded-control md:w-12"
           ><MaterialIcon :name="item.icon" :size="21" /></span
-        ><span>{{ item.label }}</span>
+        ><span>{{ $t(item.label) }}</span>
       </button>
     </div>
   </nav>

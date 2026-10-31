@@ -904,26 +904,170 @@ input:focus-visible + .md-switch {
   outline: 2px solid rgb(var(--color-app-green));
   outline-offset: 4px;
 }
-.slider-field {
-  padding: 16px 0;
-  border-block: 1px solid rgb(var(--color-app-line));
+.range-slider {
+  padding: 14px 16px 10px;
+  border-radius: 14px;
+  background: rgb(var(--color-app-elevated));
 }
-.slider-field label {
+.range-slider.is-disabled {
+  opacity: 0.55;
+}
+.range-slider-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.range-slider-label {
+  font-size: 0.8125rem;
+  color: rgb(var(--color-app-muted));
+}
+.range-slider-value {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgb(var(--color-app-green) / 0.16);
+  color: rgb(var(--color-app-green));
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+.range-slider-input {
+  --track: 6px;
+  --thumb: 22px;
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
+  width: 100%;
+  height: 44px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.range-slider-input:disabled {
+  cursor: not-allowed;
+}
+.range-slider-input::-webkit-slider-runnable-track {
+  height: var(--track);
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    rgb(var(--color-app-green)) var(--fill),
+    rgb(var(--color-app-line)) var(--fill)
+  );
+}
+.range-slider-input::-moz-range-track {
+  height: var(--track);
+  border-radius: 999px;
+  background: rgb(var(--color-app-line));
+}
+.range-slider-input::-moz-range-progress {
+  height: var(--track);
+  border-radius: 999px;
+  background: rgb(var(--color-app-green));
+}
+.range-slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: var(--thumb);
+  height: var(--thumb);
+  margin-top: calc((var(--track) - var(--thumb)) / 2);
+  border-radius: 50%;
+  border: 4px solid rgb(var(--color-app-green));
+  background: rgb(var(--color-app-card));
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+  transition: transform 0.15s ease;
+}
+.range-slider-input::-moz-range-thumb {
+  box-sizing: border-box;
+  width: var(--thumb);
+  height: var(--thumb);
+  border-radius: 50%;
+  border: 4px solid rgb(var(--color-app-green));
+  background: rgb(var(--color-app-card));
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+}
+.range-slider-input:active::-webkit-slider-thumb {
+  transform: scale(1.18);
+}
+.range-slider-input:focus-visible {
+  outline: 2px solid rgb(var(--color-app-green));
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+.range-slider-scale {
   display: flex;
   justify-content: space-between;
-  font-size: 0.8125rem;
+  font-size: 0.6875rem;
+  color: rgb(var(--color-app-muted));
 }
-.slider-field p {
+.power-group {
+  display: grid;
+  gap: 12px;
+  margin-top: 4px;
+}
+.power-group > .section-copy {
+  margin: 0;
+}
+.sensor-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgb(var(--color-app-elevated));
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+  color: rgb(var(--color-app-muted));
+}
+.sensor-chip .material-symbols-rounded {
+  color: rgb(var(--color-app-green));
+}
+.language-list {
+  display: grid;
+  gap: 8px;
+}
+.language-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1.5px solid rgb(var(--color-app-line));
+  text-align: left;
+}
+.language-option[aria-checked='true'] {
+  border-color: rgb(var(--color-app-green));
+  background: rgb(var(--color-app-green) / 0.1);
+}
+.language-option-text {
+  min-width: 0;
+  flex: 1;
+}
+.language-option-name {
+  display: block;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: rgb(var(--color-app-on));
+}
+.language-option-sub {
+  display: block;
   font-size: 0.75rem;
   color: rgb(var(--color-app-muted));
-  margin-top: 8px;
 }
-.android-slider {
-  width: 100%;
-  min-width: 0;
-  height: 44px;
-  accent-color: rgb(var(--color-app-green));
-  cursor: pointer;
+.language-option-code {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgb(var(--color-app-elevated));
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgb(var(--color-app-muted));
+}
+.language-option[aria-checked='true'] .language-option-code {
+  background: rgb(var(--color-app-green));
+  color: rgb(var(--color-app-card));
 }
 details > summary {
   min-height: 48px;

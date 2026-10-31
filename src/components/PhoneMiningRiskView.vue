@@ -6,31 +6,28 @@ const emit = defineEmits<{
 }>();
 
 const summaryItems = [
-  { label: 'Return', value: 'Tiny' },
-  { label: 'Heat load', value: 'Sustained' },
-  { label: 'Device', value: 'Spare only' }
+  { label: 'risk.factReturn', value: 'risk.factReturnValue' },
+  { label: 'risk.factHeat', value: 'risk.factHeatValue' },
+  { label: 'risk.factDevice', value: 'risk.factDeviceValue' }
 ];
 
 const risks = [
   {
     icon: 'trending_down',
-    tag: 'Economics',
-    title: 'Poor return',
-    body: 'Phone hashrate is tiny compared with dedicated mining hardware.',
+    title: 'risk.returnTitle',
+    body: 'risk.returnBody',
     tone: 'bg-app-yellow/15 text-app-yellow'
   },
   {
     icon: 'device_thermostat',
-    tag: 'Thermals',
-    title: 'Thermal stress',
-    body: 'Sustained heat can damage the battery, screen, storage, or mainboard.',
+    title: 'risk.thermalTitle',
+    body: 'risk.thermalBody',
     tone: 'bg-red-500/15 text-red-600 dark:text-red-300'
   },
   {
     icon: 'battery_alert',
-    tag: 'Battery',
-    title: 'Battery wear',
-    body: 'Charging while hot can accelerate aging, swelling, or failure.',
+    title: 'risk.batteryTitle',
+    body: 'risk.batteryBody',
     tone: 'bg-orange-500/15 text-orange-700 dark:text-orange-300'
   }
 ];
@@ -38,18 +35,18 @@ const risks = [
 const safeguards = [
   {
     icon: 'phonelink_erase',
-    title: 'Use an old phone',
-    body: 'Do not mine on a daily driver or a device with important data.'
+    title: 'risk.oldPhoneTitle',
+    body: 'risk.oldPhoneBody'
   },
   {
     icon: 'air',
-    title: 'Keep airflow open',
-    body: 'Use a flat, ventilated surface and stop if the case gets hot.'
+    title: 'risk.airflowTitle',
+    body: 'risk.airflowBody'
   },
   {
     icon: 'speed',
-    title: 'Start at low intensity',
-    body: 'Begin with conservative threads and watch temperature before raising load.'
+    title: 'risk.lowTitle',
+    body: 'risk.lowBody'
   }
 ];
 </script>
@@ -57,17 +54,17 @@ const safeguards = [
 <template>
   <main class="onboarding-page redesign-page">
     <header class="screen-heading">
-      <h1>Before you mine</h1>
-      <p>AndroMiner runs CPU mining on your phone. Review the risks before setting up a run.</p>
+      <h1>{{ $t('risk.title') }}</h1>
+      <p>{{ $t('risk.intro') }}</p>
     </header>
     <section class="risk-banner">
       <MaterialIcon name="warning" :size="28" />
-      <h3>Mining can permanently damage a phone</h3>
-      <p>Use a spare device, start gently, and keep every test supervised.</p>
+      <h3>{{ $t('risk.bannerTitle') }}</h3>
+      <p>{{ $t('risk.bannerBody') }}</p>
       <div class="risk-facts">
         <span v-for="item in summaryItems" :key="item.label"
-          ><small>{{ item.label }}</small
-          ><strong>{{ item.value }}</strong></span
+          ><small>{{ $t(item.label) }}</small
+          ><strong>{{ $t(item.value) }}</strong></span
         >
       </div>
     </section>
@@ -75,23 +72,23 @@ const safeguards = [
       <article v-for="risk in risks" :key="risk.title" class="risk-row">
         <MaterialIcon :name="risk.icon" :size="23" />
         <div>
-          <strong>{{ risk.title }}</strong>
-          <p>{{ risk.body }}</p>
+          <strong>{{ $t(risk.title) }}</strong>
+          <p>{{ $t(risk.body) }}</p>
         </div>
       </article>
     </section>
     <section>
-      <h3 class="section-title">A safer starting point</h3>
+      <h3 class="section-title">{{ $t('risk.safeTitle') }}</h3>
       <article v-for="item in safeguards" :key="item.title" class="risk-row">
         <MaterialIcon :name="item.icon" :size="21" />
         <div>
-          <strong>{{ item.title }}</strong>
-          <p>{{ item.body }}</p>
+          <strong>{{ $t(item.title) }}</strong>
+          <p>{{ $t(item.body) }}</p>
         </div>
       </article>
     </section>
     <button class="primary-button" @click="emit('continue')">
-      I understand · check my device<MaterialIcon name="arrow_forward" :size="20" />
+      {{ $t('risk.continue') }}<MaterialIcon name="arrow_forward" :size="20" />
     </button>
   </main>
 </template>

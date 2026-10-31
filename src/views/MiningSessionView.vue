@@ -11,6 +11,7 @@ import { profilePresets } from '../composables/useMiningController';
 import { useSheetDrag } from '../composables/useSheetDrag';
 import { useDialogFocus } from '../composables/useDialogFocus';
 import { useSettingsStore } from '../stores/settings';
+import { formatDate, formatDuration, formatNumber, t } from '../i18n';
 import type {
   DeviceTelemetry,
   HistoryPoint,
@@ -70,29 +71,17 @@ const speedLabel = computed(() =>
   props.stats.sampleState === 'live'
     ? formatHashrate(props.stats.hashrate)
     : props.stats.sampleState === 'stale'
-      ? 'Stale'
+      ? t('session.stale')
       : props.stats.sampleState === 'inactive'
-        ? 'Stopped'
-        : 'Waiting'
+        ? t('state.idle')
+        : t('session.waiting')
 );
-const minerStateLabel = computed(
-  () =>
-    ({
-      idle: 'Stopped',
-      starting: 'Starting',
-      mining: 'Running',
-      reconnecting: 'Reconnecting',
-      pausing: 'Pausing',
-      paused: 'Paused',
-      stopping: 'Stopping',
-      error: 'Error'
-    })[props.state]
-);
+const minerStateLabel = computed(() => t(`state.${props.state}`));
 const poolAddress = computed(() => `${props.config.poolUrl}:${props.config.poolPort}`);
 const totalHashesLabel = computed(() => {
   const results = asRecord(props.apiTelemetry.results);
   const totalHashes = readNumber(results, 'hashes_total');
-  if (totalHashes === null) return 'Unsupported';
+  if (totalHashes === null) return t('session.unsupported');
 
   if (totalHashes >= 1_000_000_000) {
     return `${(totalHashes / 1_000_000_000).toFixed(2)}B`;
@@ -106,7 +95,7 @@ const totalHashesLabel = computed(() => {
     return `${(totalHashes / 1_000).toFixed(1)}K`;
   }
 
-  return Math.round(totalHashes).toLocaleString();
+  return formatNumber(Math.round(totalHashes));
 });
 const thermalTone = computed(() =>
   props.stats.temperature !== null && props.stats.temperature >= props.config.thermalThreshold - 5
@@ -114,9 +103,7 @@ const thermalTone = computed(() =>
     : 'normal'
 );
 const batterySafetyLimit = computed(() => settings.batterySafety.stopBelowPercent);
-const profileLabel = computed(
-  () => profilePresets.find((preset) => preset.id === props.config.profile)?.label || 'Profile'
-);
+const profileLabel = computed(() => t(`profile.${props.config.profile}`));
 
 const classifyLogLine = (line: string): LogTone => {
   const normalized = line.toLowerCase();
@@ -150,14 +137,18 @@ const toLogRows = (lines: string[], prefix: string) =>
 const latestLogs = computed(() => toLogRows(props.logs.slice(-12).reverse(), 'latest'));
 const detailLogs = computed(() => toLogRows(props.logs.slice().reverse(), 'detail'));
 const latestLogCountLabel = computed(() =>
-  latestLogs.value.length > 0 ? `${latestLogs.value.length} latest` : 'waiting'
+  latestLogs.value.length > 0
+    ? t('session.latestCount', { count: latestLogs.value.length })
+    : t('session.waiting').toLowerCase()
 );
 const telemetrySourceLabel = computed(() =>
-  props.apiTelemetry.available ? 'XMRig HTTP API' : 'Log parser'
+  props.apiTelemetry.available ? 'XMRig HTTP API' : t('session.logParser')
 );
 
 const telemetryEndpointLabel = computed(() =>
-  props.apiTelemetry.port > 0 ? `${props.apiTelemetry.host}:${props.apiTelemetry.port}` : 'Inactive'
+  props.apiTelemetry.port > 0
+    ? `${props.apiTelemetry.host}:${props.apiTelemetry.port}`
+    : t('session.inactive')
 );
 const showingPreparation = computed(
   () =>
@@ -166,25 +157,25 @@ const showingPreparation = computed(
 );
 const preparationTitle = computed(() => {
   if (props.connected) {
-    return 'Collecting first speed';
+    return t('session.collecting');
   }
 
   if (props.state === 'mining') {
-    return 'Waiting for pool work';
+    return t('session.waitingWork');
   }
 
-  return 'Preparing miner';
+  return t('session.preparing');
 });
 const preparationDetail = computed(() => {
   if (props.connected) {
-    return 'Waiting for the first hashrate sample.';
+    return t('session.collectingDetail');
   }
 
   if (props.state === 'mining') {
-    return 'Opening the pool connection and waiting for work.';
+    return t('session.waitingWorkDetail');
   }
 
-  return 'Applying CPU settings and starting XMRig.';
+  return t('session.preparingDetail');
 });
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -206,13 +197,10 @@ const firstPositiveNumber = (...values: Array<number | null | undefined>): numbe
 
 const formatCompactNumber = (value: number | null): string => {
   if (value === null) {
-    return 'Unknown';
+    return t('common.unknown');
   }
 
-  return new Intl.NumberFormat('en', {
-    notation: 'compact',
-    maximumFractionDigits: 1
-  }).format(value);
+  return formatNumber(value, { notation: 'compact', maximumFractionDigits: 1 });
 };
 
 const formatCpuUsage = (value: number | null | undefined): string =>
@@ -229,46 +217,36 @@ const logToneClass = (tone: LogTone): string => {
   return classes[tone];
 };
 
-const cpuHardwareName = computed(() => props.device.cpuName || props.device.model || 'Android CPU');
+const cpuHardwareName = computed(
+  () => props.device.cpuName || props.device.model || t('device.androidCpu')
+);
 const engineLabel = 'XMRig CPU Miner';
 
-const affinityLabel = computed(() => {
-  const labels: Record<MiningConfig['affinity'], string> = {
-    auto: 'All cores',
-    little: 'Efficiency cores',
-    big: 'Performance cores',
-    custom: 'Custom affinity'
-  };
+const affinityLabel = computed(() => t(`affinity.${props.config.affinity}`));
 
-  return labels[props.config.affinity];
-});
+const priorityLabel = computed(() => t(`priority.${props.config.priority}Label`));
 
-const priorityLabel = computed(() => {
-  const labels: Record<MiningConfig['priority'], string> = {
-    low: 'Low priority',
-    normal: 'Normal priority',
-    high: 'High priority'
-  };
-
-  return labels[props.config.priority];
-});
-
-const cpuWorkerLabel = computed(
-  () => `${props.config.threadCount}/${props.config.totalDetectedThreads} CPU threads`
+const cpuWorkerLabel = computed(() =>
+  t('session.cpuWorkers', {
+    count: props.config.threadCount,
+    total: props.config.totalDetectedThreads
+  })
 );
-const cpuTuningLabel = computed(() => `${affinityLabel.value} · ${priorityLabel.value}`);
+const cpuTuningLabel = computed(() =>
+  t('session.cpuTuning', { affinity: affinityLabel.value, priority: priorityLabel.value })
+);
 
 const apiResults = computed(() => asRecord(props.apiTelemetry.results));
 const apiConnection = computed(() => asRecord(props.apiTelemetry.connection));
 const powerDrawLabel = computed(() =>
   typeof props.device.powerDrawW === 'number' && Number.isFinite(props.device.powerDrawW)
     ? `${props.device.powerDrawW.toFixed(2)} W`
-    : 'Unavailable'
+    : t('common.unavailable')
 );
 const frequencyMhzLabel = computed(() =>
   typeof props.device.cpuClockGhz === 'number' && Number.isFinite(props.device.cpuClockGhz)
-    ? `${Math.round(props.device.cpuClockGhz * 1000).toLocaleString()} MHz`
-    : 'Unknown'
+    ? `${formatNumber(Math.round(props.device.cpuClockGhz * 1000))} MHz`
+    : t('common.unknown')
 );
 const currentDifficultyLabel = computed(() =>
   formatCompactNumber(
@@ -284,7 +262,7 @@ const networkLatencyLabel = computed(() => {
     readNumber(apiConnection.value, 'ping'),
     props.stats.networkLatencyMs
   );
-  return ping === null ? 'Unknown' : `${Math.round(ping)} ms`;
+  return ping === null ? t('common.unknown') : `${Math.round(ping)} ms`;
 });
 
 const toggleDetails = (): void => {
@@ -293,46 +271,49 @@ const toggleDetails = (): void => {
 
 const diagnosticGroups = computed(() => [
   {
-    title: 'Connection',
+    title: t('diag.connection'),
     items: [
-      { label: 'Pool', value: poolAddress.value, wide: true },
-      { label: 'Worker', value: props.config.workerName },
-      { label: 'Network latency', value: networkLatencyLabel.value },
-      { label: 'Difficulty', value: currentDifficultyLabel.value },
+      { label: t('metric.pool'), value: poolAddress.value, wide: true },
+      { label: t('metric.worker'), value: props.config.workerName },
+      { label: t('diag.networkLatency'), value: networkLatencyLabel.value },
+      { label: t('metric.difficulty'), value: currentDifficultyLabel.value },
       {
-        label: 'Telemetry',
+        label: t('diag.telemetry'),
         value: telemetrySourceLabel.value,
         tone: props.apiTelemetry.available ? 'success' : 'muted'
       },
-      { label: 'API endpoint', value: telemetryEndpointLabel.value }
+      { label: t('diag.apiEndpoint'), value: telemetryEndpointLabel.value }
     ]
   },
   {
-    title: 'Mining engine',
+    title: t('diag.engine'),
     items: [
-      { label: 'Engine', value: engineLabel },
-      { label: 'CPU hardware', value: cpuHardwareName.value },
-      { label: 'CPU clock', value: frequencyMhzLabel.value },
-      { label: 'CPU workers', value: cpuWorkerLabel.value },
-      { label: 'CPU tuning', value: cpuTuningLabel.value },
-      { label: 'Miner CPU', value: formatCpuUsage(props.stats.minerCpuUsage) },
-      { label: 'Total hashes', value: totalHashesLabel.value }
+      { label: t('diag.engineName'), value: engineLabel },
+      { label: t('diag.cpuHardware'), value: cpuHardwareName.value },
+      { label: t('diag.cpuClock'), value: frequencyMhzLabel.value },
+      { label: t('diag.cpuWorkers'), value: cpuWorkerLabel.value },
+      { label: t('diag.cpuTuning'), value: cpuTuningLabel.value },
+      { label: t('metric.minerCpu'), value: formatCpuUsage(props.stats.minerCpuUsage) },
+      { label: t('diag.totalHashes'), value: totalHashesLabel.value }
     ]
   },
   {
-    title: 'Device & power',
+    title: t('diag.devicePower'),
     items: [
-      { label: 'Battery', value: formatSensor(props.stats.batteryLevel, '%') },
-      { label: 'Charging state', value: props.stats.isCharging ? 'Charging' : 'Unplugged' },
-      { label: 'Temperature', value: formatSensor(props.stats.temperature, ' °C') },
+      { label: t('metric.battery'), value: formatSensor(props.stats.batteryLevel, '%') },
       {
-        label: 'Thermal status',
+        label: t('diag.chargingState'),
+        value: props.stats.isCharging ? t('metric.charging') : t('diag.unplugged')
+      },
+      { label: t('metric.temperature'), value: formatSensor(props.stats.temperature, ' °C') },
+      {
+        label: t('diag.thermalStatus'),
         value:
           props.stats.temperature === null
-            ? 'Unavailable'
+            ? t('common.unavailable')
             : thermalTone.value === 'warning'
-              ? 'Near limit'
-              : 'Below limit',
+              ? t('diag.nearLimit')
+              : t('diag.belowLimit'),
         tone:
           props.stats.temperature === null
             ? 'muted'
@@ -340,7 +321,7 @@ const diagnosticGroups = computed(() => [
               ? 'warning'
               : 'success'
       },
-      { label: 'Battery flow (calculated)', value: powerDrawLabel.value }
+      { label: t('diag.batteryFlow'), value: powerDrawLabel.value }
     ]
   }
 ]);
@@ -559,6 +540,9 @@ const profilePanel = ref<HTMLElement | null>(null);
 useDialogFocus(() => detailsOpen.value, detailsPanel, closeDetails);
 useDialogFocus(() => profilePickerOpen.value, profilePanel, closeProfilePicker);
 defineExpose({ exitFullscreenMode });
+const remainingLabel = computed(() =>
+  props.stats.remainingSeconds === null ? '' : formatDuration(props.stats.remainingSeconds)
+);
 </script>
 
 <template>
@@ -569,11 +553,17 @@ defineExpose({ exitFullscreenMode });
     <header class="screen-heading session-heading">
       <div>
         <h1>{{ config.coin.name }}</h1>
-        <p>{{ config.algorithm }} · {{ config.threadCount }} CPU threads</p>
+        <p>
+          {{
+            $t('session.threadsLine', { algorithm: config.algorithm, threads: config.threadCount })
+          }}
+        </p>
       </div>
       <button
         class="outline-button"
-        :aria-label="fullscreenActive ? 'Exit fullscreen' : 'Enter fullscreen'"
+        :aria-label="
+          fullscreenActive ? $t('session.exitFullscreen') : $t('session.enterFullscreen')
+        "
         :disabled="fullscreenBusy"
         @click="toggleFullscreen"
       >
@@ -587,7 +577,7 @@ defineExpose({ exitFullscreenMode });
             <span
               >{{ config.coin.symbol }}
               <small>
-                / {{ apiTelemetry.available ? '10s average' : 'Reported speed' }}</small
+                / {{ apiTelemetry.available ? $t('session.avg10') : $t('session.reported') }}</small
               ></span
             ><span
               class="hero-pill"
@@ -603,7 +593,7 @@ defineExpose({ exitFullscreenMode });
               >{{ minerStateLabel }}</span
             >
           </div>
-          <p class="hero-label">Current hashrate</p>
+          <p class="hero-label">{{ $t('dashboard.currentHashrate') }}</p>
           <div class="hero-number" :class="{ 'hero-number-message': stats.sampleState !== 'live' }">
             {{ speedLabel }}
           </div>
@@ -612,20 +602,28 @@ defineExpose({ exitFullscreenMode });
               stats.sampleState === 'live'
                 ? telemetrySourceLabel
                 : stats.sampleState === 'stale'
-                  ? 'Last sample expired; waiting for a fresh reading'
+                  ? $t('session.staleCaption')
                   : stats.sampleState === 'inactive'
-                    ? 'No active measurement'
+                    ? $t('session.noMeasurement')
                     : preparationDetail
             }}
           </p>
           <TelemetrySparkline v-if="!liteSessionMode" :points="hashrateHistory" />
           <div class="hero-footer">
             <span
-              >Average · 60s<strong>{{ formatHashrate(averageHashrate) }}</strong></span
+              >{{ $t('session.avg60') }}<strong>{{ formatHashrate(averageHashrate) }}</strong></span
             ><span
-              >Peak<strong>{{ highestSpeedLabel }}</strong></span
+              >{{ $t('session.peak') }}<strong>{{ highestSpeedLabel }}</strong></span
             ><span
-              >Uptime<strong>{{ uptime }}</strong></span
+              >{{ $t('session.uptime') }}<strong>{{ uptime }}</strong
+              ><small v-if="remainingLabel">{{
+                $t('session.remaining', {
+                  remaining: remainingLabel,
+                  time: stats.deadlineAt
+                    ? formatDate(stats.deadlineAt, { timeStyle: 'medium' })
+                    : '—'
+                })
+              }}</small></span
             >
           </div>
         </section>
@@ -648,21 +646,26 @@ defineExpose({ exitFullscreenMode });
           <p>
             <strong>{{
               device.temperatureC === null || device.batteryLevel === null
-                ? 'Protection readings unavailable'
-                : 'Native device protection'
+                ? $t('session.protectionMissing')
+                : $t('session.protectionActive')
             }}</strong>
-            <span
-              >{{ device.thermalSource === 'battery' ? 'Battery' : 'Sensor' }}
-              {{ formatSensor(device.temperatureC, ' °C') }} · Limit
-              {{ config.thermalThreshold }} °C · Battery
-              {{ formatSensor(device.batteryLevel, '%') }}</span
-            >
+            <span>{{
+              $t('session.protectionLine', {
+                source:
+                  device.thermalSource === 'battery'
+                    ? $t('session.sourceBattery')
+                    : $t('session.sourceSensor'),
+                temp: formatSensor(device.temperatureC, ' °C'),
+                limit: config.thermalThreshold,
+                battery: formatSensor(device.batteryLevel, '%')
+              })
+            }}</span>
           </p>
         </div>
         <div v-if="actionFailure" class="notice notice-error" role="alert">
           <MaterialIcon name="error" :size="20" />
           <div>
-            <strong>Action needs attention</strong>
+            <strong>{{ $t('session.actionAttention') }}</strong>
             <p>{{ actionFailure }}</p>
           </div>
         </div>
@@ -671,17 +674,17 @@ defineExpose({ exitFullscreenMode });
         <section class="share-strip">
           <div>
             <span class="status-dot"></span><strong>{{ stats.acceptedShares }}</strong
-            ><small>Accepted shares</small>
+            ><small>{{ $t('session.acceptedShares') }}</small>
           </div>
           <div>
             <strong>{{ stats.rejectedShares }}</strong
-            ><small>Rejected shares</small>
+            ><small>{{ $t('session.rejectedShares') }}</small>
           </div>
           <div>
             <StatusIndicator
               :connected="connected"
-              :label="connected ? 'Connected' : 'Disconnected'"
-            /><small>Pool connection</small>
+              :label="connected ? $t('metric.connected') : $t('metric.disconnected')"
+            /><small>{{ $t('session.poolConnection') }}</small>
           </div>
         </section>
         <div
@@ -702,16 +705,16 @@ defineExpose({ exitFullscreenMode });
               :aria-pressed="!liteSessionMode"
               @click="settings.performance.liteSessionMode = false"
             >
-              Full view</button
+              {{ $t('session.fullView') }}</button
             ><button
               :aria-pressed="liteSessionMode"
               @click="settings.performance.liteSessionMode = true"
             >
-              Lite view
+              {{ $t('session.liteView') }}
             </button>
           </div>
           <button class="text-button" @click="toggleDetails">
-            Diagnostics <MaterialIcon name="chevron_right" :size="18" />
+            {{ $t('session.diagnostics') }} <MaterialIcon name="chevron_right" :size="18" />
           </button>
         </div>
         <template v-if="!liteSessionMode">
@@ -721,52 +724,55 @@ defineExpose({ exitFullscreenMode });
                 formatSensor(stats.temperature, ' °C')
               }}</strong
               ><small>{{
-                device.thermalSource === 'battery' ? 'Battery temp' : 'Temperature'
+                device.thermalSource === 'battery'
+                  ? $t('metric.batteryTemp')
+                  : $t('metric.temperature')
               }}</small>
             </div>
             <div>
               <MaterialIcon name="battery_5_bar" :size="20" /><strong>{{
                 formatSensor(stats.batteryLevel, '%')
               }}</strong
-              ><small>{{ stats.isCharging ? 'Charging' : 'Battery' }}</small>
+              ><small>{{ stats.isCharging ? $t('metric.charging') : $t('metric.battery') }}</small>
             </div>
             <div>
               <MaterialIcon name="memory" :size="20" /><strong>{{
                 formatCpuUsage(stats.minerCpuUsage)
               }}</strong
-              ><small>Miner CPU</small>
+              ><small>{{ $t('metric.minerCpu') }}</small>
             </div>
           </section>
           <section class="surface">
             <div class="section-heading">
-              <h3>Connection</h3>
+              <h3>{{ $t('session.connection') }}</h3>
               <span class="supporting-label">{{ config.protocol }}</span>
             </div>
             <dl class="definition-list">
               <div>
-                <dt>Pool</dt>
+                <dt>{{ $t('metric.pool') }}</dt>
                 <dd>{{ poolAddress }}</dd>
               </div>
               <div>
-                <dt>Worker</dt>
+                <dt>{{ $t('metric.worker') }}</dt>
                 <dd>{{ config.workerName }}</dd>
               </div>
               <div>
-                <dt>Latency</dt>
+                <dt>{{ $t('metric.latency') }}</dt>
                 <dd>{{ networkLatencyLabel }}</dd>
               </div>
               <div>
-                <dt>Difficulty</dt>
+                <dt>{{ $t('metric.difficulty') }}</dt>
                 <dd>{{ currentDifficultyLabel }}</dd>
               </div>
             </dl>
           </section>
           <details class="surface log-disclosure" open>
             <summary>
-              <span>Miner output</span><small>{{ latestLogCountLabel }}</small>
+              <span>{{ $t('session.minerOutput') }}</span
+              ><small>{{ latestLogCountLabel }}</small>
             </summary>
             <div class="terminal">
-              <p v-if="!latestLogs.length">{{ backendMessage || 'Waiting for output…' }}</p>
+              <p v-if="!latestLogs.length">{{ backendMessage || $t('session.waitingOutput') }}</p>
               <p v-for="line in latestLogs" :key="line.id" :class="logToneClass(line.tone)">
                 {{ line.text }}
               </p>
@@ -790,7 +796,7 @@ defineExpose({ exitFullscreenMode });
             ref="detailsPanel"
             role="dialog"
             aria-modal="true"
-            aria-label="Mining diagnostics"
+            :aria-label="$t('session.diagnosticsLabel')"
             tabindex="-1"
             class="diagnostics-sheet"
             :style="detailsSheetStyle"
@@ -798,7 +804,7 @@ defineExpose({ exitFullscreenMode });
             <button
               class="sheet-handle diagnostics-handle"
               type="button"
-              aria-label="Drag down or tap to close diagnostics"
+              :aria-label="$t('session.closeSheetDrag')"
               @click="closeDetails"
               @pointerdown="startDetailsDrag"
               @pointermove="moveDetailsDrag"
@@ -809,13 +815,13 @@ defineExpose({ exitFullscreenMode });
             </button>
             <header class="diagnostics-heading">
               <div>
-                <h2>Diagnostics</h2>
-                <p>Live mining and device readings</p>
+                <h2>{{ $t('session.diagnostics') }}</h2>
+                <p>{{ $t('session.diagnosticsSub') }}</p>
               </div>
               <button
                 type="button"
                 class="outline-button diagnostics-close"
-                aria-label="Close diagnostics"
+                :aria-label="$t('session.closeDiagnostics')"
                 @click="closeDetails"
               >
                 <MaterialIcon name="close" :size="22" />
@@ -842,21 +848,24 @@ defineExpose({ exitFullscreenMode });
               </section>
               <details class="diagnostics-output diagnostics-section">
                 <summary>
-                  <span>Miner output</span><small>{{ logs.length }} lines</small>
+                  <span>{{ $t('session.minerOutput') }}</span
+                  ><small>{{ $t('session.linesCount', { count: logs.length }) }}</small>
                 </summary>
                 <div class="terminal" data-swipe-ignore>
                   <p v-if="!detailLogs.length">
-                    {{ backendMessage || 'Waiting for miner output...' }}
+                    {{ backendMessage || $t('session.waitingMinerOutput') }}
                   </p>
                   <p v-for="line in detailLogs" :key="line.id" :class="logToneClass(line.tone)">
                     {{ line.text }}
                   </p>
                 </div>
               </details>
-              <p class="diagnostics-note">Estimated earnings are not available from the miner.</p>
+              <p class="diagnostics-note">{{ $t('session.noEarnings') }}</p>
             </div>
             <footer class="diagnostics-footer">
-              <button type="button" class="primary-button" @click="closeDetails">Done</button>
+              <button type="button" class="primary-button" @click="closeDetails">
+                {{ $t('session.done') }}
+              </button>
             </footer>
           </section>
         </div>
@@ -880,13 +889,13 @@ defineExpose({ exitFullscreenMode });
         class="detail-sheet"
         role="dialog"
         aria-modal="true"
-        aria-label="Change CPU profile"
+        :aria-label="$t('session.changeProfile')"
         tabindex="-1"
         :style="profileSheetStyle"
       >
         <button
           class="sheet-handle"
-          aria-label="Close profile picker"
+          :aria-label="$t('session.closeProfile')"
           @click="closeProfilePicker"
           @pointerdown="startProfileDrag"
           @pointermove="moveProfileDrag"
@@ -896,11 +905,11 @@ defineExpose({ exitFullscreenMode });
           <span />
         </button>
         <div class="section-heading">
-          <h3>Change CPU profile</h3>
+          <h3>{{ $t('session.changeProfile') }}</h3>
           <MaterialIcon name="tune" :size="20" />
         </div>
         <p class="section-copy">
-          Choose a different CPU allocation. Watch temperature after changing the load.
+          {{ $t('session.profileCopy') }}
         </p>
         <button
           v-for="preset in profilePresets"
@@ -910,12 +919,13 @@ defineExpose({ exitFullscreenMode });
           @click="selectProfile(preset.id)"
         >
           <MaterialIcon name="memory" :size="21" /><span
-            ><strong>{{ preset.label }}</strong
-            ><small>{{ preset.description }}</small
-            ><small
-              >{{ preset.id === 'custom' ? config.customThreadCount : preset.threads }} worker
-              threads</small
-            ></span
+            ><strong>{{ $t(`profile.${preset.id}`) }}</strong
+            ><small>{{ $t(`profile.hint.${preset.id}`) }}</small
+            ><small>{{
+              $t('session.workerThreads', {
+                count: preset.id === 'custom' ? config.customThreadCount : preset.threads
+              })
+            }}</small></span
           ><MaterialIcon
             :name="config.profile === preset.id ? 'radio_button_checked' : 'radio_button_unchecked'"
             :size="21"

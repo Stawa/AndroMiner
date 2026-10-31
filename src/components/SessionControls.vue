@@ -21,7 +21,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="session-controls grid gap-2" role="group" aria-label="Mining controls">
+  <div class="session-controls grid gap-2" role="group" :aria-label="$t('controls.group')">
     <button
       class="session-action ripple"
       type="button"
@@ -43,12 +43,12 @@ const emit = defineEmits<{
       <MaterialIcon v-else :name="state === 'paused' ? 'play_arrow' : 'pause'" :size="28" filled />
       <span>{{
         pendingAction === 'pause'
-          ? 'Pausing'
+          ? $t('controls.pausing')
           : pendingAction === 'resume'
-            ? 'Resuming'
+            ? $t('controls.resuming')
             : state === 'paused'
-              ? 'Resume'
-              : 'Pause'
+              ? $t('controls.resume')
+              : $t('controls.pause')
       }}</span>
     </button>
     <button
@@ -65,7 +65,7 @@ const emit = defineEmits<{
         :class="{ 'animate-spin': animationsEnabled }"
       />
       <MaterialIcon v-else name="stop" :size="28" filled />
-      <span>{{ pendingAction === 'stop' ? 'Stopping' : 'Stop' }}</span>
+      <span>{{ pendingAction === 'stop' ? $t('controls.stopping') : $t('controls.stop') }}</span>
     </button>
     <button
       class="session-action ripple"

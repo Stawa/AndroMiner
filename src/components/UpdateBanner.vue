@@ -15,7 +15,7 @@ const emit = defineEmits<{ view: []; dismiss: [] }>();
       <button
         type="button"
         class="update-banner-link flex w-full items-center gap-3 p-4 pr-16 text-left"
-        :aria-label="`${title}. ${message}. Open update details`"
+        :aria-label="$t('banner.open', { title, message })"
         @click="emit('view')"
       >
         <span
@@ -31,7 +31,7 @@ const emit = defineEmits<{ view: []; dismiss: [] }>();
       <button
         type="button"
         class="absolute right-2 top-1/2 inline-flex size-11 min-h-11 -translate-y-1/2 items-center justify-center rounded-control text-app-muted hover:bg-app-elevated"
-        aria-label="Dismiss update notification"
+        :aria-label="$t('banner.dismiss')"
         @click.stop="emit('dismiss')"
       >
         <MaterialIcon name="close" :size="20" />

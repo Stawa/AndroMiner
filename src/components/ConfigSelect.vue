@@ -74,7 +74,7 @@ useDialogFocus(() => open.value, panel, closeSheet);
       type="button"
       aria-haspopup="dialog"
       :aria-expanded="open"
-      :aria-label="`${label}: ${selectedOption?.label || 'Select'}`"
+      :aria-label="`${label}: ${selectedOption?.label || $t('select.choose')}`"
       @click="open = true"
     >
       <CoinIcon
@@ -108,7 +108,7 @@ useDialogFocus(() => open.value, panel, closeSheet);
         v-if="open"
         class="fixed inset-0 z-50 h-full w-full bg-black/65"
         type="button"
-        :aria-label="`Close ${label} selector`"
+        :aria-label="$t('select.closeNamed', { label })"
         @click="closeSheet"
       />
     </Transition>
@@ -132,19 +132,19 @@ useDialogFocus(() => open.value, panel, closeSheet);
           <button
             class="ripple grid h-12 w-12 shrink-0 place-items-center rounded-full text-app-muted"
             type="button"
-            aria-label="Close selector"
+            :aria-label="$t('select.close')"
             @click="closeSheet"
           >
             <MaterialIcon name="close" :size="22" />
           </button>
         </div>
         <label v-if="searchable" class="coin-search">
-          <span class="sr-only">Search coins</span>
+          <span class="sr-only">{{ $t('select.searchLabel') }}</span>
           <input
             v-model="query"
             type="search"
             class="config-input"
-            placeholder="Find a coin or algorithm"
+            :placeholder="$t('select.searchPlaceholder')"
             autocomplete="off"
           />
         </label>
@@ -196,7 +196,7 @@ useDialogFocus(() => open.value, panel, closeSheet);
             />
           </button>
           <p v-if="!visibleOptions.length" class="coin-search-empty" role="status">
-            No matches. Try a different name or symbol.
+            {{ $t('select.noMatches') }}
           </p>
         </div>
       </section>

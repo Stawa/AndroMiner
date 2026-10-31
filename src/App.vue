@@ -16,7 +16,9 @@ import StartMiningWarningSheet from './components/StartMiningWarningSheet.vue';
 import { useDeviceTelemetry } from './composables/useDeviceTelemetry';
 import { useGitHubReleaseUpdater } from './composables/useGitHubReleaseUpdater';
 import { useMiningController, type MinerBinaryVariant } from './composables/useMiningController';
+import { useTelemetry } from './composables/useTelemetry';
 import { useTheme } from './composables/useTheme';
+import { t } from './i18n';
 import { usePageSwipe } from './composables/usePageSwipe';
 import { useProfilesStore } from './stores/profiles';
 import { useSettingsStore, type SettingsState } from './stores/settings';
@@ -54,6 +56,7 @@ const profiles = useProfilesStore();
 const { device } = useDeviceTelemetry();
 const updater = useGitHubReleaseUpdater();
 useTheme();
+const telemetry = useTelemetry();
 const sessionActive = computed(() => !['idle', 'error'].includes(miner.state.value));
 const sessionFullscreen = ref(false);
 const sessionView = ref<InstanceType<typeof MiningSessionView> | null>(null);
@@ -173,8 +176,8 @@ const hideUpdateBanner = (): void => {
 const showUpdateBanner = (version: string): void => {
   updateBanner.value = {
     visible: true,
-    title: 'Update available',
-    message: `Version ${version} is ready to download.`
+    title: t('app.updateAvailable'),
+    message: t('app.updateReady', { version })
   };
 };
 
@@ -271,10 +274,10 @@ const performExport = async (): Promise<void> => {
     });
 
     await Share.share({
-      title: 'Export AndroMiner config',
-      text: 'AndroMiner configuration export',
+      title: t('app.shareTitle'),
+      text: t('app.shareText'),
       url: result.uri,
-      dialogTitle: 'Save or share config'
+      dialogTitle: t('app.shareDialog')
     });
     return;
   }
@@ -294,13 +297,13 @@ const exportConfig = async (): Promise<void> => {
   try {
     await performExport();
   } catch {
-    dataFeedback.value = 'Could not export your configuration. Please try again.';
+    dataFeedback.value = t('app.exportFailed');
   }
 };
 
 const openImportPicker = (): void => {
   if (sessionActive.value) {
-    dataFeedback.value = 'Stop the active session before importing a configuration.';
+    dataFeedback.value = t('app.importBlocked');
     return;
   }
   importInput.value?.click();
@@ -322,7 +325,7 @@ const isConfigBundle = (value: unknown): value is ConfigBundle => {
 
 const importConfig = async (event: Event): Promise<void> => {
   if (sessionActive.value) {
-    window.alert('Stop the active session before importing a configuration.');
+    window.alert(t('app.importBlocked'));
     return;
   }
   const input = event.target as HTMLInputElement;
@@ -353,10 +356,9 @@ const importConfig = async (event: Event): Promise<void> => {
     profiles.replaceAll(parsed.profiles, parsed.activeProfileId);
     settings.replace(parsed.settings);
     Object.assign(miner.config, parsed.currentConfig);
-    dataFeedback.value = 'Configuration imported. Your saved setups are ready.';
+    dataFeedback.value = t('app.imported');
   } catch {
-    dataFeedback.value =
-      'Could not import this file. Choose an AndroMiner JSON configuration export.';
+    dataFeedback.value = t('app.importFailed');
   }
 };
 
@@ -422,6 +424,7 @@ onMounted(() => {
   systemCheckComplete.value = localStorage.getItem(systemCheckKey) === 'true';
   settings.load();
   profiles.load();
+  telemetry.start();
 
   if (profiles.profiles.length === 0) {
     profiles.createDefaults(miner.config);
@@ -443,9 +446,7 @@ onMounted(() => {
 watch(
   () => settings.$state,
   () => {
-    if (!settings.persist())
-      dataFeedback.value =
-        'Settings could not be saved. Current protection remains active until you close the app.';
+    if (!settings.persist()) dataFeedback.value = t('app.settingsSaveFailed');
   },
   { deep: true }
 );
@@ -495,8 +496,7 @@ watch(
   () => [settings.batterySafety.stopBelowPercent, settings.batterySafety.mineOnlyCharging],
   () => {
     void miner.syncSafetySettings().catch(() => {
-      dataFeedback.value =
-        'Could not update native protection. Stop mining and reopen the app before changing limits.';
+      dataFeedback.value = t('app.protectionSyncFailed');
       void miner.stopMining();
     });
   }
@@ -549,14 +549,14 @@ onBeforeUnmount(() => {
         role="status"
       >
         <button class="text-button" @click="activeTab = 'dashboard'">
-          {{ miner.statusLabel.value }} · View session
+          {{ $t('app.viewSession', { status: miner.statusLabel.value }) }}
         </button>
         <button
           class="stop-button"
           :disabled="miner.state.value === 'stopping'"
           @click="miner.stopMining"
         >
-          <MaterialIcon name="stop" :size="20" />Stop mining
+          <MaterialIcon name="stop" :size="20" />{{ $t('app.stopMining') }}
         </button>
       </div>
 
@@ -596,7 +596,7 @@ onBeforeUnmount(() => {
           <p>{{ dataFeedback }}</p>
           <button
             class="text-button"
-            aria-label="Dismiss configuration message"
+            :aria-label="$t('app.dismissMessage')"
             @click="dataFeedback = ''"
           >
             <MaterialIcon name="close" :size="20" />
@@ -641,6 +641,9 @@ onBeforeUnmount(() => {
           />
           <SettingsView
             v-else-if="activeTab === 'settings'"
+            :config="miner.config"
+            :device="device"
+            :locked="sessionActive"
             @export-config="exportConfig"
             @import-config="openImportPicker"
             @open-about="activeTab = 'about'"

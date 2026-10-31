@@ -3,6 +3,7 @@ import { formatSensor } from '../utils/miningTelemetry';
 import { computed } from 'vue';
 import MaterialIcon from '../components/MaterialIcon.vue';
 import type { DeviceTelemetry } from '../types/mining';
+import { t } from '../i18n';
 
 interface SystemCheckViewProps {
   device: DeviceTelemetry;
@@ -27,34 +28,34 @@ const isAndroidLike = computed(() =>
 );
 
 const memoryLabel = computed(() =>
-  props.device.deviceMemoryGb === null ? 'Unknown' : `${props.device.deviceMemoryGb} GB`
+  props.device.deviceMemoryGb === null ? t('common.unknown') : `${props.device.deviceMemoryGb} GB`
 );
 
 const thermalLabel = computed(() =>
   props.device.temperatureC === null
-    ? props.device.thermalStatus
+    ? t(`thermalStatus.${props.device.thermalStatus}`)
     : `${Math.round(props.device.temperatureC)} °C`
 );
 
 const checkItems = computed<CheckItem[]>(() => [
   {
-    label: 'Platform',
+    label: t('check.platform'),
     value:
       props.device.platform === 'web'
-        ? 'Browser preview'
+        ? t('check.browserPreview')
         : `${props.device.operatingSystem || props.device.platform} ${props.device.osVersion}`,
     status: isAndroidLike.value ? (props.device.platform === 'web' ? 'warn' : 'pass') : 'fail',
     detail:
       props.device.platform === 'web'
-        ? 'The browser can preview the interface. Mining needs the Android app.'
+        ? t('check.platformWeb')
         : isAndroidLike.value
-          ? 'Compatible with the Android miner runtime.'
-          : 'This app is designed for Android mining devices.',
+          ? t('check.platformOk')
+          : t('check.platformBad'),
     icon: 'android'
   },
   {
-    label: 'CPU threads',
-    value: `${props.device.cpuThreads} detected`,
+    label: t('check.threads'),
+    value: t('check.threadsDetected', { count: props.device.cpuThreads }),
     status:
       props.device.cpuThreads >= 6
         ? 'pass'
@@ -65,14 +66,14 @@ const checkItems = computed<CheckItem[]>(() => [
             : 'fail',
     detail:
       props.device.cpuThreads >= 6
-        ? 'Enough headroom for balanced or performance profiles.'
+        ? t('check.threadsGood')
         : props.device.cpuThreads >= 2
-          ? 'Use Battery Saver or a low custom thread count.'
-          : 'At least 2 CPU threads are required for a useful mining session.',
+          ? t('check.threadsLow')
+          : t('check.threadsBad'),
     icon: 'memory'
   },
   {
-    label: 'Memory',
+    label: t('check.memory'),
     value: memoryLabel.value,
     status:
       props.device.deviceMemoryGb === null
@@ -84,16 +85,16 @@ const checkItems = computed<CheckItem[]>(() => [
             : 'fail',
     detail:
       props.device.deviceMemoryGb === null
-        ? 'Memory is not exposed by this runtime, so the app will use conservative defaults.'
+        ? t('check.memoryUnknown')
         : props.device.deviceMemoryGb >= 4
-          ? 'Memory capacity is reported by the device; actual miner allocation may still fail.'
+          ? t('check.memoryGood')
           : props.device.deviceMemoryGb >= 2
-            ? 'Close background apps before mining.'
-            : 'Too little available memory for safe native mining.',
+            ? t('check.memoryLow')
+            : t('check.memoryBad'),
     icon: 'developer_board'
   },
   {
-    label: 'Thermals',
+    label: t('check.thermals'),
     value: thermalLabel.value,
     status:
       props.device.thermalStatus === 'hot'
@@ -105,18 +106,18 @@ const checkItems = computed<CheckItem[]>(() => [
             : 'pass',
     detail:
       props.device.thermalStatus === 'hot'
-        ? 'Let the device cool before starting a mining session.'
+        ? t('check.thermalHot')
         : props.device.thermalStatus === 'warm'
-          ? 'Start with Battery Saver and monitor temperature closely.'
+          ? t('check.thermalWarm')
           : props.device.thermalStatus === 'unavailable'
-            ? 'Thermal readings are unavailable, so safety limits should stay conservative.'
+            ? t('check.thermalUnavailable')
             : props.device.thermalStatus === 'unknown'
-              ? 'Waiting for thermal readings.'
-              : 'Thermal state is acceptable for a low-intensity start.',
+              ? t('check.thermalWaiting')
+              : t('check.thermalOk'),
     icon: 'device_thermostat'
   },
   {
-    label: 'Battery',
+    label: t('check.battery'),
     value: formatSensor(props.device.batteryLevel, '%'),
     status:
       props.device.batteryLevel === null
@@ -129,14 +130,14 @@ const checkItems = computed<CheckItem[]>(() => [
             : 'fail',
     detail:
       props.device.batteryLevel === null
-        ? 'Battery level is unavailable. Check the device before starting.'
+        ? t('check.batteryUnknown')
         : props.device.isCharging
-          ? 'Charging is recommended for longer mining sessions.'
+          ? t('check.batteryCharging')
           : props.device.batteryLevel !== null && props.device.batteryLevel >= 50
-            ? 'Battery level is acceptable, but charging is still recommended.'
+            ? t('check.batteryOk')
             : props.device.batteryLevel !== null && props.device.batteryLevel >= 25
-              ? 'Short sessions only unless plugged in.'
-              : 'Battery is too low for mining.',
+              ? t('check.batteryLow')
+              : t('check.batteryBad'),
     icon: props.device.isCharging ? 'battery_charging_full' : 'battery_5_bar'
   }
 ]);
@@ -150,29 +151,28 @@ const failures = computed(() => checkItems.value.filter((item) => item.status ==
 <template>
   <main class="onboarding-page redesign-page">
     <header class="screen-heading">
-      <h1>Device check</h1>
-      <p>Reported hardware and power readings, before your first run.</p>
+      <h1>{{ $t('check.title') }}</h1>
+      <p>{{ $t('check.intro') }}</p>
     </header>
     <div class="notice">
       <MaterialIcon name="info" :size="20" />
       <div>
         <strong>{{
           failures.length
-            ? 'This device needs attention'
+            ? $t('check.attention')
             : warnings.length
-              ? 'Some readings need review'
-              : 'Readings available'
+              ? $t('check.review')
+              : $t('check.available')
         }}</strong>
         <p>
-          This is a basic readiness check, not a speed benchmark. Begin with a low thread count and
-          watch the phone.
+          {{ $t('check.note') }}
         </p>
       </div>
     </div>
     <section class="surface">
       <div class="section-heading">
         <h3>{{ device.model }}</h3>
-        <span class="supporting-label">Local check</span>
+        <span class="supporting-label">{{ $t('check.local') }}</span>
       </div>
       <article v-for="item in checkItems" :key="item.label" class="check-row">
         <MaterialIcon :name="item.icon" :size="21" />
@@ -199,11 +199,10 @@ const failures = computed(() => checkItems.value.filter((item) => item.status ==
       </article>
     </section>
     <p class="section-copy">
-      These readings stay on this screen and are not uploaded by this check. Unavailable sensors
-      cannot confirm that a device is cool.
+      {{ $t('check.privacy') }}
     </p>
     <button class="primary-button" :disabled="failures.length > 0" @click="emit('continue')">
-      {{ failures.length ? 'Resolve failed checks to continue' : 'Continue to setup'
+      {{ failures.length ? $t('check.resolve') : $t('check.continue')
       }}<MaterialIcon name="arrow_forward" :size="20" />
     </button>
   </main>

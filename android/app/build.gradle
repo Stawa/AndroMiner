@@ -29,7 +29,7 @@ android {
         buildConfig = true
     }
     defaultConfig {
-        applicationId "com.androminer.app"
+        applicationId project.findProperty('validationApp') == 'true' ? "com.androminer.validation" : "com.androminer.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion targetSdkVersionOverride ? targetSdkVersionOverride.toInteger() : rootProject.ext.targetSdkVersion
         versionCode versionCodeOverride ? versionCodeOverride.toInteger() : 1

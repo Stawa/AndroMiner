@@ -11,6 +11,8 @@ interface ConfigInputProps {
   suffix?: string;
   revealable?: boolean;
   error?: string;
+  min?: number;
+  max?: number;
 }
 
 withDefaults(defineProps<ConfigInputProps>(), {
@@ -47,6 +49,8 @@ const hintId = useId();
         :value="modelValue"
         :type="revealable && visible ? 'text' : type"
         :inputmode="inputmode"
+        :min="min"
+        :max="max"
         autocomplete="off"
         autocapitalize="none"
         :spellcheck="false"
@@ -62,7 +66,7 @@ const hintId = useId();
         v-if="revealable"
         class="ripple absolute right-1 top-1/2 grid h-12 w-12 -translate-y-1/2 place-items-center rounded-full text-app-muted"
         type="button"
-        :aria-label="visible ? 'Hide password' : 'Show password'"
+        :aria-label="visible ? $t('config.hidePassword') : $t('config.showPassword')"
         @click="visible = !visible"
       >
         <MaterialIcon :name="visible ? 'visibility_off' : 'visibility'" :size="21" />

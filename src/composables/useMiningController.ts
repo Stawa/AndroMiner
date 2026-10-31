@@ -1,5 +1,7 @@
+import { mergeNativeHistory, type NativeSessionRecord } from '../utils/sessionHistory';
 import { App } from '@capacitor/app';
 import { useSettingsStore } from '../stores/settings';
+import { formatDate, t } from '../i18n';
 import { validateMiningSetup } from '../utils/configValidation';
 import { isFresh, nonNegative, readHashrates } from '../utils/miningTelemetry';
 import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core';
@@ -29,9 +31,14 @@ interface NativeMinerStats {
   rejectedShares?: number;
   activeThreads?: number;
   uptimeSeconds?: number;
+  remainingSeconds?: number | null;
+  deadlineAt?: number | null;
 }
 
 interface NativeMinerStatus {
+  sessions?: NativeSessionRecord[];
+  session?: NativeSessionRecord;
+  storageError?: string;
   available: boolean;
   running: boolean;
   paused?: boolean;
@@ -65,6 +72,7 @@ interface NativeMinerPlugin {
   pause: () => Promise<NativeMinerStatus>;
   stop: () => Promise<NativeMinerStatus>;
   status: () => Promise<NativeMinerStatus>;
+  deleteHistory: (options: { id?: string }) => Promise<NativeMinerStatus>;
   updateSafety: (options: { batteryFloor: number; chargingOnly: boolean }) => Promise<void>;
 }
 
@@ -103,6 +111,7 @@ const initialConfig: MiningConfig = {
   autoPauseScreenOff: false,
   backgroundMining: true,
   thermalThreshold: 42,
+  maxDurationMinutes: 0,
   profile: 'balanced'
 };
 
@@ -122,6 +131,8 @@ const initialStats: MiningStats = {
   isCharging: false,
   activeThreads: 0,
   estimatedEarnings: null,
+  remainingSeconds: null,
+  deadlineAt: null,
   uptimeSeconds: 0
 };
 
@@ -131,15 +142,13 @@ const defaultApiTelemetry = (): MiningApiTelemetry => ({
   host: '127.0.0.1',
   port: 0,
   lastUpdatedAt: null,
-  message: 'XMRig API telemetry has not started.',
+  message: t('msg.apiNotStarted'),
   threadHashrates: []
 });
 
 export const profilePresets: ProfilePreset[] = [
   {
     id: 'battery_saver',
-    label: 'Battery Saver',
-    description: 'Cooler CPU use for longer unplugged sessions',
     threads: 1,
     affinity: 'little',
     thermalLimit: 40,
@@ -147,8 +156,6 @@ export const profilePresets: ProfilePreset[] = [
   },
   {
     id: 'balanced',
-    label: 'Balanced',
-    description: 'Two threads with a conservative temperature limit',
     threads: 2,
     affinity: 'auto',
     thermalLimit: 42,
@@ -156,8 +163,6 @@ export const profilePresets: ProfilePreset[] = [
   },
   {
     id: 'performance',
-    label: 'Performance',
-    description: 'Higher output with tighter thermal monitoring',
     threads: 4,
     affinity: 'big',
     thermalLimit: 44,
@@ -165,8 +170,6 @@ export const profilePresets: ProfilePreset[] = [
   },
   {
     id: 'custom',
-    label: 'Custom',
-    description: 'Manual CPU and safety configuration',
     threads: 2,
     affinity: 'auto',
     thermalLimit: 42,
@@ -175,11 +178,7 @@ export const profilePresets: ProfilePreset[] = [
 ];
 
 const formatClockLabel = (): string =>
-  new Intl.DateTimeFormat('en', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
-  }).format(new Date());
+  formatDate(Date.now(), { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
 const createEmptyHistory = (): HistoryPoint[] => [];
 
@@ -253,6 +252,7 @@ const emptyDownloadProgress = (): Required<NativeMinerDownloadProgress> => ({
 
 const cloneConfig = (config: MiningConfig): MiningConfig => ({
   ...config,
+  maxDurationMinutes: config.maxDurationMinutes ?? 0,
   hardwareMode: normalizeHardwareMode(config.hardwareMode),
   affinity: normalizeCpuAffinity(config.affinity),
   coin: {
@@ -268,7 +268,7 @@ export const useMiningController = () => {
   const state = ref<MiningState>('idle');
   const connected = ref(false);
   const backendState = ref<MinerBackendState>('checking');
-  const backendMessage = ref('Checking native miner backend...');
+  const backendMessage = ref(t('msg.checkingBackend'));
   const lastBackendError = ref('');
   const historySaveError = ref('');
   const downloadProgress = ref<Required<NativeMinerDownloadProgress>>(emptyDownloadProgress());
@@ -312,18 +312,7 @@ export const useMiningController = () => {
   }));
 
   const statusLabel = computed(() => {
-    const labels: Record<MiningState, string> = {
-      idle: 'Stopped',
-      reconnecting: 'Reconnecting',
-      pausing: 'Pausing',
-      stopping: 'Stopping',
-      error: 'Error',
-      starting: 'Starting',
-      mining: 'Mining',
-      paused: 'Paused'
-    };
-
-    return labels[state.value];
+    return state.value === 'mining' ? t('state.miningShort') : t(`state.${state.value}`);
   });
 
   const uptimeLabel = computed(() => formatUptime(stats.uptimeSeconds));
@@ -359,11 +348,12 @@ export const useMiningController = () => {
   const formatNativeFailureMessage = (status: NativeMinerStatus): string => {
     const exitCode =
       typeof status.exitCode === 'number' && Number.isFinite(status.exitCode)
-        ? ` Exit code: ${status.exitCode}.`
+        ? t('msg.exitCode', { code: status.exitCode })
         : '';
-    const reason = status.failureReason || status.message || 'No miner error was reported.';
+    const reason =
+      status.session?.endReason || status.failureReason || status.message || t('msg.noMinerError');
 
-    return `Native miner stopped unexpectedly.${exitCode} ${reason}`;
+    return t('msg.minerStopped', { exitCode, reason });
   };
 
   const setBackendError = (message: string): void => {
@@ -373,15 +363,19 @@ export const useMiningController = () => {
   };
 
   const setBackendStatus = (status: NativeMinerStatus): void => {
+    if (status.sessions) {
+      sessionHistory.value = mergeNativeHistory(sessionHistory.value, status.sessions);
+      historySaveError.value = status.storageError || '';
+    }
     const wasActive = ['mining', 'starting', 'reconnecting'].includes(state.value);
     const stoppedUnexpectedly =
       status.available && !status.running && !status.paused && !status.stopRequested && wasActive;
     const unexpectedExit = Boolean(status.unexpectedExit || stoppedUnexpectedly);
     const nextMessage =
+      status.storageError ||
+      status.session?.endReason ||
       status.message ||
-      (status.available
-        ? 'Native miner backend is ready.'
-        : 'Native miner download is required before the first mining session.');
+      (status.available ? t('msg.backendReady') : t('msg.downloadRequired'));
 
     connected.value = status.running && status.connected === true;
     minerLogs.value = Array.isArray(status.logs) ? status.logs : minerLogs.value;
@@ -389,9 +383,7 @@ export const useMiningController = () => {
       ...apiTelemetry.value,
       available: false,
       source: 'stdout-fallback',
-      message: status.running
-        ? 'Using stdout fallback until XMRig API telemetry responds.'
-        : 'XMRig API telemetry is inactive.'
+      message: status.running ? t('msg.stdoutFallback') : t('msg.apiInactive')
     };
 
     if (unexpectedExit && !status.running) {
@@ -412,7 +404,12 @@ export const useMiningController = () => {
       backendState.value = 'ready';
       backendMessage.value = nextMessage;
       if (connected.value) hasConnectedThisRun = true;
-      state.value = connected.value ? 'mining' : hasConnectedThisRun ? 'reconnecting' : 'starting';
+      state.value =
+        status.session?.state === 'running'
+          ? 'mining'
+          : hasConnectedThisRun
+            ? 'reconnecting'
+            : 'starting';
       if (!sessionStartedAt)
         sessionStartedAt = Date.now() - (status.stats?.uptimeSeconds ?? 0) * 1000;
       return;
@@ -488,6 +485,8 @@ export const useMiningController = () => {
     stats.rejectedShares = nonNegative(nativeStats.rejectedShares) ?? stats.rejectedShares;
     stats.activeThreads = nonNegative(nativeStats.activeThreads) ?? 0;
     stats.uptimeSeconds = nonNegative(nativeStats.uptimeSeconds) ?? 0;
+    stats.remainingSeconds = nonNegative(nativeStats.remainingSeconds);
+    stats.deadlineAt = nonNegative(nativeStats.deadlineAt);
     stats.estimatedEarnings = null;
     // Sample each native observation once, including valid zero speeds.
     if (stats.sampleState === 'live' && timestamp !== lastSampleAt) {
@@ -498,15 +497,17 @@ export const useMiningController = () => {
     }
   };
 
+  let lastUptimeTick = performance.now();
   const refreshLocalUptime = (): void => {
+    const elapsed = Math.floor((performance.now() - lastUptimeTick) / 1000);
+    lastUptimeTick = performance.now();
     if (!['mining', 'starting', 'reconnecting'].includes(state.value) || sessionStartedAt <= 0) {
       return;
     }
 
-    stats.uptimeSeconds = Math.max(
-      stats.uptimeSeconds,
-      Math.floor((Date.now() - sessionStartedAt) / 1000)
-    );
+    stats.uptimeSeconds += Math.max(0, elapsed);
+    if (stats.remainingSeconds !== null)
+      stats.remainingSeconds = Math.max(0, stats.remainingSeconds - elapsed);
   };
 
   const refreshStatus = async (): Promise<void> => {
@@ -517,7 +518,7 @@ export const useMiningController = () => {
     if (!Capacitor.isNativePlatform()) {
       connected.value = false;
       backendState.value = 'web-unavailable';
-      backendMessage.value = 'Actual mining is only available in the Android app.';
+      backendMessage.value = t('msg.androidOnlyMining');
       state.value = 'idle';
       return;
     }
@@ -547,9 +548,8 @@ export const useMiningController = () => {
       stats.minerCpuUsage = null;
       stats.difficulty = null;
       stats.networkLatencyMs = null;
-      apiTelemetry.value = { ...defaultApiTelemetry(), message: 'Status unavailable. Retrying…' };
-      backendMessage.value =
-        error instanceof Error ? error.message : 'Status unavailable. Retrying…';
+      apiTelemetry.value = { ...defaultApiTelemetry(), message: t('msg.statusRetry') };
+      backendMessage.value = error instanceof Error ? error.message : t('msg.statusRetry');
       if (['mining', 'starting', 'reconnecting'].includes(state.value))
         state.value = 'reconnecting';
     } finally {
@@ -560,7 +560,7 @@ export const useMiningController = () => {
   const downloadMiner = async (variant: MinerBinaryVariant): Promise<boolean> => {
     if (!Capacitor.isNativePlatform()) {
       backendState.value = 'web-unavailable';
-      backendMessage.value = 'Build and run the Android app to download the miner.';
+      backendMessage.value = t('msg.buildToDownload');
       return false;
     }
 
@@ -572,7 +572,9 @@ export const useMiningController = () => {
       variant
     };
     backendState.value = 'downloading';
-    backendMessage.value = `Downloading ${variant === 'tls' ? 'TLS' : 'no-TLS'} Android miner binary from GitHub...`;
+    backendMessage.value = t('msg.downloadingMiner', {
+      variant: variant === 'tls' ? 'TLS' : 'no-TLS'
+    });
 
     try {
       const status = await NativeMiner.download({ variant });
@@ -585,7 +587,7 @@ export const useMiningController = () => {
     } catch (error) {
       connected.value = false;
       backendState.value = 'missing';
-      backendMessage.value = error instanceof Error ? error.message : 'Miner download failed.';
+      backendMessage.value = error instanceof Error ? error.message : t('msg.downloadFailed');
       return false;
     }
   };
@@ -604,46 +606,45 @@ export const useMiningController = () => {
     }
 
     if (externalTemperature !== null && externalTemperature >= config.thermalThreshold) {
-      setBackendError('Device is above the temperature limit. Let it cool before starting.');
+      setBackendError(t('msg.tooHot'));
       return;
     }
     if (
       externalBatteryLevel !== null &&
       externalBatteryLevel <= settings.batterySafety.stopBelowPercent
     ) {
-      setBackendError(
-        `Battery is at or below the ${settings.batterySafety.stopBelowPercent}% stop limit.`
-      );
+      setBackendError(t('msg.batteryLow', { percent: settings.batterySafety.stopBelowPercent }));
       return;
     }
     if (
       !externalCharging &&
       (config.autoPauseOnBattery || settings.batterySafety.mineOnlyCharging)
     ) {
-      setBackendError('Connect a charger or turn off auto-pause on battery in Mining setup.');
+      setBackendError(t('msg.needCharger'));
       return;
     }
     if (!Capacitor.isNativePlatform()) {
       backendState.value = 'web-unavailable';
-      backendMessage.value = 'Build and run the Android app to start a real miner.';
+      backendMessage.value = t('msg.buildToStart');
       return;
     }
 
     if (backendState.value === 'missing') {
-      backendMessage.value = 'Download the Android miner binary before starting.';
+      backendMessage.value = t('msg.downloadBeforeStart');
       return;
     }
 
     if (config.coin.supportStatus !== 'bundled' || config.coin.miner !== 'xmrig') {
       backendState.value = 'error';
-      backendMessage.value = `${config.coin.name} requires ${
-        config.coin.minerName || 'a custom miner'
-      }. The bundled Android binary currently supports XMRig presets only.`;
+      backendMessage.value = t('msg.needsCustomMiner', {
+        coin: config.coin.name,
+        miner: config.coin.minerName || t('msg.customMiner')
+      });
       return;
     }
 
     if (Object.values(validateMiningSetup(config)).some(Boolean)) {
-      setBackendError('Enter a wallet, pool host, and valid port (1–65535) in Mining setup.');
+      setBackendError(t('msg.incompleteSetup'));
       return;
     }
     actionBusy = true;
@@ -694,12 +695,11 @@ export const useMiningController = () => {
         Object.assign(config, cloneConfig(status.activeConfig));
       if (!stopAfterStart) setBackendStatus(status);
       applyNativeStats(status.stats, status);
-      if (!status.running)
-        setBackendError(status.message || 'The miner did not start. Check mining logs.');
+      if (!status.running) setBackendError(status.message || t('msg.didNotStart'));
     } catch (error) {
       resetActiveSession();
       state.value = 'error';
-      setBackendError(error instanceof Error ? error.message : 'Native miner failed to start.');
+      setBackendError(error instanceof Error ? error.message : t('msg.startFailed'));
     } finally {
       actionBusy = false;
       if (stopAfterStart) {
@@ -712,10 +712,11 @@ export const useMiningController = () => {
   const persistSessionHistory = (): void => {
     historySaveError.value = writeSessionHistory(sessionHistory.value)
       ? ''
-      : 'Session history could not be saved on this device.';
+      : t('msg.historyNotSaved');
   };
 
   const recordSession = (): void => {
+    if (Capacitor.isNativePlatform()) return;
     if (sessionStartedAt <= 0 || (stats.uptimeSeconds <= 0 && sessionHashrateSamples === 0)) {
       return;
     }
@@ -753,7 +754,7 @@ export const useMiningController = () => {
       if (state.value === 'starting') {
         stopAfterStart = true;
         state.value = 'stopping';
-        backendMessage.value = 'Stop requested. Ending the starting process…';
+        backendMessage.value = t('msg.stopRequested');
       }
       return;
     }
@@ -763,7 +764,10 @@ export const useMiningController = () => {
     try {
       if (Capacitor.isNativePlatform()) {
         const status = await NativeMiner.stop();
-        if (status.running) throw new Error('Miner is still running. Retry Stop.');
+        if (status.running) throw new Error(t('msg.stillRunningStop'));
+        if (status.sessions)
+          sessionHistory.value = mergeNativeHistory(sessionHistory.value, status.sessions);
+        historySaveError.value = status.storageError || '';
         minerLogs.value = status.logs ?? minerLogs.value;
         if (sessionStartedAt > 0) {
           stats.uptimeSeconds = Math.max(
@@ -778,10 +782,10 @@ export const useMiningController = () => {
       resetActiveSession();
       lastBackendError.value = '';
       backendState.value = Capacitor.isNativePlatform() ? 'ready' : 'web-unavailable';
-      backendMessage.value = ['Miner stopped.', historySaveError.value].filter(Boolean).join(' ');
+      backendMessage.value = [t('msg.stopped'), historySaveError.value].filter(Boolean).join(' ');
     } catch (error) {
       state.value = previous;
-      backendMessage.value = error instanceof Error ? error.message : 'Stop failed. Retry Stop.';
+      backendMessage.value = error instanceof Error ? error.message : t('msg.stopFailed');
     } finally {
       actionBusy = false;
     }
@@ -799,7 +803,7 @@ export const useMiningController = () => {
     state.value = 'pausing';
     try {
       const status = await NativeMiner.pause();
-      if (status.running) throw new Error('Miner is still running. Retry Pause.');
+      if (status.running) throw new Error(t('msg.stillRunningPause'));
       stats.acceptedShares = nonNegative(status.stats?.acceptedShares) ?? stats.acceptedShares;
       stats.rejectedShares = nonNegative(status.stats?.rejectedShares) ?? stats.rejectedShares;
       stats.uptimeSeconds = Math.max(
@@ -816,7 +820,7 @@ export const useMiningController = () => {
       stats.peakHashrate = null;
     } catch (error) {
       state.value = previous;
-      backendMessage.value = error instanceof Error ? error.message : 'Pause failed. Retry Pause.';
+      backendMessage.value = error instanceof Error ? error.message : t('msg.pauseFailed');
     } finally {
       actionBusy = false;
     }
@@ -856,9 +860,7 @@ export const useMiningController = () => {
       if (state.value !== 'paused') return;
     }
     updateProfileConfig(profile);
-    if (wasRunning)
-      backendMessage.value =
-        'Performance profile changed. Review the device and resume when ready.';
+    if (wasRunning) backendMessage.value = t('msg.profileChanged');
   };
 
   const updateCoin = (coinId: string): void => {
@@ -888,14 +890,24 @@ export const useMiningController = () => {
     Object.assign(config, cloneConfig(profile.config));
   };
 
-  const deleteSessionHistoryItem = (id: string): void => {
-    sessionHistory.value = sessionHistory.value.filter((item) => item.id !== id);
-    persistSessionHistory();
+  const deleteSessionHistoryItem = async (id: string): Promise<void> => {
+    try {
+      if (Capacitor.isNativePlatform()) await NativeMiner.deleteHistory({ id });
+      sessionHistory.value = sessionHistory.value.filter((item) => item.id !== id);
+      persistSessionHistory();
+    } catch {
+      backendMessage.value = t('msg.deleteFailed');
+    }
   };
 
-  const clearSessionHistory = (): void => {
-    sessionHistory.value = [];
-    persistSessionHistory();
+  const clearSessionHistory = async (): Promise<void> => {
+    try {
+      if (Capacitor.isNativePlatform()) await NativeMiner.deleteHistory({});
+      sessionHistory.value = [];
+      persistSessionHistory();
+    } catch {
+      backendMessage.value = t('msg.clearFailed');
+    }
   };
 
   const syncDeviceTelemetry = (

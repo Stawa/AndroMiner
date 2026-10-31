@@ -1,17 +1,24 @@
 import type { MiningConfig } from '../types/mining';
 
-/** Pool usernames are valid too; do not enforce a coin-specific address length. */
+/**
+ * Returns a message key (see `validation.*` in the locale files) per invalid field, or '' when valid.
+ * Pool usernames are valid too; do not enforce a coin-specific address length.
+ */
 export const validateMiningSetup = (config: MiningConfig) => ({
   wallet:
     !config.walletAddress.trim() || /^YOUR_/i.test(config.walletAddress.trim())
-      ? 'Enter your wallet address or the username supplied by your pool.'
+      ? 'validation.wallet'
       : '',
-  pool:
-    !config.poolUrl.trim() || /\s/.test(config.poolUrl.trim())
-      ? 'Enter a pool host without spaces.'
+  pool: !config.poolUrl.trim() || /\s/.test(config.poolUrl.trim()) ? 'validation.pool' : '',
+  duration:
+    config.maxDurationMinutes !== undefined &&
+    (!Number.isInteger(config.maxDurationMinutes) ||
+      config.maxDurationMinutes < 0 ||
+      config.maxDurationMinutes > 1440)
+      ? 'validation.duration'
       : '',
   port:
     !Number.isInteger(config.poolPort) || config.poolPort < 1 || config.poolPort > 65535
-      ? 'Use a port between 1 and 65535.'
+      ? 'validation.port'
       : ''
 });

@@ -27,7 +27,7 @@ const getInitialTheme = (): ThemeMode => {
     return 'dark';
   }
 
-  let stored: string | null = null;
+  let stored: string | null;
   try {
     stored = localStorage.getItem(storageKey);
   } catch {

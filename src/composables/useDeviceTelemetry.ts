@@ -2,6 +2,7 @@ import { Device } from '@capacitor/device';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { onMounted, onUnmounted, reactive } from 'vue';
 import type { DeviceTelemetry } from '../types/mining';
+import { t } from '../i18n';
 
 interface WebBatteryManager {
   level: number;
@@ -81,14 +82,14 @@ export const useDeviceTelemetry = () => {
 
   const device = reactive<DeviceTelemetry>({
     platform: 'web',
-    model: 'Android device',
+    model: t('device.androidDevice'),
     operatingSystem: 'unknown',
     osVersion: '',
     manufacturer: 'unknown',
     batteryLevel: null,
     isCharging: false,
     cpuThreads: getHardwareConcurrency(),
-    cpuName: 'Android CPU',
+    cpuName: t('device.androidCpu'),
     cpuClockGhz: null,
     cpuClockLabel: '-',
     gpuName: 'Android GPU',
@@ -131,7 +132,7 @@ export const useDeviceTelemetry = () => {
         typeof webBattery?.charging === 'boolean' ? webBattery.charging : undefined;
 
       device.platform = info.platform;
-      device.model = info.model || 'Android device';
+      device.model = info.model || t('device.androidDevice');
       device.operatingSystem = info.operatingSystem;
       device.osVersion = info.osVersion;
       device.manufacturer = info.manufacturer || 'unknown';
@@ -139,7 +140,7 @@ export const useDeviceTelemetry = () => {
       device.cpuName =
         nativeStatus?.cpuName ||
         [info.manufacturer, info.model].filter(Boolean).join(' ') ||
-        'Android CPU';
+        t('device.androidCpu');
       device.cpuClockGhz =
         typeof nativeStatus?.cpuClockGhz === 'number' ? nativeStatus.cpuClockGhz : null;
       device.cpuClockLabel = nativeStatus?.cpuClockLabel || '-';
@@ -172,7 +173,7 @@ export const useDeviceTelemetry = () => {
     } catch {
       device.batteryLevel = null;
       device.cpuThreads = getHardwareConcurrency();
-      device.cpuName = 'Android CPU';
+      device.cpuName = t('device.androidCpu');
       device.cpuClockGhz = null;
       device.cpuClockLabel = '-';
       device.gpuName = 'Android GPU';

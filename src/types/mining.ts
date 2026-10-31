@@ -75,6 +75,7 @@ export interface MiningConfig {
   autoPauseScreenOff: boolean;
   backgroundMining: boolean;
   thermalThreshold: number;
+  maxDurationMinutes: number;
   profile: MiningProfile;
 }
 
@@ -95,6 +96,8 @@ export interface MiningStats {
   activeThreads: number;
   estimatedEarnings: number | null;
   uptimeSeconds: number;
+  remainingSeconds: number | null;
+  deadlineAt: number | null;
 }
 
 export interface MiningApiTelemetry {
@@ -130,6 +133,17 @@ export interface MiningSessionHistoryItem {
   averageHashrate: number | null;
   startedAt: string;
   endedAt: string;
+  endReason?: string;
+  reasonCode?: string;
+  algorithm?: string;
+  sampleCount?: number;
+  sampleWindowSeconds?: number;
+  hashingSeconds?: number;
+  native?: boolean;
+  pool?: string;
+  requestedThreads?: number;
+  effectiveThreads?: number | null;
+  minerVersion?: string | null;
 }
 
 export interface MiningTelemetry {
@@ -146,8 +160,6 @@ export interface MiningTelemetry {
 
 export interface ProfilePreset {
   id: MiningProfile;
-  label: string;
-  description: string;
   threads: number;
   affinity: CpuAffinity;
   thermalLimit: number;

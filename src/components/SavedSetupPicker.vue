@@ -24,19 +24,19 @@ const emit = defineEmits<{
     <div class="saved-setups-heading">
       <div>
         <h3 id="saved-setups-title">
-          Saved setups <span>{{ profiles.length }}</span>
+          {{ $t('saved.title') }} <span>{{ profiles.length }}</span>
         </h3>
-        <p>Switch between your saved wallet, pool, and CPU settings.</p>
+        <p>{{ $t('saved.subtitle') }}</p>
       </div>
       <button class="outline-button" @click="emit('create')">
-        <MaterialIcon name="add" :size="18" />New setup
+        <MaterialIcon name="add" :size="18" />{{ $t('saved.new') }}
       </button>
     </div>
     <div
       v-if="profiles.length"
       class="saved-setup-list grid gap-2.5 md:grid-cols-2"
       role="group"
-      aria-label="Saved setups"
+      :aria-label="$t('saved.title')"
     >
       <button
         v-for="profile in profiles"
@@ -52,7 +52,12 @@ const emit = defineEmits<{
         />
         <span class="saved-setup-copy">
           <strong>{{ profile.name }}</strong>
-          <span>{{ profile.config.coin.symbol }} · {{ profile.config.threadCount }} threads</span>
+          <span
+            >{{ profile.config.coin.symbol }} ·
+            {{
+              $t('unit.threads', { n: profile.config.threadCount }, profile.config.threadCount)
+            }}</span
+          >
           <small>{{ profile.config.poolUrl }}:{{ profile.config.poolPort }}</small>
         </span>
         <MaterialIcon
@@ -61,27 +66,31 @@ const emit = defineEmits<{
         />
       </button>
     </div>
-    <p v-else class="section-copy">Save your current configuration to reuse it next time.</p>
+    <p v-else class="section-copy">{{ $t('saved.empty') }}</p>
     <details v-if="profiles.some((profile) => profile.id === activeId)" class="saved-setup-manage">
-      <summary>Manage selected setup</summary>
+      <summary>{{ $t('saved.manage') }}</summary>
       <div class="saved-setup-editor">
         <ConfigInput
           :model-value="name"
-          label="Setup name"
+          :label="$t('saved.name')"
           @update:model-value="emit('update:name', String($event))"
         />
         <button class="outline-button" :disabled="!name.trim()" @click="emit('rename')">
-          Rename
+          {{ $t('saved.rename') }}
         </button>
-        <button class="outline-button" aria-label="Copy selected setup" @click="emit('duplicate')">
-          <MaterialIcon name="content_copy" :size="18" />Copy
+        <button
+          class="outline-button"
+          :aria-label="$t('saved.copyAria')"
+          @click="emit('duplicate')"
+        >
+          <MaterialIcon name="content_copy" :size="18" />{{ $t('saved.copy') }}
         </button>
         <button
           class="outline-button danger-text"
-          aria-label="Delete selected setup"
+          :aria-label="$t('saved.deleteAria')"
           @click="emit('delete')"
         >
-          <MaterialIcon name="delete" :size="18" />Delete
+          <MaterialIcon name="delete" :size="18" />{{ $t('saved.delete') }}
         </button>
       </div>
     </details>

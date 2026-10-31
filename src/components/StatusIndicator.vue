@@ -36,7 +36,7 @@ const resolvedTone = computed(() => props.tone || (props.connected ? 'good' : 'w
   >
     <span class="h-2 w-2 shrink-0 rounded-full" :class="dotClasses[resolvedTone]" />
     <span class="min-w-0 [overflow-wrap:anywhere]">{{
-      label || (connected ? 'Connected' : 'Reconnecting')
+      label || (connected ? $t('status.connected') : $t('status.reconnecting'))
     }}</span>
   </span>
 </template>

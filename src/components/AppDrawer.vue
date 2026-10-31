@@ -5,6 +5,7 @@ import BrandLogo from './BrandLogo.vue';
 import MaterialIcon from './MaterialIcon.vue';
 import type { AppTab } from './BottomNav.vue';
 import { useDialogFocus } from '../composables/useDialogFocus';
+import { t } from '../i18n';
 
 interface DrawerItem {
   label: string;
@@ -28,18 +29,18 @@ const emit = defineEmits<{
 }>();
 
 const primaryItems: DrawerItem[] = [
-  { label: 'Overview', icon: 'speed', tab: 'dashboard' },
-  { label: 'Miner', icon: 'tune', tab: 'mining' },
-  { label: 'History', icon: 'history', tab: 'statistics' },
-  { label: 'Settings', icon: 'settings', tab: 'settings' }
+  { label: 'nav.overview', icon: 'speed', tab: 'dashboard' },
+  { label: 'nav.miner', icon: 'tune', tab: 'mining' },
+  { label: 'nav.history', icon: 'history', tab: 'statistics' },
+  { label: 'nav.settings', icon: 'settings', tab: 'settings' }
 ];
 
 const secondaryItems: DrawerItem[] = [
-  { label: 'Profiles', icon: 'tune', tab: 'profiles' },
-  { label: 'Export configuration', icon: 'upload_file', action: 'export' },
-  { label: 'Import configuration', icon: 'download_for_offline', action: 'import' },
-  { label: 'Help & support', icon: 'help', tab: 'help' },
-  { label: 'About', icon: 'info', tab: 'about' }
+  { label: 'nav.profiles', icon: 'tune', tab: 'profiles' },
+  { label: 'nav.exportConfig', icon: 'upload_file', action: 'export' },
+  { label: 'nav.importConfig', icon: 'download_for_offline', action: 'import' },
+  { label: 'nav.helpSupport', icon: 'help', tab: 'help' },
+  { label: 'nav.about', icon: 'info', tab: 'about' }
 ];
 
 const rendered = ref(props.open);
@@ -51,7 +52,7 @@ useDialogFocus(
   () => emit('close')
 );
 const { displayVersion, refreshAppVersion } = useAppVersion();
-const versionLabel = computed(() => `Version ${displayVersion.value}`);
+const versionLabel = computed(() => t('nav.version', { version: displayVersion.value }));
 let closeTimer = 0;
 let openTimer = 0;
 
@@ -154,7 +155,7 @@ onBeforeUnmount(() => {
     :inert="!active"
     role="dialog"
     aria-modal="true"
-    aria-label="Application menu"
+    :aria-label="$t('nav.menuLabel')"
     @keydown.esc="emit('close')"
     @click.stop
   >
@@ -169,15 +170,15 @@ onBeforeUnmount(() => {
       <button
         class="ripple grid h-11 w-11 shrink-0 place-items-center rounded-full text-app-muted active:bg-app-elevated"
         type="button"
-        aria-label="Close menu"
+        :aria-label="$t('nav.closeMenu')"
         @click="emit('close')"
       >
         <MaterialIcon name="close" :size="22" />
       </button>
     </div>
 
-    <p class="supporting-label menu-label">WORKSPACE</p>
-    <nav class="menu-list" aria-label="Primary navigation">
+    <p class="supporting-label menu-label">{{ $t('nav.workspace') }}</p>
+    <nav class="menu-list" :aria-label="$t('nav.primary')">
       <button
         v-for="item in primaryItems"
         :key="item.label"
@@ -185,12 +186,12 @@ onBeforeUnmount(() => {
         :class="{ 'drawer-row-selected': isSelected(item) }"
         @click="selectItem(item)"
       >
-        <MaterialIcon :name="item.icon" :size="21" /><span>{{ item.label }}</span
+        <MaterialIcon :name="item.icon" :size="21" /><span>{{ $t(item.label) }}</span
         ><MaterialIcon v-if="isSelected(item)" name="check" :size="18" />
       </button>
     </nav>
-    <p class="supporting-label menu-label">TOOLS & SUPPORT</p>
-    <nav class="menu-list" aria-label="Tools and support">
+    <p class="supporting-label menu-label">{{ $t('nav.toolsSupport') }}</p>
+    <nav class="menu-list" :aria-label="$t('nav.tools')">
       <button
         v-for="item in secondaryItems"
         :key="item.label"
@@ -198,7 +199,7 @@ onBeforeUnmount(() => {
         :class="{ 'drawer-row-selected': isSelected(item) }"
         @click="selectItem(item)"
       >
-        <MaterialIcon :name="item.icon" :size="21" /><span>{{ item.label }}</span>
+        <MaterialIcon :name="item.icon" :size="21" /><span>{{ $t(item.label) }}</span>
       </button>
     </nav>
   </aside>

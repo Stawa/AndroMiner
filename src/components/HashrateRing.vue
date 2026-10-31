@@ -54,7 +54,7 @@ const progress = computed(() =>
     >
       <div>
         <p class="text-[0.75rem] font-medium uppercase tracking-[0.18em] text-app-muted">
-          Hashrate
+          {{ $t('hashrate.label') }}
         </p>
 
         <p class="mt-3 text-[3rem] font-bold leading-none text-app-on">

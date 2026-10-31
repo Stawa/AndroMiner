@@ -4,6 +4,7 @@ import ConfigInput from '../components/ConfigInput.vue';
 import MaterialIcon from '../components/MaterialIcon.vue';
 import CoinIcon from '../components/CoinIcon.vue';
 import { useProfilesStore } from '../stores/profiles';
+import { formatDate, t } from '../i18n';
 import type { MiningConfig, SavedMiningProfile } from '../types/mining';
 
 interface ProfilesViewProps {
@@ -20,18 +21,16 @@ const emit = defineEmits<{
 
 const profiles = useProfilesStore();
 const newName = ref(
-  `${props.config.coin.symbol} ${props.config.profile === 'battery_saver' ? 'Battery Saver' : props.config.profile}`
+  t('profiles.defaultName', {
+    symbol: props.config.coin.symbol,
+    profile: t(`profile.${props.config.profile}`)
+  })
 );
 
 const coinProfiles = computed(() => profiles.profilesByCoin(props.config.coin.id));
 
-const formatDate = (value: string): string =>
-  new Intl.DateTimeFormat('en', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  }).format(new Date(value));
+const formatUpdated = (value: string): string =>
+  formatDate(value, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 const saveProfile = (): void => {
   const trimmed = newName.value.trim();
@@ -40,7 +39,10 @@ const saveProfile = (): void => {
   }
 
   emit('saveCurrent', trimmed);
-  newName.value = `${props.config.coin.symbol} Custom ${profiles.profiles.length + 1}`;
+  newName.value = t('profiles.customName', {
+    symbol: props.config.coin.symbol,
+    n: profiles.profiles.length + 1
+  });
 };
 
 const applyProfile = (profile: SavedMiningProfile): void => {
@@ -51,9 +53,7 @@ const applyProfile = (profile: SavedMiningProfile): void => {
 
 const deleteProfile = (profile: SavedMiningProfile): void => {
   if (props.locked) return;
-  const confirmed = window.confirm(
-    `Delete "${profile.name}"? This saved mining profile cannot be restored.`
-  );
+  const confirmed = window.confirm(t('config.deleteConfirm', { name: profile.name }));
   if (!confirmed) {
     return;
   }
@@ -73,38 +73,41 @@ const duplicateProfile = (profile: SavedMiningProfile): void => {
 <template>
   <div class="app-page phone-page redesign-page profiles-page">
     <header class="screen-heading">
-      <h1>Mining profiles</h1>
+      <h1>{{ $t('profiles.title') }}</h1>
       <p>
-        {{ coinProfiles.length }} {{ config.coin.symbol }} setups ·
-        {{ profiles.profiles.length }} saved in total.
+        {{
+          $t('profiles.summary', {
+            count: coinProfiles.length,
+            symbol: config.coin.symbol,
+            total: profiles.profiles.length
+          })
+        }}
       </p>
     </header>
     <div v-if="locked" class="notice">
-      <p>Stop the active run to apply a different setup. You can still save a copy.</p>
+      <p>{{ $t('profiles.locked') }}</p>
     </div>
     <section class="surface profile-save">
-      <h3 class="section-title">Save this configuration</h3>
-      <p class="section-copy">
-        Keep your wallet, pool, and CPU settings together for your next run.
-      </p>
-      <ConfigInput v-model="newName" label="Setup name" /><button
+      <h3 class="section-title">{{ $t('profiles.saveTitle') }}</h3>
+      <p class="section-copy">{{ $t('profiles.saveCopy') }}</p>
+      <ConfigInput v-model="newName" :label="$t('profiles.name')" /><button
         class="primary-button full-width"
         :disabled="!newName.trim()"
         @click="saveProfile"
       >
-        <MaterialIcon name="add" :size="20" />Save setup
+        <MaterialIcon name="add" :size="20" />{{ $t('profiles.save') }}
       </button>
     </section>
     <section class="surface">
       <div class="section-heading">
-        <h3>Your saved setups</h3>
+        <h3>{{ $t('profiles.yours') }}</h3>
         <span class="supporting-label">{{ profiles.profiles.length }}</span>
       </div>
       <div v-if="!profiles.profiles.length" class="empty-state">
-        <MaterialIcon name="bookmark_border" :size="28" /><strong
-          >A good setup is worth keeping</strong
-        >
-        <p>Save the current configuration to reuse it later.</p>
+        <MaterialIcon name="bookmark_border" :size="28" /><strong>{{
+          $t('profiles.emptyTitle')
+        }}</strong>
+        <p>{{ $t('profiles.emptyBody') }}</p>
       </div>
       <div class="profile-library grid min-w-0 grid-cols-1 gap-3.5 md:grid-cols-2">
         <article v-for="profile in profiles.profiles" :key="profile.id" class="profile-row min-w-0">
@@ -117,28 +120,31 @@ const duplicateProfile = (profile: SavedMiningProfile): void => {
             <div class="min-w-0 flex-1">
               <strong class="block [overflow-wrap:anywhere]">{{ profile.name }}</strong>
               <p>
-                {{ profile.config.coin.symbol }} · {{ profile.config.threadCount }} threads ·
-                {{ profile.config.affinity }}
+                {{ profile.config.coin.symbol }} ·
+                {{
+                  $t('unit.threads', { n: profile.config.threadCount }, profile.config.threadCount)
+                }}
+                · {{ $t(`affinity.${profile.config.affinity}`) }}
               </p>
-              <small class="text-app-muted">{{ formatDate(profile.updatedAt) }}</small>
+              <small class="text-app-muted">{{ formatUpdated(profile.updatedAt) }}</small>
             </div>
-            <span v-if="profile.id === profiles.activeProfileId" class="supporting-label"
-              >ACTIVE</span
-            >
+            <span v-if="profile.id === profiles.activeProfileId" class="supporting-label">{{
+              $t('profiles.active')
+            }}</span>
           </div>
           <div class="action-row">
             <button class="outline-button" :disabled="locked" @click="applyProfile(profile)">
-              Use setup</button
+              {{ $t('profiles.use') }}</button
             ><button
               class="outline-button"
-              :aria-label="'Duplicate ' + profile.name"
+              :aria-label="$t('profiles.duplicate', { name: profile.name })"
               :disabled="locked"
               @click="duplicateProfile(profile)"
             >
               <MaterialIcon name="content_copy" :size="18" /></button
             ><button
               class="outline-button danger-text"
-              :aria-label="'Delete ' + profile.name"
+              :aria-label="$t('profiles.delete', { name: profile.name })"
               :disabled="locked"
               @click="deleteProfile(profile)"
             >
