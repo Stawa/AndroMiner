@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import BarList from './BarList.vue';
+import type { BarRow } from './BarList.vue';
 import TrendChart from './TrendChart.vue';
 import type { Breakdown, PublicStats } from './types';
 
@@ -12,10 +14,6 @@ const loading = ref(true);
 
 const regionNames = new Intl.DisplayNames(undefined, { type: 'region' });
 const number = new Intl.NumberFormat();
-const percent = (share: number): string => `${(share * 100).toFixed(share < 0.1 ? 1 : 0)}%`;
-
-const flag = (code: string): string =>
-  String.fromCodePoint(...[...code].map((char) => 0x1f1e6 + char.charCodeAt(0) - 65));
 const countryName = (code: string): string => regionNames.of(code) || code;
 const variantLabels: Record<string, string> = {
   tls: 'TLS bundled',
@@ -28,7 +26,9 @@ const load = async (): Promise<void> => {
   loading.value = true;
   failed.value = false;
   try {
-    if (!endpoint) throw new Error('No statistics service is configured for this build.');
+    if (!endpoint && import.meta.env.PROD === false) {
+      throw new Error('No statistics service is configured for this build.');
+    }
     const response = await fetch(`${endpoint}/v1/stats`, { credentials: 'omit' });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     stats.value = (await response.json()) as PublicStats;
@@ -56,323 +56,424 @@ const maxRelease = computed(() =>
   Math.max(1, ...(downloads.value?.releases ?? []).map((release) => release.total))
 );
 const updated = computed(() =>
-  stats.value ? new Date(stats.value.generatedAt).toLocaleString() : ''
+  stats.value
+    ? new Date(stats.value.generatedAt).toLocaleString(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short'
+      })
+    : ''
 );
-const shown = (breakdown: Breakdown): boolean => breakdown.published && breakdown.groups.length > 0;
-const installsForVersion = (tag: string): number | null => {
+
+const published = (breakdown: Breakdown): boolean =>
+  breakdown.published && breakdown.groups.length > 0;
+const rowsOf = (breakdown: Breakdown, label: (key: string) => string): BarRow[] =>
+  breakdown.groups.map((group) => ({
+    label: label(group.key),
+    count: group.count,
+    share: group.share
+  }));
+const notesOf = (breakdown: Breakdown, other: string, unshared?: string) => [
+  ...(breakdown.other ? [{ label: other, count: breakdown.other }] : []),
+  ...(unshared && breakdown.unshared ? [{ label: unshared, count: breakdown.unshared }] : [])
+];
+
+const activeFor = (tag: string): number | null => {
   const wanted = tag.replace(/^v/i, '');
-  const match = stats.value?.appVersions.groups.find((group) => group.key === wanted);
-  return match ? match.count : null;
+  return stats.value?.appVersions.groups.find((group) => group.key === wanted)?.count ?? null;
 };
 </script>
 
 <template>
-  <main class="stats-page">
-    <header class="stats-hero">
-      <p class="eyebrow">AndroMiner</p>
-      <h1>Community statistics</h1>
-      <p class="lede">
-        Aggregate figures from people who opted in to anonymous usage statistics, plus public GitHub
-        download counts. These are estimates, not a census.
-      </p>
+  <div class="page">
+    <header class="bar">
+      <a class="brand" :href="repoUrl">AndroMiner <span>Usage</span></a>
+      <nav aria-label="Project links">
+        <a :href="`${repoUrl}/blob/main/docs/statistics-methodology.md`">Methodology</a>
+        <a :href="`${repoUrl}/blob/main/docs/privacy.md`">Privacy</a>
+        <a :href="repoUrl">Source</a>
+      </nav>
     </header>
 
-    <p v-if="loading" class="state" role="status">Loading statistics…</p>
-    <div v-else-if="failed" class="state card" role="alert">
-      <p>The statistics service could not be reached. This does not affect the app.</p>
-      <button type="button" class="retry" @click="load">Try again</button>
-    </div>
-
-    <template v-else-if="stats">
-      <section aria-labelledby="overview">
-        <h2 id="overview">Overview</h2>
-        <div class="tiles">
-          <div class="card tile">
-            <span class="value">{{ downloads ? number.format(downloads.total ?? 0) : '—' }}</span>
-            <span class="name">Release downloads</span>
-            <span class="hint">GitHub APK downloads. Not people or devices.</span>
-          </div>
-          <div class="card tile">
-            <span class="value">{{ number.format(stats.active.monthly) }}</span>
-            <span class="name">Estimated active installations</span>
-            <span class="hint">Opted-in installations seen in the last 30 days</span>
-          </div>
-          <div class="card tile">
-            <span class="value">{{ number.format(stats.active.daily) }}</span>
-            <span class="name">Daily active</span>
-            <span class="hint">Checked in during the last 24 hours</span>
-          </div>
-          <div class="card tile">
-            <span class="value">{{ number.format(stats.active.weekly) }}</span>
-            <span class="name">Weekly active</span>
-            <span class="hint">Checked in during the last 7 days</span>
-          </div>
-          <div class="card tile">
-            <span class="value">{{ number.format(stats.active.monthly) }}</span>
-            <span class="name">Monthly active</span>
-            <span class="hint">Checked in during the last 30 days</span>
-          </div>
-        </div>
-        <p class="note">
-          Only installations that turned reporting on are counted, so every installation figure is a
-          lower bound. A download is one HTTP request for an APK and may be a repeat, a mirror, or a
-          bot; it is never a unique user, device or installation.
+    <main>
+      <div class="title">
+        <h1>How many people use AndroMiner</h1>
+        <p>
+          Anonymous check-ins from people who opted in, plus public GitHub download counts. These
+          are estimates, not a census.
         </p>
-      </section>
+      </div>
 
-      <section aria-labelledby="geo">
-        <h2 id="geo">Geographic distribution</h2>
-        <div class="card">
-          <ol v-if="shown(stats.countries)" class="rank">
-            <li v-for="group in stats.countries.groups" :key="group.key">
-              <span class="flag" aria-hidden="true">{{ flag(group.key) }}</span>
-              <span class="label">{{ group.key }} — {{ countryName(group.key) }}</span>
-              <span class="count">{{ number.format(group.count) }}</span>
-              <span class="share">{{ percent(group.share) }}</span>
-              <span class="bar" :style="{ width: percent(group.share) }" aria-hidden="true" />
-            </li>
-            <li v-if="stats.countries.other" class="muted">
-              <span class="flag" aria-hidden="true">🌐</span>
-              <span class="label">Other countries (fewer than {{ stats.minGroupSize }} each)</span>
-              <span class="count">{{ number.format(stats.countries.other) }}</span>
-            </li>
-            <li v-if="stats.countries.unshared" class="muted">
-              <span class="flag" aria-hidden="true">·</span>
-              <span class="label">Country not shared</span>
-              <span class="count">{{ number.format(stats.countries.unshared) }}</span>
-            </li>
-          </ol>
-          <p v-else class="empty">
-            Country statistics appear once at least {{ stats.minGroupSize }} installations have
-            reported, so no individual installation can be singled out.
-          </p>
-        </div>
-        <p class="note">
-          Countries are chosen by users in Settings. They are never detected from location or IP
-          address. A country is listed only if at least {{ stats.minGroupSize }} installations chose
-          it.
-        </p>
-      </section>
+      <p v-if="loading" class="state" role="status">Loading statistics…</p>
+      <div v-else-if="failed" class="state panel" role="alert">
+        <p>The statistics service could not be reached. This does not affect the app.</p>
+        <button type="button" class="retry" @click="load">Try again</button>
+      </div>
 
-      <section aria-labelledby="platform">
-        <h2 id="platform">Platform distribution</h2>
-        <div class="grid">
-          <div
-            v-for="item in [
-              {
-                title: 'Android versions',
-                data: stats.androidVersions,
-                label: (k: string) => `Android ${k}`
-              },
-              { title: 'AndroMiner versions', data: stats.appVersions, label: (k: string) => k },
-              {
-                title: 'APK variants',
-                data: stats.variants,
-                label: (k: string) => variantLabels[k] ?? k
-              }
-            ]"
-            :key="item.title"
-            class="card"
-          >
-            <h3>{{ item.title }}</h3>
-            <ul v-if="shown(item.data)" class="rank compact">
-              <li v-for="group in item.data.groups" :key="group.key">
-                <span class="label">{{ item.label(group.key) }}</span>
-                <span class="count">{{ number.format(group.count) }}</span>
-                <span class="share">{{ percent(group.share) }}</span>
-                <span class="bar" :style="{ width: percent(group.share) }" aria-hidden="true" />
-              </li>
-              <li v-if="item.data.other" class="muted">
-                <span class="label">Other</span>
-                <span class="count">{{ number.format(item.data.other) }}</span>
-              </li>
-            </ul>
-            <p v-else class="empty">Not enough reports to publish.</p>
+      <template v-else-if="stats">
+        <section class="hero" aria-labelledby="active-heading">
+          <div class="figures">
+            <h2 id="active-heading" class="sr-only">Active installations</h2>
+            <p class="big">
+              <span class="value">{{ number.format(stats.active.monthly) }}</span>
+              <span class="what">active installations in the last 30 days</span>
+            </p>
+            <dl class="windows">
+              <div>
+                <dt>Today</dt>
+                <dd>{{ number.format(stats.active.daily) }}</dd>
+              </div>
+              <div>
+                <dt>Last 7 days</dt>
+                <dd>{{ number.format(stats.active.weekly) }}</dd>
+              </div>
+            </dl>
+            <p class="dl">
+              <span class="value">{{ downloads ? number.format(downloads.total ?? 0) : '—' }}</span>
+              <span class="what">
+                release downloads
+                <small>GitHub APK requests, not people or devices.</small>
+              </span>
+            </p>
           </div>
-        </div>
-      </section>
 
-      <section aria-labelledby="trends">
-        <h2 id="trends">Adoption trends</h2>
-        <div class="grid">
-          <div class="card">
-            <h3>Daily active installations</h3>
+          <div class="panel">
+            <h2>Daily active installations</h2>
             <TrendChart :points="dailyPoints" title="Daily active installations" />
           </div>
-          <div class="card">
-            <h3>Monthly active installations</h3>
+        </section>
+
+        <div class="split">
+          <section class="panel" aria-labelledby="geo">
+            <h2 id="geo">Countries</h2>
+            <BarList
+              v-if="published(stats.countries)"
+              :rows="rowsOf(stats.countries, (key) => `${countryName(key)} (${key})`)"
+              :notes="
+                notesOf(
+                  stats.countries,
+                  `Other countries (fewer than ${stats.minGroupSize} each)`,
+                  'Country not shared'
+                )
+              "
+            />
+            <p v-else class="empty">
+              Countries appear once at least {{ stats.minGroupSize }} installations have reported,
+              so no single installation can be picked out.
+            </p>
+            <p class="foot">
+              Chosen by users in Settings, never detected from location or IP address.
+            </p>
+          </section>
+
+          <div class="stack">
+            <section class="panel" aria-labelledby="android">
+              <h2 id="android">Android versions</h2>
+              <BarList
+                v-if="published(stats.androidVersions)"
+                :rows="rowsOf(stats.androidVersions, (key) => `Android ${key}`)"
+                :notes="notesOf(stats.androidVersions, 'Other')"
+              />
+              <p v-else class="empty">Not enough reports to publish yet.</p>
+            </section>
+            <section class="panel" aria-labelledby="variants">
+              <h2 id="variants">APK variants</h2>
+              <BarList
+                v-if="published(stats.variants)"
+                :rows="rowsOf(stats.variants, (key) => variantLabels[key] ?? key)"
+                :notes="notesOf(stats.variants, 'Other')"
+              />
+              <p v-else class="empty">Not enough reports to publish yet.</p>
+            </section>
+          </div>
+        </div>
+
+        <section class="panel" aria-labelledby="versions">
+          <h2 id="versions">Versions</h2>
+          <table v-if="downloads?.releases?.length">
+            <thead>
+              <tr>
+                <th scope="col">Release</th>
+                <th scope="col" class="num">Active</th>
+                <th scope="col" class="num">Downloads</th>
+                <th scope="col" class="meter"><span class="sr-only">Share of downloads</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="release in downloads.releases" :key="release.tag">
+                <th scope="row">
+                  {{ release.tag }}
+                  <small v-if="release.prerelease">pre-release</small>
+                </th>
+                <td class="num">
+                  {{
+                    activeFor(release.tag) === null ? '—' : number.format(activeFor(release.tag)!)
+                  }}
+                </td>
+                <td class="num">{{ number.format(release.total) }}</td>
+                <td class="meter" aria-hidden="true">
+                  <span class="track"
+                    ><span
+                      class="fill"
+                      :style="{ width: `${(release.total / maxRelease) * 100}%` }"
+                  /></span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <BarList
+            v-else-if="published(stats.appVersions)"
+            :rows="rowsOf(stats.appVersions, (key) => key)"
+            :notes="notesOf(stats.appVersions, 'Other')"
+          />
+          <p v-else class="empty">
+            Version figures appear once enough installations have reported.
+          </p>
+          <p class="foot">
+            <template v-if="downloads">
+              Downloads come from the GitHub Releases API<template v-if="downloads.fetchedAt"
+                >, last fetched {{ new Date(downloads.fetchedAt).toLocaleString() }}</template
+              >. A download is one HTTP request and may be a repeat, a mirror or a bot.
+            </template>
+            <template v-else>Download counts are temporarily unavailable.</template>
+          </p>
+        </section>
+
+        <div class="split even">
+          <section class="panel" aria-labelledby="monthly">
+            <h2 id="monthly">Monthly active installations</h2>
             <TrendChart :points="monthlyPoints" title="Monthly active installations" kind="bar" />
-          </div>
-          <div class="card">
-            <h3>Release downloads over time</h3>
+          </section>
+          <section class="panel" aria-labelledby="dltrend">
+            <h2 id="dltrend">Release downloads over time</h2>
             <TrendChart :points="downloadPoints" title="Cumulative release downloads" />
-          </div>
+          </section>
         </div>
-      </section>
 
-      <section aria-labelledby="releases">
-        <h2 id="releases">Downloads by release</h2>
-        <div class="card">
-          <template v-if="downloads">
-            <ul class="rank compact">
-              <li v-for="release in downloads.releases" :key="release.tag">
-                <span class="label"
-                  >{{ release.tag }}
-                  <small v-if="installsForVersion(release.tag) !== null">
-                    · {{ number.format(installsForVersion(release.tag) ?? 0) }} active</small
-                  ></span
-                >
-                <span class="count">{{ number.format(release.total) }}</span>
-                <span
-                  class="bar"
-                  :style="{ width: `${(release.total / maxRelease) * 100}%` }"
-                  aria-hidden="true"
-                />
-              </li>
-            </ul>
-            <h3>By APK variant</h3>
-            <ul class="rank compact">
-              <li v-for="(count, key) in downloads.byVariant" :key="key">
-                <span class="label">{{ variantLabels[key] ?? key }}</span>
-                <span class="count">{{ number.format(count) }}</span>
-              </li>
-            </ul>
-          </template>
-          <p v-else class="empty">Download counts are temporarily unavailable.</p>
-        </div>
-        <p class="note">
-          Source: GitHub Releases API
-          <template v-if="downloads?.fetchedAt"
-            >, cached, last fetched {{ new Date(downloads.fetchedAt).toLocaleString() }}</template
-          >. Counts include repeated downloads and do not represent installations.
-        </p>
-      </section>
-
-      <footer class="foot">
-        <p>
-          Generated {{ updated }}. Individual records are removed after
-          {{ stats.retentionDays }} days of inactivity.
-          <a :href="`${repoUrl}/blob/main/docs/statistics-methodology.md`">Methodology</a> ·
-          <a :href="`${repoUrl}/blob/main/docs/privacy.md`">Privacy policy</a> ·
-          <a :href="repoUrl">Source code</a>
-        </p>
-      </footer>
-    </template>
-  </main>
+        <footer>
+          <p>
+            Only installations that turned reporting on are counted, so every installation figure is
+            a lower bound. Individual records are removed after
+            {{ stats.retentionDays }} days of inactivity. Updated {{ updated }}.
+          </p>
+        </footer>
+      </template>
+    </main>
+  </div>
 </template>
 
 <style scoped>
-.stats-page {
-  max-width: 64rem;
+.page {
+  max-width: 72rem;
   margin: 0 auto;
-  padding: 32px 16px 64px;
-  display: grid;
-  gap: 32px;
+  padding: 0 var(--spacing-page, 16px) 64px;
 }
-.eyebrow {
-  margin: 0;
-  color: rgb(var(--color-app-green));
-  font-weight: 650;
-  font-size: 0.8125rem;
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 0;
 }
-h1 {
-  margin: 4px 0 8px;
-  font-size: clamp(1.75rem, 5vw, 2.5rem);
-  line-height: 1.15;
+.brand {
+  font-weight: 750;
+  font-size: 1.0625rem;
+  color: inherit;
+  text-decoration: none;
+  white-space: nowrap;
 }
-h2 {
-  margin: 0 0 12px;
-  font-size: 1.125rem;
+.brand span {
+  color: rgb(var(--color-app-muted));
+  font-weight: 550;
+  margin-left: 6px;
 }
-h3 {
-  margin: 0 0 12px;
+nav {
+  display: flex;
+  gap: 20px;
   font-size: 0.875rem;
 }
-.lede,
-.note,
-.empty,
-.foot {
+nav a {
   color: rgb(var(--color-app-muted));
-  font-size: 0.8125rem;
-  line-height: 1.65;
-  max-width: 62ch;
+  text-decoration: none;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
 }
-.note {
-  margin: 12px 0 0;
+nav a:hover {
+  color: rgb(var(--color-app-on));
 }
-.card {
+main {
+  display: grid;
+  gap: 16px;
+}
+.title {
+  padding: 24px 0 12px;
+}
+h1 {
+  margin: 0 0 12px;
+  font-size: clamp(1.75rem, 4.5vw, 2.75rem);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  max-width: 20ch;
+}
+.title p {
+  margin: 0;
+  max-width: 56ch;
+  color: rgb(var(--color-app-muted));
+  line-height: 1.6;
+}
+h2 {
+  margin: 0 0 16px;
+  font-size: 0.9375rem;
+  font-weight: 650;
+}
+.panel {
   background: rgb(var(--color-app-card));
+  border: 1px solid rgb(var(--color-app-line));
   border-radius: var(--radius-panel, 16px);
-  padding: 16px;
+  padding: clamp(16px, 2vw, 24px);
   min-width: 0;
 }
-.tiles {
+.hero {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
-  gap: 12px;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 16px;
+  align-items: stretch;
 }
-.tile {
+.figures {
   display: grid;
-  gap: 4px;
+  align-content: space-between;
+  gap: 28px;
+  padding: 8px 0;
 }
 .value {
-  font-size: 1.75rem;
+  display: block;
   font-weight: 750;
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  line-height: 1;
 }
-.name {
-  font-weight: 600;
-  font-size: 0.8125rem;
+.big .value {
+  font-size: clamp(3.5rem, 9vw, 6rem);
+  color: rgb(var(--color-app-green));
 }
-.hint {
+.dl .value {
+  font-size: 2.25rem;
+}
+.what {
+  display: block;
+  margin-top: 8px;
   color: rgb(var(--color-app-muted));
-  font-size: 0.75rem;
-  line-height: 1.5;
+  font-size: 0.9375rem;
 }
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
-  gap: 12px;
-}
-.rank {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 4px;
-}
-.rank li {
-  position: relative;
-  display: grid;
-  grid-template-columns: auto 1fr auto 3.5rem;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 4px;
+.what small {
+  display: block;
+  margin-top: 2px;
   font-size: 0.8125rem;
-  overflow: hidden;
 }
-.rank.compact li {
-  grid-template-columns: 1fr auto 3.5rem;
+.big,
+.dl {
+  margin: 0;
 }
-.rank .count,
-.rank .share {
-  text-align: right;
+.windows {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  justify-content: start;
+  gap: 28px;
+}
+.windows dt {
+  color: rgb(var(--color-app-muted));
+  font-size: 0.8125rem;
+}
+.windows dd {
+  margin: 2px 0 0;
+  font-size: 1.5rem;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
-.rank .bar {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  height: 3px;
-  background: rgb(var(--color-app-green));
-  border-radius: 2px;
-  opacity: 0.8;
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: 16px;
 }
-.rank .muted {
+.split.even {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.stack {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+.foot,
+.empty,
+footer p {
   color: rgb(var(--color-app-muted));
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  max-width: 64ch;
 }
-.flag {
-  font-size: 1.125rem;
+.foot {
+  margin: 20px 0 0;
+}
+.empty {
+  margin: 0;
+}
+footer {
+  padding: 16px 4px 0;
+}
+footer p {
+  margin: 0;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+th,
+td {
+  padding: 12px 8px;
+  text-align: left;
+  border-bottom: 1px solid rgb(var(--color-app-line));
+  font-weight: 500;
+}
+thead th {
+  color: rgb(var(--color-app-muted));
+  font-size: 0.8125rem;
+  padding-top: 0;
+}
+tbody th {
+  font-weight: 650;
+}
+tbody tr:last-child th,
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.meter {
+  width: 35%;
+  padding-left: 20px;
+}
+.track {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: rgb(var(--color-app-elevated));
+  overflow: hidden;
+}
+.fill {
+  display: block;
+  height: 100%;
+  background: rgb(var(--color-app-green));
+  border-radius: 3px;
+}
+small {
+  color: rgb(var(--color-app-muted));
+  font-weight: 500;
+  margin-left: 6px;
 }
 .state {
   color: rgb(var(--color-app-muted));
@@ -382,14 +483,36 @@ h3 {
   min-height: 44px;
   padding: 0 16px;
   border: 1px solid rgb(var(--color-app-line));
-  border-radius: 12px;
+  border-radius: var(--radius-control, 12px);
   background: transparent;
   color: rgb(var(--color-app-on));
+  cursor: pointer;
 }
-.foot a {
-  color: rgb(var(--color-app-green));
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid rgb(var(--color-app-green));
+  outline-offset: 2px;
 }
-small {
-  color: rgb(var(--color-app-muted));
+
+@media (max-width: 860px) {
+  .hero,
+  .split,
+  .split.even {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .meter {
+    display: none;
+  }
+}
+@media (max-width: 480px) {
+  .brand span {
+    display: none;
+  }
+  .windows {
+    gap: 20px;
+  }
+  nav {
+    gap: 12px;
+  }
 }
 </style>

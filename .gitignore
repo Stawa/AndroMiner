@@ -10,12 +10,9 @@ coverage/
 .sourcemaps/
 *.map
 *.tsbuildinfo
-# Keep source tests tracked despite the broad pattern above
-!tests/
-!tests/**
-!server/tests/
-!server/tests/**
-*test*
+# Test run output (the tests themselves are source and stay tracked)
+test-results/
+playwright-report/
 
 # Capacitor / Android generated files
 android/.gradle/
@@ -76,3 +73,9 @@ Carthage/
 
 # Statistics service data
 server/data/*.sqlite*
+
+# JVM crash dumps and local tooling
+hs_err_pid*
+replay_pid*
+.claude/
+*.base64

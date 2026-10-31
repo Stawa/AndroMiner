@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 interface Point {
   label: string;
@@ -10,34 +10,101 @@ const props = defineProps<{
   points: Point[];
   title: string;
   kind?: 'line' | 'bar';
-  unit?: string;
 }>();
 
 const width = 640;
-const height = 200;
-const pad = { top: 12, right: 12, bottom: 26, left: 44 };
-
-const max = computed(() => Math.max(1, ...props.points.map((point) => point.value)));
+const height = 220;
+const pad = { top: 16, right: 12, bottom: 28, left: 40 };
 const innerWidth = width - pad.left - pad.right;
 const innerHeight = height - pad.top - pad.bottom;
 
+const compact = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 });
+const full = new Intl.NumberFormat();
+
+const formatLabel = (label: string): string => {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(label)) {
+    return new Date(`${label}T00:00:00Z`).toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC'
+    });
+  }
+  if (/^\d{4}-\d{2}$/.test(label)) {
+    return new Date(`${label}-01T00:00:00Z`).toLocaleDateString(undefined, {
+      month: 'short',
+      year: '2-digit',
+      timeZone: 'UTC'
+    });
+  }
+  return label;
+};
+
+// A flat or empty series still gets a sensible scale; whole-number ticks only.
+const niceMax = computed(() => {
+  const peak = Math.max(1, ...props.points.map((point) => point.value));
+  const step = 10 ** Math.floor(Math.log10(peak));
+  return Math.ceil(peak / step) * step;
+});
+const ticks = computed(() => [0, 0.5, 1].map((fraction) => Math.round(niceMax.value * fraction)));
+
+const isBar = computed(() => props.kind === 'bar');
+const slot = computed(() => innerWidth / Math.max(1, props.points.length));
 const xFor = (index: number): number =>
-  props.points.length < 2
-    ? pad.left + innerWidth / 2
+  isBar.value || props.points.length < 2
+    ? pad.left + slot.value * (index + 0.5)
     : pad.left + (index / (props.points.length - 1)) * innerWidth;
-const yFor = (value: number): number => pad.top + innerHeight - (value / max.value) * innerHeight;
+const yFor = (value: number): number =>
+  pad.top + innerHeight - (value / niceMax.value) * innerHeight;
+const barWidth = computed(() => Math.max(3, Math.min(36, slot.value * 0.7)));
 
 const path = computed(() =>
   props.points
     .map((point, i) => `${i ? 'L' : 'M'}${xFor(i).toFixed(1)},${yFor(point.value).toFixed(1)}`)
     .join('')
 );
-const barWidth = computed(() =>
-  Math.max(2, Math.min(40, innerWidth / Math.max(1, props.points.length) - 4))
+
+const hovered = ref<number | null>(null);
+const active = computed(() =>
+  props.points.length ? (hovered.value ?? props.points.length - 1) : null
 );
-const ticks = computed(() => [0, 0.5, 1].map((fraction) => Math.round(max.value * fraction)));
+const readout = computed(() => (active.value === null ? null : props.points[active.value]));
+const caption = computed(() => (hovered.value === null ? 'Latest' : 'Selected'));
+
+const indexAt = (event: PointerEvent): number => {
+  const box = (event.currentTarget as SVGElement).getBoundingClientRect();
+  const x = ((event.clientX - box.left) / box.width) * width;
+  const raw = isBar.value
+    ? (x - pad.left) / slot.value - 0.5
+    : ((x - pad.left) / innerWidth) * (props.points.length - 1);
+  return Math.min(props.points.length - 1, Math.max(0, Math.round(raw)));
+};
+const onMove = (event: PointerEvent): void => {
+  if (props.points.length) hovered.value = indexAt(event);
+};
+const onKey = (event: KeyboardEvent): void => {
+  if (!props.points.length) return;
+  const last = props.points.length - 1;
+  const current = hovered.value ?? last;
+  if (event.key === 'ArrowLeft') hovered.value = Math.max(0, current - 1);
+  else if (event.key === 'ArrowRight') hovered.value = Math.min(last, current + 1);
+  else if (event.key === 'Escape') hovered.value = null;
+  else return;
+  event.preventDefault();
+};
+
 const edgeLabels = computed(() =>
-  props.points.length ? [props.points[0], props.points[props.points.length - 1]] : []
+  props.points.length > 1
+    ? [
+        { text: formatLabel(props.points[0].label), x: pad.left, anchor: 'start' },
+        {
+          text: formatLabel(props.points[props.points.length - 1].label),
+          x: width - pad.right,
+          anchor: 'end'
+        }
+      ]
+    : props.points.length === 1
+      ? [{ text: formatLabel(props.points[0].label), x: xFor(0), anchor: 'middle' }]
+      : []
 );
 const summary = computed(() =>
   props.points.length
@@ -48,44 +115,73 @@ const summary = computed(() =>
 
 <template>
   <figure class="chart">
-    <svg :viewBox="`0 0 ${width} ${height}`" role="img" :aria-label="summary">
+    <div class="readout" aria-live="polite">
+      <template v-if="readout">
+        <strong>{{ full.format(readout.value) }}</strong>
+        <span>{{ caption }} · {{ formatLabel(readout.label) }}</span>
+      </template>
+      <span v-else>No data yet</span>
+    </div>
+    <svg
+      :viewBox="`0 0 ${width} ${height}`"
+      role="img"
+      tabindex="0"
+      :aria-label="summary"
+      @pointermove="onMove"
+      @pointerleave="hovered = null"
+      @keydown="onKey"
+      @blur="hovered = null"
+    >
       <g class="grid">
         <template v-for="tick in ticks" :key="tick">
           <line :x1="pad.left" :x2="width - pad.right" :y1="yFor(tick)" :y2="yFor(tick)" />
-          <text :x="pad.left - 8" :y="yFor(tick) + 4" text-anchor="end">{{ tick }}</text>
+          <text :x="pad.left - 8" :y="yFor(tick) + 4" text-anchor="end">
+            {{ compact.format(tick) }}
+          </text>
         </template>
       </g>
       <template v-if="points.length">
-        <path v-if="kind !== 'bar'" :d="path" class="series" />
-        <template v-else>
+        <template v-if="isBar">
           <rect
             v-for="(point, i) in points"
             :key="point.label"
             class="bar"
+            :class="{ dim: active !== i }"
             :x="xFor(i) - barWidth / 2"
             :y="yFor(point.value)"
             :width="barWidth"
-            :height="pad.top + innerHeight - yFor(point.value)"
+            :height="Math.max(1, pad.top + innerHeight - yFor(point.value))"
             rx="3"
           />
         </template>
-        <circle
-          v-if="kind !== 'bar' && points.length === 1"
-          :cx="xFor(0)"
-          :cy="yFor(points[0].value)"
-          r="4"
-          class="dot"
-        />
+        <template v-else>
+          <path v-if="points.length > 1" :d="path" class="series" />
+          <line
+            v-if="hovered !== null"
+            class="cursor"
+            :x1="xFor(hovered)"
+            :x2="xFor(hovered)"
+            :y1="pad.top"
+            :y2="pad.top + innerHeight"
+          />
+          <circle
+            v-if="active !== null"
+            :cx="xFor(active)"
+            :cy="yFor(points[active].value)"
+            r="4.5"
+            class="dot"
+          />
+        </template>
       </template>
       <text
-        v-for="(point, i) in edgeLabels"
-        :key="point.label"
+        v-for="edge in edgeLabels"
+        :key="edge.text"
         class="axis"
-        :x="i === 0 ? pad.left : width - pad.right"
+        :x="edge.x"
         :y="height - 6"
-        :text-anchor="i === 0 ? 'start' : 'end'"
+        :text-anchor="edge.anchor"
       >
-        {{ point.label }}
+        {{ edge.text }}
       </text>
       <text v-if="!points.length" class="axis" :x="width / 2" :y="height / 2" text-anchor="middle">
         Not enough data yet
@@ -99,29 +195,69 @@ const summary = computed(() =>
 .chart {
   margin: 0;
 }
+.readout {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-height: 2rem;
+  margin-bottom: 8px;
+}
+.readout strong {
+  font-size: 1.5rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+.readout span {
+  color: rgb(var(--color-app-muted));
+  font-size: 0.8125rem;
+}
 svg {
   display: block;
   width: 100%;
   height: auto;
+  touch-action: pan-y;
+  border-radius: 8px;
 }
 .grid line {
   stroke: rgb(var(--color-app-line));
   stroke-width: 1;
+  opacity: 0.7;
 }
 text {
   fill: rgb(var(--color-app-muted));
   font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 .series {
   fill: none;
   stroke: rgb(var(--color-app-green));
-  stroke-width: 2.5;
+  stroke-width: 2.25;
   stroke-linejoin: round;
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;
 }
+.cursor {
+  stroke: rgb(var(--color-app-muted));
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
 .bar,
 .dot {
   fill: rgb(var(--color-app-green));
+}
+.dot {
+  stroke: rgb(var(--color-app-card));
+  stroke-width: 2;
+}
+.bar {
+  transition: opacity 120ms ease;
+}
+.bar.dim {
+  opacity: 0.45;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bar {
+    transition: none;
+  }
 }
 </style>
