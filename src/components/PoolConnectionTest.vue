@@ -32,8 +32,7 @@ async function testConnection() {
   preview.value = '';
   copied.value = false;
   try {
-    if (!Capacitor.isNativePlatform())
-      throw new Error(t('pool.androidOnly'));
+    if (!Capacitor.isNativePlatform()) throw new Error(t('pool.androidOnly'));
     const tls = /ssl|tls|https/.test(props.config.protocol);
     report.value = await native.testPool({
       host: props.config.poolUrl,
@@ -79,7 +78,8 @@ async function copyReport() {
     <p v-if="error" role="alert" class="field-error">{{ error }}</p>
     <ol v-if="report" class="section-copy" aria-live="polite">
       <li v-for="(stage, index) in report.stages" :key="index">
-        <strong>{{ stage.stage }} · {{ stage.passed ? $t('pool.passed') : $t('pool.failed') }}</strong
+        <strong
+          >{{ stage.stage }} · {{ stage.passed ? $t('pool.passed') : $t('pool.failed') }}</strong
         >: {{ stage.detail }}
       </li>
     </ol>
