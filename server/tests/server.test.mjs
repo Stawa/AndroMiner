@@ -290,3 +290,16 @@ test('rebuilds an older database whose install columns were required', () => {
   store.db.prepare('INSERT INTO installs VALUES (?, NULL, NULL, NULL, NULL, 3, 4)').run(hex(2));
   store.db.close();
 });
+
+test('error responses never echo request text', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const attack = '<img src=x onerror=alert(1)>';
+  const res = await s.post({ ...baseCheckin(9), [attack]: 'x' });
+  assert.equal(res.status, 400);
+  const text = await res.text();
+  assert.equal(text.includes('<img'), false);
+  assert.equal(text.includes('onerror'), false);
+  assert.match(res.headers.get('content-type'), /^application\/json/);
+  assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
+});

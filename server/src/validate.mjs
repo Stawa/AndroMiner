@@ -25,7 +25,8 @@ export const validateCheckin = (body) => {
     return { ok: false, error: 'Body must be a JSON object.' };
   }
   for (const key of Object.keys(body)) {
-    if (!allowedFields.has(key)) return { ok: false, error: `Unexpected field: ${key}.` };
+    if (!allowedFields.has(key))
+      return { ok: false, error: 'Request contains an unexpected field.' };
   }
   if (body.v !== 1) return { ok: false, error: 'Unsupported schema version.' };
   if (!isInstallationId(body.installationId)) {
@@ -35,7 +36,6 @@ export const validateCheckin = (body) => {
   if (country !== null && !isCountryCode(country)) {
     return { ok: false, error: 'country must be an ISO 3166-1 alpha-2 code or null.' };
   }
-  // A user may switch any of these off; the client then sends null and nothing is stored for it.
   const appVersion = body.appVersion ?? null;
   const androidMajor = body.androidMajor ?? null;
   const variant = body.variant ?? null;
