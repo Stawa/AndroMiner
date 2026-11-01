@@ -31,8 +31,6 @@ final class PoolProbe {
         }
     }
 
-    // One resolver task at a time. A platform DNS call that ignores interruption cannot leak
-    // threads.
     private static final ExecutorService resolver =
             Executors.newSingleThreadExecutor(
                     r -> {

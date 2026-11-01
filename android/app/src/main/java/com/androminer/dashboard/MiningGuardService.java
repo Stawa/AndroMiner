@@ -60,7 +60,6 @@ public class MiningGuardService extends Service {
     }
 
     static void begin(Context context, Session owner) throws Exception {
-        // Wait for a prior service instance to finish before attaching a new process.
         ended.get(5, TimeUnit.SECONDS);
         session = owner;
         CompletableFuture<Void> started = new CompletableFuture<>();

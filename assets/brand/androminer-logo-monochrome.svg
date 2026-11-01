@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>AndroMiner monochrome</title>
+  <g transform="translate(512 512) scale(0.9) translate(-512 -512)">
+    <mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024"><rect width="1024" height="1024" fill="#fff"/>
+      <path d="M421 506L479 552L421 598M519 598H603" fill="none" stroke="#000" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/></mask>
+    <g fill="#000" stroke="#000" mask="url(#m)">
+      <path d="M262 665A250 250 0 0 1 762 665Z" stroke="none"/>
+      <path d="M372.1 474.9L315.1 376.1M651.9 474.9L708.9 376.1" fill="none" stroke-width="34" stroke-linecap="round"/>
+    </g>
+  </g>
+</svg>

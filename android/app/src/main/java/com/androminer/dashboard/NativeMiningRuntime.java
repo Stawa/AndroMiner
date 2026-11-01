@@ -700,7 +700,6 @@ final class NativeMiningRuntime {
         startedAtMs = SystemClock.elapsedRealtime();
         sessionClock.start(startedAtMs, minutes);
         transition("starting", "user_start");
-        // A run must be durably identifiable before its process is launched.
         journal.save(sessionRecord);
         storageError = "";
     }
@@ -1493,7 +1492,6 @@ final class NativeMiningRuntime {
             }
 
             JSONObject backends = null;
-            // Optional backend details must never invalidate a valid summary.
             try {
                 backends = getApiJson(port, token, "/2/backends");
             } catch (IOException | JSONException ignored) {

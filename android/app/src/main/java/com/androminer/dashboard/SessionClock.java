@@ -19,7 +19,6 @@ final class SessionClock {
     }
 
     void sample(long now, boolean measuredHashing) {
-        // Never count an unobserved long gap as hashing time.
         if (hashing) hashingMillis += Math.min(10_000, Math.max(0, now - sampledAt));
         sampledAt = now;
         hashing = measuredHashing;

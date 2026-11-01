@@ -85,7 +85,6 @@ final class SessionJournal extends SQLiteOpenHelper {
     }
 
     synchronized void delete(String id) {
-        // Active runs cannot be deleted while the watchdog is updating their checkpoint.
         JSArray rows = records();
         for (int i = 0; i < rows.length(); i++) {
             JSObject row = (JSObject) rows.opt(i);
