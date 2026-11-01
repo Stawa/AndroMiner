@@ -1,3 +1,9 @@
+/* Default page stack. Lives in the components layer (not the app-page utility) so a page can switch to grid. */
+.app-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-layout);
+}
 .onboarding-page {
   width: 100%;
   max-width: var(--container-phone);

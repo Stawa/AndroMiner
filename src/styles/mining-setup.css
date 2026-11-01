@@ -285,15 +285,11 @@
   letter-spacing: -0.005em;
   white-space: normal;
 }
-.cfg-actions .primary-button {
-  box-shadow: 0 8px 24px -10px rgb(var(--color-app-green) / 0.7);
-}
 .cfg-actions .outline-button {
   background: rgb(var(--color-app-elevated));
   color: rgb(var(--color-app-on));
 }
 .cfg-actions button:disabled {
-  box-shadow: none;
   opacity: 0.45;
 }
 .cfg-alert {

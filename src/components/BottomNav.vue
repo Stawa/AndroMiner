@@ -42,7 +42,7 @@ const secondaryItems: NavItem[] = [
       <button
         v-for="item in items"
         :key="item.id"
-        class="bottom-nav-button flex min-w-0 flex-col items-center justify-center gap-1.5 text-[0.75rem] font-medium md:min-h-18 md:text-[0.75rem]"
+        class="bottom-nav-button flex min-w-0 flex-col items-center justify-center gap-1.5 text-[0.75rem] font-medium md:min-h-[72px] md:text-[0.75rem]"
         :class="{ 'bottom-nav-button-active': modelValue === item.id }"
         :aria-current="modelValue === item.id ? 'page' : undefined"
         type="button"
@@ -60,7 +60,7 @@ const secondaryItems: NavItem[] = [
       <button
         v-for="item in secondaryItems"
         :key="item.id"
-        class="bottom-nav-button flex min-w-0 flex-col items-center justify-center gap-1.5 text-[0.75rem] font-medium md:min-h-18 md:text-[0.75rem]"
+        class="bottom-nav-button flex min-w-0 flex-col items-center justify-center gap-1.5 text-[0.75rem] font-medium md:min-h-[72px] md:text-[0.75rem]"
         :class="{ 'bottom-nav-button-active': modelValue === item.id }"
         :aria-current="modelValue === item.id ? 'page' : undefined"
         @click="emit('update:modelValue', item.id)"

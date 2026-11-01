@@ -1,0 +1,6 @@
+/* Profiles page. */
+
+/* Profiles is a single short form; keep it to a readable measure on wide screens. */
+.profiles-page {
+  --container-workspace: 46rem;
+}

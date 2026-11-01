@@ -605,7 +605,7 @@ const remainingLabel = computed(() =>
 
 <template>
   <div
-    class="app-page session-page redesign-page"
+    class="app-page session-page"
     :class="{ 'session-page-fullscreen': fullscreenActive }"
   >
     <header class="screen-heading session-heading">

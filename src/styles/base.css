@@ -49,6 +49,17 @@ body {
 html {
   scroll-padding-block: calc(5.5rem + var(--app-inset-top)) calc(6rem + var(--app-inset-bottom));
 }
+/* Phone-sized type reads small on tablets and desktops; rem-based sizes scale with the root. */
+@media (min-width: 64rem) {
+  html {
+    font-size: 106.25%;
+  }
+}
+@media (min-width: 80rem) {
+  html {
+    font-size: 112.5%;
+  }
+}
 input,
 select,
 textarea {

@@ -149,7 +149,7 @@ const warnings = computed(() =>
 const failures = computed(() => checkItems.value.filter((item) => item.status === 'fail'));
 </script>
 <template>
-  <main class="onboarding-page redesign-page">
+  <main class="onboarding-page">
     <header class="screen-heading">
       <h1>{{ $t('check.title') }}</h1>
       <p>{{ $t('check.intro') }}</p>

@@ -340,3 +340,42 @@
 .session-profile > .material-symbols-rounded {
   color: rgb(var(--color-app-muted));
 }
+
+
+.session-page .hash-hero {
+  padding: 22px 20px 6px;
+  border-radius: 24px;
+  background: rgb(var(--color-app-card));
+}
+.session-page .hero-pill {
+  border-radius: 999px;
+  padding: 6px 12px;
+}
+.session-page .hero-number {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+}
+.session-column .device-strip,
+.session-column .share-strip {
+  padding: 14px 6px;
+  border: 0;
+  border-radius: 20px;
+  background: rgb(var(--color-app-card));
+}
+.session-column .device-strip > div,
+.session-column .share-strip > div {
+  padding-inline: 12px;
+  border-color: rgb(var(--color-app-line));
+}
+.session-column .share-strip > div:first-child,
+.session-column .device-strip > div:first-child {
+  padding-left: 12px;
+}
+.session-column .device-strip strong,
+.session-column .share-strip strong {
+  font-size: 1.125rem;
+  font-weight: 650;
+}
+.session-protection {
+  border-radius: 18px;
+}

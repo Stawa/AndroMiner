@@ -2,9 +2,17 @@
 @import './styles/base.css' layer(base);
 @import './styles/components.css' layer(components);
 @import './styles/layout.css' layer(components);
-@import './styles/config.css' layer(components);
-@import './styles/redesign.css' layer(components);
-@import './styles/session.css' layer(components);
+@import './styles/mining-setup.css' layer(components);
+@import './styles/primitives.css' layer(components);
+@import './styles/home.css' layer(components);
+@import './styles/device.css' layer(components);
+@import './styles/navigation.css' layer(components);
+@import './styles/statistics.css' layer(components);
+@import './styles/hashrate-ring.css' layer(components);
+@import './styles/theme-transition.css' layer(components);
+@import './styles/live-session.css' layer(components);
+@import './styles/session-history.css' layer(components);
+@import './styles/profiles.css' layer(components);
 @import './styles/about.css' layer(components);
 @import './styles/utilities.css';
 @import './styles/motion.css';
@@ -12,7 +20,7 @@
 
 @theme {
   --container-phone: 42.5rem;
-  --container-workspace: 84rem;
+  --container-workspace: 70rem;
   --spacing-page: clamp(1rem, 2.3vw, 2rem);
   --spacing-panel: clamp(1rem, 1.5vw, 1.375rem);
   --spacing-layout: clamp(1.5rem, 2.3vw, 2rem);

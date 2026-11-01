@@ -71,7 +71,7 @@ const duplicateProfile = (profile: SavedMiningProfile): void => {
 </script>
 
 <template>
-  <div class="app-page phone-page redesign-page profiles-page">
+  <div class="app-page phone-page profiles-page">
     <header class="screen-heading">
       <h1>{{ $t('profiles.title') }}</h1>
       <p>

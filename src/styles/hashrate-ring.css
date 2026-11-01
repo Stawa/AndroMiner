@@ -1,0 +1,26 @@
+/* Live hashrate ring (dot matrix). */
+.ring-dot {
+  fill: rgb(var(--color-app-line));
+  transition:
+    fill 300ms ease,
+    r 300ms ease;
+}
+.ring-dot-on {
+  fill: rgb(var(--color-app-green));
+}
+.ring-dot-head {
+  animation: ring-head 1.6s ease-in-out infinite;
+}
+@keyframes ring-head {
+  50% {
+    opacity: 0.35;
+  }
+}
+.ring-number {
+  margin-top: 10px;
+  font-size: 3.25rem;
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: -0.045em;
+  font-variant-numeric: tabular-nums;
+}

@@ -16,7 +16,7 @@ const troubleshooting = [
 const firstRun = ['coin', 'pool', 'gentle', 'watch'];
 </script>
 <template>
-  <div class="app-page phone-page redesign-page help-page md:grid md:grid-cols-2 md:items-stretch">
+  <div class="app-page phone-page help-page md:grid md:grid-cols-2 md:items-stretch">
     <header class="screen-heading">
       <h1>{{ $t('nav.helpSupport') }}</h1>
       <p>{{ $t('help.subtitle') }}</p>

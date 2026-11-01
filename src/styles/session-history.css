@@ -1,0 +1,133 @@
+/* Session history list and detail sheet. */
+.st-toolbar {
+  display: grid;
+  gap: 12px;
+}
+.st-tools {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.st-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  border-radius: 16px;
+  background: rgb(var(--color-app-elevated));
+  color: rgb(var(--color-app-on));
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+.st-tool:disabled {
+  opacity: 0.45;
+}
+.st-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgb(var(--color-app-green));
+  color: var(--action-ink);
+  font-size: 0.75rem;
+}
+.st-history {
+  display: grid;
+  gap: 4px;
+}
+.st-runs {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 0;
+  list-style: none;
+}
+.st-run {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 6px;
+  border-radius: 20px;
+  background: rgb(var(--color-app-card));
+}
+.st-run .history-row {
+  flex: 1;
+  min-width: 0;
+  padding: 14px 8px 14px 16px;
+  border: 0;
+}
+.st-run .history-row b {
+  max-width: 34%;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+.st-remove {
+  display: grid;
+  place-items: center;
+  flex: 0 0 44px;
+  height: 44px;
+  border-radius: 14px;
+  color: rgb(var(--color-app-muted));
+}
+.st-remove:hover,
+.st-remove:focus-visible {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+.st-filter-grid {
+  display: grid;
+  gap: 14px;
+  margin-top: 6px;
+}
+.st-sheet-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 18px;
+}
+.st-sheet-actions button {
+  min-height: 52px;
+  border-radius: 16px;
+  border: 0;
+  font-weight: 650;
+}
+.st-sheet-actions .outline-button {
+  background: rgb(var(--color-app-elevated));
+}
+@media (min-width: 30rem) {
+  .st-sheet-actions:has(.outline-button) {
+    grid-template-columns: 1fr 2fr;
+  }
+}
+.st-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0;
+  font-size: 0.9375rem;
+}
+.st-check input {
+  width: 20px;
+  height: 20px;
+  accent-color: rgb(var(--color-app-green));
+}
+.st-preview {
+  max-height: 14rem;
+  overflow: auto;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgb(var(--color-app-bg));
+  font:
+    0.75rem/1.55 ui-monospace,
+    Consolas,
+    monospace;
+}
+@media (min-width: 48rem) {
+  .st-toolbar {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+  }
+}

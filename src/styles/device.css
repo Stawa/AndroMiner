@@ -1,0 +1,85 @@
+/* Device page. */
+.device-page {
+  display: grid;
+  gap: 28px;
+}
+.dv-hero {
+  display: grid;
+  gap: 14px;
+  padding: 18px 0 4px;
+}
+.dv-hero-top,
+.dv-battery {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.dv-reading {
+  font-size: clamp(3.5rem, 18vw, 5rem);
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: -0.045em;
+  font-variant-numeric: tabular-nums;
+}
+.dv-reading span {
+  margin-left: 4px;
+  font-size: 1.5rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: rgb(var(--color-app-muted));
+}
+.dv-reading-sm {
+  font-size: 2.5rem;
+}
+.dv-reading[data-unavailable='true'] {
+  font-size: 1.5rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: rgb(var(--color-app-muted));
+}
+.dv-note {
+  font-size: 0.75rem;
+  color: rgb(var(--color-app-muted));
+  overflow-wrap: anywhere;
+}
+.dv-group {
+  display: grid;
+  gap: 12px;
+}
+.dv-list > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 0;
+  border-top: 1px solid rgb(var(--color-app-line));
+}
+.dv-list dt {
+  flex: none;
+  font-size: 0.8125rem;
+  color: rgb(var(--color-app-muted));
+}
+.dv-list dd {
+  min-width: 0;
+  text-align: right;
+  font-size: 0.875rem;
+  font-weight: 550;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.dv-list dd[data-unavailable='true'] {
+  font-weight: 400;
+  color: rgb(var(--color-app-muted));
+}
+@media (min-width: 48rem) {
+  .device-page {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 48px;
+    align-items: start;
+  }
+  .device-page > .screen-heading,
+  .dv-hero {
+    grid-column: 1 / -1;
+  }
+}

@@ -52,7 +52,7 @@ const safeguards = [
 </script>
 
 <template>
-  <main class="onboarding-page redesign-page">
+  <main class="onboarding-page">
     <header class="screen-heading">
       <h1>{{ $t('risk.title') }}</h1>
       <p>{{ $t('risk.intro') }}</p>

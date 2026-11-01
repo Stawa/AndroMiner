@@ -1,0 +1,15 @@
+/* Bottom navigation and the tablet side rail. */
+.app-bottom-nav {
+  border-top: 1px solid rgb(var(--color-app-line));
+  background: rgb(var(--color-app-bg));
+}
+.bottom-nav-button {
+  color: rgb(var(--color-app-muted));
+}
+.bottom-nav-button-active {
+  color: rgb(var(--color-app-on));
+}
+.bottom-nav-button-active .bottom-nav-icon {
+  background: rgb(var(--color-app-green-dim));
+  color: rgb(var(--color-app-green-ink));
+}

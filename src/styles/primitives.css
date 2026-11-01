@@ -1,0 +1,88 @@
+/* Shared building blocks: status chips, dot meters, typography, buttons. */
+.eyebrow {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgb(var(--color-app-muted));
+}
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 11px 4px 9px;
+  border: 1px solid rgb(var(--color-app-line));
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+  color: rgb(var(--color-app-on));
+}
+.status-chip::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgb(var(--color-app-green));
+}
+.status-chip[data-tone='warn']::before {
+  background: rgb(var(--color-app-yellow));
+}
+.status-chip[data-tone='muted']::before {
+  background: rgb(var(--color-app-muted));
+}
+.status-chip[data-tone='danger']::before {
+  background: var(--danger);
+}
+.dot-meter {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+}
+.dot-meter > span {
+  flex: 1 1 0;
+  max-width: 10px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgb(var(--color-app-line));
+  transition: background-color 300ms ease;
+}
+.dot-meter > span[data-on='true'] {
+  background: rgb(var(--color-app-green));
+}
+.dot-meter[data-tone='warn'] > span[data-on='true'] {
+  background: rgb(var(--color-app-yellow));
+}
+.dot-meter[data-tone='danger'] > span[data-on='true'] {
+  background: var(--danger);
+}
+
+/* ---- Typography ---- */
+.screen-heading h1,
+.hm-top h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+.hm-top p {
+  margin-top: 4px;
+  font-size: 0.8125rem;
+  color: rgb(var(--color-app-muted));
+}
+
+/* ---- Buttons ---- */
+.primary-button {
+  border-radius: 14px;
+  font-weight: 700;
+  letter-spacing: 0.005em;
+}
+.primary-button:disabled {
+  background: rgb(var(--color-app-elevated));
+  color: rgb(var(--color-app-muted));
+}
+.outline-button {
+  border-radius: 14px;
+}

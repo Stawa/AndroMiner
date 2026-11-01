@@ -60,7 +60,7 @@ onMounted(() => document.addEventListener('pointerdown', onDocumentPointerDown))
 onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocumentPointerDown));
 </script>
 <template>
-  <div class="app-page phone-page redesign-page settings-page">
+  <div class="app-page phone-page settings-page">
     <header class="screen-heading">
       <h1>{{ $t('nav.settings') }}</h1>
       <p>{{ $t('settings.subtitle') }}</p>
