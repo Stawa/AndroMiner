@@ -159,9 +159,7 @@ useDialogFocus(
 );
 </script>
 <template>
-  <div
-    class="app-page phone-page insights-page md:grid md:grid-cols-2 md:items-stretch"
-  >
+  <div class="app-page phone-page insights-page md:grid md:grid-cols-2 md:items-stretch">
     <header class="screen-heading">
       <h1>{{ $t('header.statistics') }}</h1>
       <p>{{ $t('history.subtitle') }}</p>

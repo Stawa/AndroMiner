@@ -604,10 +604,7 @@ const remainingLabel = computed(() =>
 </script>
 
 <template>
-  <div
-    class="app-page session-page"
-    :class="{ 'session-page-fullscreen': fullscreenActive }"
-  >
+  <div class="app-page session-page" :class="{ 'session-page-fullscreen': fullscreenActive }">
     <header class="screen-heading session-heading">
       <div>
         <h1>{{ config.coin.name }}</h1>
