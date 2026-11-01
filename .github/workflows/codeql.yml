@@ -1,0 +1,64 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '23 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  security-events: write
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: javascript-typescript
+            build-mode: none
+          - language: java-kotlin
+            build-mode: manual
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js, Bun and JDK
+        if: matrix.language == 'java-kotlin'
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - uses: oven-sh/setup-bun@v2
+        if: matrix.language == 'java-kotlin'
+
+      - uses: actions/setup-java@v6
+        if: matrix.language == 'java-kotlin'
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          config-file: ./.github/codeql/codeql-config.yml
+
+      - name: Build Android app
+        if: matrix.language == 'java-kotlin'
+        run: |
+          bun install --frozen-lockfile
+          npm run android:sync
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;35.0.0"
+          chmod +x android/gradlew
+          android/gradlew -p android assembleDebug -PminerVariant=download -PtargetSdkVersionOverride=28 --no-daemon --stacktrace
+
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}
