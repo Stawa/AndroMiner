@@ -6,11 +6,22 @@ import { computeStats } from './stats.mjs';
 import { isInstallationId, validateCheckin } from './validate.mjs';
 
 const MAX_BODY_BYTES = 1024;
+const CLIENT_ERRORS = {
+  contentType: 'Content-Type must be application/json.',
+  tooLarge: 'Request body is too large.',
+  badJson: 'Body is not valid JSON.',
+  rateLimited: 'Too many requests.',
+  busy: 'Service is busy.',
+  badId: 'Invalid installation ID.',
+  unauthorized: 'Unauthorized.',
+  notFound: 'Not found.'
+};
 
 class HttpError extends Error {
-  constructor(status, message, headers = {}) {
-    super(message);
+  constructor(status, code, headers = {}) {
+    super(code);
     this.status = status;
+    this.code = code;
     this.headers = headers;
   }
 }
@@ -18,19 +29,19 @@ class HttpError extends Error {
 const readJson = async (request) => {
   const type = (request.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
   if (type !== 'application/json') {
-    throw new HttpError(415, 'Content-Type must be application/json.');
+    throw new HttpError(415, 'contentType');
   }
   const chunks = [];
   let size = 0;
   for await (const chunk of request) {
     size += chunk.length;
-    if (size > MAX_BODY_BYTES) throw new HttpError(413, 'Request body is too large.');
+    if (size > MAX_BODY_BYTES) throw new HttpError(413, 'tooLarge');
     chunks.push(chunk);
   }
   try {
     return JSON.parse(Buffer.concat(chunks).toString('utf8'));
   } catch {
-    throw new HttpError(400, 'Body is not valid JSON.');
+    throw new HttpError(400, 'badJson');
   }
 };
 
@@ -61,7 +72,7 @@ export const createApp = ({ config, store, now = Date.now, fetchImpl }) => {
   const limit = (limiter, request, bucket) => {
     const result = limiter.check(clientAddress(request), bucket);
     if (!result.allowed) {
-      throw new HttpError(429, 'Too many requests.', {
+      throw new HttpError(429, 'rateLimited', {
         'Retry-After': String(result.retryAfterSeconds)
       });
     }
@@ -88,19 +99,19 @@ export const createApp = ({ config, store, now = Date.now, fetchImpl }) => {
     if (request.method === 'POST' && pathname === '/v1/checkin') {
       limit(writeLimiter, request, 'write');
       const result = validateCheckin(await readJson(request));
-      if (!result.ok) throw new HttpError(400, result.error);
+      if (!result.ok) return send(response, 400, { ok: false, error: result.error });
       const outcome = await store.checkin(result.value, nowSeconds(), {
         minIntervalSeconds: config.minCheckinIntervalHours * 3600,
         maxNewPerHour: config.maxNewInstallsPerHour
       });
-      if (outcome.busy) throw new HttpError(429, 'Service is busy.', { 'Retry-After': '3600' });
+      if (outcome.busy) throw new HttpError(429, 'busy', { 'Retry-After': '3600' });
       return send(response, 200, { ok: true, counted: outcome.counted });
     }
 
     const deletion = pathname.match(/^\/v1\/installations\/([^/]+)$/);
     if (request.method === 'DELETE' && deletion) {
       limit(writeLimiter, request, 'write');
-      if (!isInstallationId(deletion[1])) throw new HttpError(400, 'Invalid installation ID.');
+      if (!isInstallationId(deletion[1])) throw new HttpError(400, 'badId');
       // The same 204 is returned whether or not a record existed, so IDs cannot be probed.
       await store.deleteInstallation(deletion[1]);
       response.writeHead(204, baseHeaders());
@@ -109,13 +120,13 @@ export const createApp = ({ config, store, now = Date.now, fetchImpl }) => {
 
     if (request.method === 'GET' && pathname === '/v1/maintenance/prune' && config.cronSecret) {
       if (!isCronAuthorized(request.headers.authorization, config.cronSecret)) {
-        throw new HttpError(401, 'Unauthorized.');
+        throw new HttpError(401, 'unauthorized');
       }
       await store.prune(nowSeconds(), config);
       return send(response, 200, { ok: true });
     }
 
-    throw new HttpError(404, 'Not found.');
+    throw new HttpError(404, 'notFound');
   };
 
   const baseHeaders = (extra = {}) => ({
@@ -142,7 +153,12 @@ export const createApp = ({ config, store, now = Date.now, fetchImpl }) => {
       await route(request, response);
     } catch (error) {
       if (error instanceof HttpError) {
-        return send(response, error.status, { ok: false, error: error.message }, error.headers);
+        return send(
+          response,
+          error.status,
+          { ok: false, error: CLIENT_ERRORS[error.code] },
+          error.headers
+        );
       }
       console.error(`Unhandled error: ${error instanceof Error ? error.message : 'unknown'}`);
       send(response, 500, { ok: false, error: 'Internal error.' });
