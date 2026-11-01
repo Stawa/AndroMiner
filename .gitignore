@@ -153,6 +153,7 @@ replay_pid*
 CLAUDE.local.md
 .cursor/
 *.base64
+.taste-skill
 
 # local
 PLAN.md

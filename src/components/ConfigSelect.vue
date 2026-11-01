@@ -20,10 +20,17 @@ interface ConfigSelectProps {
   label: string;
   options: ConfigSelectOption[];
   supportingText?: string;
+  /** Shows the search box. Defaults to on when the options are coins. */
+  searchable?: boolean;
+  searchLabel?: string;
+  searchPlaceholder?: string;
 }
 
 const props = withDefaults(defineProps<ConfigSelectProps>(), {
-  supportingText: ''
+  supportingText: '',
+  searchable: undefined,
+  searchLabel: '',
+  searchPlaceholder: ''
 });
 
 const emit = defineEmits<{
@@ -32,7 +39,9 @@ const emit = defineEmits<{
 
 const open = ref(false);
 const query = ref('');
-const searchable = computed(() => props.options.some((option) => option.coinSymbol));
+const searchable = computed(
+  () => props.searchable ?? props.options.some((option) => option.coinSymbol)
+);
 const visibleOptions = computed(() => {
   const text = query.value.trim().toLowerCase();
   return text
@@ -83,6 +92,12 @@ useDialogFocus(() => open.value, panel, closeSheet);
         :name="selectedOption.coinName"
         :size="36"
       />
+      <span
+        v-else-if="selectedOption?.iconText"
+        class="grid h-9 w-9 shrink-0 place-items-center text-[1.5rem] leading-none"
+        aria-hidden="true"
+        >{{ selectedOption.iconText }}</span
+      >
       <span class="min-w-0 flex-1">
         <span class="block break-words whitespace-normal text-[0.875rem] leading-6">{{
           selectedOption?.label
@@ -139,12 +154,12 @@ useDialogFocus(() => open.value, panel, closeSheet);
           </button>
         </div>
         <label v-if="searchable" class="coin-search">
-          <span class="sr-only">{{ $t('select.searchLabel') }}</span>
+          <span class="sr-only">{{ searchLabel || $t('select.searchLabel') }}</span>
           <input
             v-model="query"
             type="search"
             class="config-input"
-            :placeholder="$t('select.searchPlaceholder')"
+            :placeholder="searchPlaceholder || $t('select.searchPlaceholder')"
             autocomplete="off"
           />
         </label>
@@ -170,7 +185,7 @@ useDialogFocus(() => open.value, panel, closeSheet);
             />
             <span
               v-else-if="option.iconText"
-              class="grid h-10 w-10 shrink-0 place-items-center rounded-control text-[1.125rem] font-bold text-app-on"
+              class="grid h-10 w-10 shrink-0 place-items-center rounded-control text-[1.5rem] leading-none text-app-on"
               :class="option.iconClass"
             >
               {{ option.iconText }}

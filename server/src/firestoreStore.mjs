@@ -1,5 +1,6 @@
 import { FieldValue } from '@google-cloud/firestore';
 import { dayOf, monthOf } from './dates.mjs';
+import { publicIdOf } from './identity.mjs';
 import { HISTORY_DAYS, tallyInstalls } from './stats.mjs';
 
 const DAY = 86_400;
@@ -65,6 +66,8 @@ export const createFirestoreStore = ({ firestore, statsCacheSeconds = 3600 }) =>
           appVersion: checkin.appVersion,
           androidMajor: checkin.androidMajor,
           variant: checkin.variant,
+          miningSeconds: checkin.miningSeconds,
+          acceptedShares: checkin.acceptedShares,
           firstSeen: existing?.firstSeen ?? nowSeconds,
           lastSeen: nowSeconds
         });
@@ -139,6 +142,24 @@ export const createFirestoreStore = ({ firestore, statsCacheSeconds = 3600 }) =>
         })
       ]);
       return { ...live, ...history };
+    },
+
+    async readLeaderboard(limit, nowSeconds) {
+      return cached('leaderboard', statsCacheSeconds, nowSeconds, async () => {
+        const snap = await installs
+          .orderBy('miningSeconds', 'desc')
+          .limit(limit)
+          .select('country', 'miningSeconds', 'acceptedShares')
+          .get();
+        return snap.docs
+          .filter((doc) => doc.get('miningSeconds') !== null)
+          .map((doc) => ({
+            id: publicIdOf(doc.id),
+            country: doc.get('country') ?? null,
+            miningSeconds: doc.get('miningSeconds'),
+            acceptedShares: doc.get('acceptedShares') ?? null
+          }));
+      });
     },
 
     async saveDownloadSnapshot(day, total, byVariant) {

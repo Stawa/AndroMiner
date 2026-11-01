@@ -2,9 +2,11 @@
 import { computed, ref } from 'vue';
 import { Browser } from '@capacitor/browser';
 import MaterialIcon from './MaterialIcon.vue';
+import ConfigSelect from './ConfigSelect.vue';
 import ToggleRow from './ToggleRow.vue';
 import type { ShareField } from '../utils/telemetryClient';
 import countryCodes from '../../server/data/countries.json';
+import { countryFlag } from '../utils/countryFlag';
 import { useTelemetry } from '../composables/useTelemetry';
 import { formatDate, regionName, t } from '../i18n';
 
@@ -16,11 +18,17 @@ const consentOpen = ref(false);
 const feedback = ref('');
 const confirmingWithdraw = ref(false);
 
-const countries = computed(() =>
-  (countryCodes as string[])
-    .map((code) => ({ code, name: regionName(code) }))
-    .sort((a, b) => a.name.localeCompare(b.name))
-);
+const countryOptions = computed(() => [
+  { value: '', label: t('privacy.noCountry'), iconText: countryFlag(null) },
+  ...(countryCodes as string[])
+    .map((code) => ({
+      value: code,
+      label: regionName(code),
+      supportingText: code,
+      iconText: countryFlag(code)
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label))
+]);
 
 const enabled = computed(() => telemetry.state.value.enabled);
 const lastCheckin = computed(() => {
@@ -59,12 +67,15 @@ const shareRows = computed<Array<{ field: ShareField; label: string; hint: strin
     hint: t('privacy.fieldAppVersionHint')
   },
   { field: 'variant', label: t('privacy.fieldVariant'), hint: t('privacy.fieldVariantHint') },
-  { field: 'country', label: t('privacy.fieldCountry'), hint: '' }
+  { field: 'country', label: t('privacy.fieldCountry'), hint: '' },
+  {
+    field: 'activity',
+    label: t('privacy.fieldActivity'),
+    hint: t('privacy.fieldActivityHint')
+  }
 ]);
 
-const onCountry = (event: Event): void => {
-  telemetry.setCountry((event.target as HTMLSelectElement).value || null);
-};
+const onCountry = (code: string): void => telemetry.setCountry(code || null);
 
 const reset = async (): Promise<void> => {
   feedback.value = '';
@@ -137,6 +148,7 @@ const open = async (url: string): Promise<void> => {
         <li>{{ $t('privacy.itemCountry') }}</li>
         <li>{{ $t('privacy.itemVersion') }}</li>
         <li>{{ $t('privacy.itemAndroid') }}</li>
+        <li>{{ $t('privacy.itemActivity') }}</li>
       </ul>
       <p class="section-copy">{{ $t('privacy.fieldsOptional') }}</p>
       <p class="section-copy">
@@ -164,20 +176,23 @@ const open = async (url: string): Promise<void> => {
         />
         <p class="section-copy">{{ $t('privacy.fieldsNote') }}</p>
       </div>
-      <div v-if="telemetry.state.value.share.country" class="config-field usage-field">
-        <label for="usage-country">{{ $t('privacy.country') }}</label>
-        <select id="usage-country" :value="telemetry.state.value.country ?? ''" @change="onCountry">
-          <option value="">{{ $t('privacy.noCountry') }}</option>
-          <option v-for="country in countries" :key="country.code" :value="country.code">
-            {{ country.name }} ({{ country.code }})
-          </option>
-        </select>
-        <p class="section-copy">
-          {{ $t('privacy.countryHint') }}
-        </p>
-      </div>
+      <ConfigSelect
+        v-if="telemetry.state.value.share.country"
+        :model-value="telemetry.state.value.country ?? ''"
+        :label="$t('privacy.country')"
+        :options="countryOptions"
+        :supporting-text="$t('privacy.countryHint')"
+        searchable
+        :search-label="$t('privacy.searchCountry')"
+        :search-placeholder="$t('privacy.searchCountry')"
+        @update:model-value="onCountry"
+      />
     </template>
     <template v-if="telemetry.supported && enabled">
+      <p v-if="telemetry.publicId.value" class="section-copy">
+        {{ $t('leaderboard.yourId') }}:
+        <strong class="usage-id">{{ telemetry.publicId.value }}</strong>
+      </p>
       <p class="section-copy usage-status" role="status">
         {{ $t('privacy.lastCheckin', { when: lastCheckin }) }}
       </p>
@@ -266,18 +281,10 @@ const open = async (url: string): Promise<void> => {
   text-transform: uppercase;
   color: rgb(var(--color-app-muted));
 }
-.usage-field {
-  display: grid;
-  gap: 8px;
-}
-.usage-field select {
-  width: 100%;
-  min-height: 48px;
-  padding: 0 12px;
-  border: 1px solid rgb(var(--color-app-line));
-  border-radius: var(--radius-control);
-  background: rgb(var(--color-app-card));
+.usage-id {
+  letter-spacing: 0.06em;
   color: rgb(var(--color-app-on));
+  user-select: all;
 }
 .usage-links {
   flex-wrap: wrap;

@@ -4,7 +4,7 @@ Privacy comes before statistics. Any change here must leave AndroMiner fully usa
 
 ## Rules
 
-1. Telemetry stays off by default, opt-in and revocable. Builds without `VITE_TELEMETRY_ENDPOINT` must not contain it.
+1. Telemetry is on by default only in the Android app, and it must stay visible in Settings, revocable and deletable. A saved opt-out is never overridden. Builds without `VITE_TELEMETRY_ENDPOINT` must not contain it.
 2. Don't add fields to the payload. If you think one is needed, open an issue first. A new field needs a stated purpose, an update to `docs/privacy.md`, a change to the strict server schema, and a test change that lists the exact keys.
 3. Never read wallet, pool, worker, mining state, hashrate, sensors, hardware identifiers or location for telemetry.
 4. Telemetry code must not be awaited on a startup or mining path. It must ignore its own errors and must not log identifiers.

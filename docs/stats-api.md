@@ -13,7 +13,9 @@ Example body:
   "country": "ID",
   "appVersion": "1.4.0",
   "androidMajor": 14,
-  "variant": "tls"
+  "variant": "tls",
+  "miningSeconds": 43200,
+  "acceptedShares": 310
 }
 ```
 
@@ -25,6 +27,10 @@ Example body:
 | `appVersion`     | `MAJOR.MINOR[.PATCH][-suffix]`                               |
 | `androidMajor`   | An integer from 5 to 40.                                     |
 | `variant`        | `tls`, `notls` or `download`.                                |
+| `miningSeconds`  | An integer from 0 to 10 years in seconds, or `null`.         |
+| `acceptedShares` | An integer from 0 to 10,000,000,000, or `null`.              |
+
+`miningSeconds` and `acceptedShares` are optional. Omitting them is the same as sending `null`, and an installation with `miningSeconds: null` is not on the leaderboard.
 
 Unknown fields are rejected. The body can be at most 1 KiB, and `Content-Type: application/json` is required.
 
@@ -51,6 +57,10 @@ Public. Responses can be cached for 5 minutes. The response contains:
 - `history.{daily,monthly,appVersionsByDay}`: trend data.
 - `downloads`: `total`, `byVariant`, `releases[]`, `history[]`, `fetchedAt` and `stale`.
 - `minGroupSize`: the minimum group size in use.
+
+## `GET /v1/leaderboard`
+
+Public. Responses can be cached for 5 minutes. Returns `{generatedAt, entries[]}` with at most 50 entries, longest mining time first. Each entry is `{rank, id, country, miningSeconds, acceptedShares}`. `id` is a public code (`XXXX-XXXX`, Crockford base32) made from a SHA-256 hash of the installation ID, so the installation ID itself is never returned. `country` and `acceptedShares` can be `null`.
 
 ## `GET /healthz`
 

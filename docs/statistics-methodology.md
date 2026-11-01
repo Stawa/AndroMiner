@@ -7,12 +7,12 @@ This page explains what the public numbers mean and how they are counted.
 | Metric                       | Meaning                                                                                                                                                                 |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Release downloads            | The sum of `download_count` for `.apk` files across non-draft GitHub releases. It counts HTTP downloads, including repeats, mirrors and bots. **Not users or devices.** |
-| Daily active installations   | Opted-in installations whose last accepted check-in was in the past 24 hours.                                                                                           |
+| Daily active installations   | Installations with reporting on whose last accepted check-in was in the past 24 hours.                                                                                  |
 | Weekly active installations  | Same, for the past 7 days.                                                                                                                                              |
 | Monthly active installations | Same, for the past 30 days.                                                                                                                                             |
 | Estimated active             | The monthly figure.                                                                                                                                                     |
 
-None of these is a total number of installations or users. Every installation figure is a **lower bound**, because only people who opt in are counted.
+None of these is a total number of installations or users. Every installation figure is a **lower bound**, because only installations that leave reporting on are counted.
 
 ## How counting works
 
@@ -31,7 +31,7 @@ If "Other" is itself smaller than the minimum, the next-smallest group is added 
 
 ## Limitations
 
-- **Self-selection:** people who opt in are not the same as all users. Countries with many privacy-minded users may be under-represented.
+- **Self-selection:** people who keep reporting on are not the same as all users. Countries with many privacy-minded users may be under-represented.
 - **No identity checks:** a person can reset their ID or script fake check-ins. Rate limits and an hourly cap on new installations reduce the damage but can't remove it.
 - **Reinstalls and cleared app data** create a new ID. The old ID stays counted until it ages out.
 - **Country** is whatever the user picked. It isn't verified.

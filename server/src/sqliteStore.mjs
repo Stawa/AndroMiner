@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { dayOf, monthOf } from './dates.mjs';
+import { publicIdOf } from './identity.mjs';
 import { HISTORY_DAYS, tallyInstalls } from './stats.mjs';
 
 const DAY = 86_400;
@@ -14,7 +15,9 @@ CREATE TABLE IF NOT EXISTS installs (
   android_major INTEGER,
   variant TEXT,
   first_seen_ts INTEGER NOT NULL,
-  last_seen_ts INTEGER NOT NULL
+  last_seen_ts INTEGER NOT NULL,
+  mining_seconds INTEGER,
+  accepted_shares INTEGER
 ) STRICT;
 CREATE INDEX IF NOT EXISTS installs_last_seen ON installs (last_seen_ts);
 CREATE TABLE IF NOT EXISTS daily_active (day TEXT PRIMARY KEY, count INTEGER NOT NULL) STRICT;
@@ -49,7 +52,9 @@ const migrateNullableInstallColumns = (db) => {
         first_seen_ts INTEGER NOT NULL,
         last_seen_ts INTEGER NOT NULL
       ) STRICT;
-      INSERT INTO installs SELECT * FROM installs_old;
+      INSERT INTO installs (id, country, app_version, android_major, variant, first_seen_ts, last_seen_ts)
+        SELECT id, country, app_version, android_major, variant, first_seen_ts, last_seen_ts
+        FROM installs_old;
       DROP TABLE installs_old;
       CREATE INDEX installs_last_seen ON installs (last_seen_ts);
     `);
@@ -57,6 +62,16 @@ const migrateNullableInstallColumns = (db) => {
   } catch (error) {
     db.exec('ROLLBACK');
     throw error;
+  }
+};
+
+/** Databases created before the leaderboard gain its two nullable columns in place. */
+const migrateActivityColumns = (db) => {
+  const columns = db.prepare('PRAGMA table_info(installs)').all();
+  for (const name of ['mining_seconds', 'accepted_shares']) {
+    if (!columns.some((column) => column.name === name)) {
+      db.exec(`ALTER TABLE installs ADD COLUMN ${name} INTEGER`);
+    }
   }
 };
 
@@ -70,6 +85,7 @@ export const createSqliteStore = (path) => {
   db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;');
   db.exec(schema);
   migrateNullableInstallColumns(db);
+  migrateActivityColumns(db);
 
   return {
     db,
@@ -104,11 +120,13 @@ export const createSqliteStore = (path) => {
         const newMonth = !existing || monthOf(existing.last_seen_ts) !== month;
 
         db.prepare(
-          `INSERT INTO installs (id, country, app_version, android_major, variant, first_seen_ts, last_seen_ts)
-           VALUES (?, ?, ?, ?, ?, ?, ?)
+          `INSERT INTO installs (id, country, app_version, android_major, variant, first_seen_ts, last_seen_ts,
+                                 mining_seconds, accepted_shares)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET country = excluded.country, app_version = excluded.app_version,
              android_major = excluded.android_major, variant = excluded.variant,
-             last_seen_ts = excluded.last_seen_ts`
+             last_seen_ts = excluded.last_seen_ts, mining_seconds = excluded.mining_seconds,
+             accepted_shares = excluded.accepted_shares`
         ).run(
           checkin.installationId,
           checkin.country,
@@ -116,7 +134,9 @@ export const createSqliteStore = (path) => {
           checkin.androidMajor,
           checkin.variant,
           nowSeconds,
-          nowSeconds
+          nowSeconds,
+          checkin.miningSeconds,
+          checkin.acceptedShares
         );
         if (newDay) {
           db.prepare(
@@ -171,6 +191,18 @@ export const createSqliteStore = (path) => {
           .all(historyFrom),
         downloadHistory: db.prepare('SELECT day, total FROM download_snapshots ORDER BY day').all()
       };
+    },
+
+    /** The installations that share their activity, longest mining time first. */
+    async readLeaderboard(limit) {
+      return db
+        .prepare(
+          `SELECT id, country, mining_seconds AS miningSeconds, accepted_shares AS acceptedShares
+           FROM installs WHERE mining_seconds IS NOT NULL
+           ORDER BY mining_seconds DESC, first_seen_ts ASC, id ASC LIMIT ?`
+        )
+        .all(limit)
+        .map(({ id, ...entry }) => ({ id: publicIdOf(id), ...entry }));
     },
 
     async saveDownloadSnapshot(day, total, byVariant) {

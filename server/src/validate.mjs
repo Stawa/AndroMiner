@@ -11,8 +11,12 @@ const allowedFields = new Set([
   'country',
   'appVersion',
   'androidMajor',
-  'variant'
+  'variant',
+  'miningSeconds',
+  'acceptedShares'
 ]);
+const MAX_MINING_SECONDS = 10 * 365 * 86_400;
+const MAX_ACCEPTED_SHARES = 10_000_000_000;
 const idPattern = /^[0-9a-f]{32}$/;
 const versionPattern = /^\d{1,3}\.\d{1,3}(?:\.\d{1,3})?(?:-[0-9A-Za-z.]{1,16})?$/;
 
@@ -51,6 +55,22 @@ export const validateCheckin = (body) => {
   if (variant !== null && !VARIANTS.includes(variant)) {
     return { ok: false, error: `variant must be one of: ${VARIANTS.join(', ')}, or null.` };
   }
+  const miningSeconds = body.miningSeconds ?? null;
+  const acceptedShares = body.acceptedShares ?? null;
+  if (
+    miningSeconds !== null &&
+    (!Number.isInteger(miningSeconds) || miningSeconds < 0 || miningSeconds > MAX_MINING_SECONDS)
+  ) {
+    return { ok: false, error: 'miningSeconds must be a non-negative integer or null.' };
+  }
+  if (
+    acceptedShares !== null &&
+    (!Number.isInteger(acceptedShares) ||
+      acceptedShares < 0 ||
+      acceptedShares > MAX_ACCEPTED_SHARES)
+  ) {
+    return { ok: false, error: 'acceptedShares must be a non-negative integer or null.' };
+  }
   return {
     ok: true,
     value: {
@@ -58,7 +78,9 @@ export const validateCheckin = (body) => {
       country,
       appVersion,
       androidMajor,
-      variant
+      variant,
+      miningSeconds,
+      acceptedShares
     }
   };
 };

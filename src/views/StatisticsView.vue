@@ -6,6 +6,7 @@ import CoinIcon from '../components/CoinIcon.vue';
 import { compatibleAverage, exportHistory } from '../utils/sessionHistory';
 import { Clipboard } from '@capacitor/clipboard';
 import ConfigSelect from '../components/ConfigSelect.vue';
+import LeaderboardCard from '../components/LeaderboardCard.vue';
 import { formatHashrate } from '../utils/miningTelemetry';
 import { formatDate, formatDuration, formatNumber, t, te } from '../i18n';
 import type { MiningConfig, MiningSessionHistoryItem } from '../types/mining';
@@ -241,6 +242,7 @@ useDialogFocus(
         />
       </div>
     </section>
+    <LeaderboardCard class="md:col-span-2" />
     <section class="surface">
       <div class="section-heading">
         <h3>{{ $t('history.shareQuality') }}</h3>

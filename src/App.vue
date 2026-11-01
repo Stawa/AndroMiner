@@ -66,6 +66,7 @@ const { device } = useDeviceTelemetry();
 const updater = useGitHubReleaseUpdater();
 useTheme();
 const telemetry = useTelemetry();
+watch(() => miner.sessionHistory.value, telemetry.recordSessions);
 const sessionActive = computed(() => !['idle', 'error'].includes(miner.state.value));
 const sessionFullscreen = ref(false);
 const sessionView = ref<InstanceType<typeof MiningSessionView> | null>(null);
@@ -430,6 +431,7 @@ onMounted(() => {
   settings.load();
   profiles.load();
   telemetry.start();
+  telemetry.recordSessions(miner.sessionHistory.value);
 
   if (profiles.profiles.length === 0) {
     profiles.createDefaults(miner.config);

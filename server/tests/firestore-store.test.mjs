@@ -5,6 +5,7 @@ import { FieldValue } from '@google-cloud/firestore';
 import { loadConfig } from '../src/config.mjs';
 import { createApp } from '../src/app.mjs';
 import { createFirestoreStore } from '../src/firestoreStore.mjs';
+import { publicIdOf } from '../src/identity.mjs';
 
 const DAY = 86_400_000;
 const hex = (n) => n.toString(16).padStart(32, '0');
@@ -52,13 +53,20 @@ const createFakeFirestore = () => {
         filters.every(({ field, op, value }) => compare[op](bucket(name).get(id)[field], value))
       );
       if (order) {
-        ids.sort((a, b) => (bucket(name).get(a)[order] < bucket(name).get(b)[order] ? -1 : 1));
+        // Like the real service, ordering by a field leaves out documents that lack it.
+        const ordered = ids.filter((id) => bucket(name).get(id)[order.field] !== undefined);
+        const sign = order.direction === 'desc' ? -1 : 1;
+        ordered.sort(
+          (a, b) =>
+            sign * (bucket(name).get(a)[order.field] < bucket(name).get(b)[order.field] ? -1 : 1)
+        );
+        return ordered.slice(0, max);
       }
       return ids.slice(0, max);
     };
     return {
       where: (field, op, value) => query(name, [...filters, { field, op, value }], order, max),
-      orderBy: (field) => query(name, filters, field, max),
+      orderBy: (field, direction = 'asc') => query(name, filters, { field, direction }, max),
       select: () => query(name, filters, order, max),
       limit: (n) => query(name, filters, order, n),
       get: async () => {
@@ -196,4 +204,18 @@ test('maintenance prune is closed without a secret and requires it when set', as
   assert.equal(pruned.status, 200);
   assert.equal(s.firestore.size('installs'), 0);
   assert.equal(s.firestore.size('daily_active'), 1);
+});
+
+test('the leaderboard lists only installations that share activity, best first', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  await s.post(checkin(1, { miningSeconds: 3600, acceptedShares: 10 }));
+  await s.post(checkin(2, { miningSeconds: 7200, acceptedShares: 4, country: null }));
+  await s.post(checkin(3));
+  const board = await (await s.call('/v1/leaderboard')).json();
+  assert.deepEqual(board.entries, [
+    { rank: 1, id: publicIdOf(hex(2)), country: null, miningSeconds: 7200, acceptedShares: 4 },
+    { rank: 2, id: publicIdOf(hex(1)), country: 'ID', miningSeconds: 3600, acceptedShares: 10 }
+  ]);
+  assert.equal(JSON.stringify(board).includes(hex(1)), false);
 });

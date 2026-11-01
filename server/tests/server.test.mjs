@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { loadConfig } from '../src/config.mjs';
+import { publicIdOf } from '../src/identity.mjs';
 import { createApp } from '../src/app.mjs';
 import { createSqliteStore } from '../src/sqliteStore.mjs';
 import { summarizeReleases } from '../src/github.mjs';
@@ -287,7 +288,25 @@ test('rebuilds an older database whose install columns were required', () => {
   old.close();
   const store = createSqliteStore(path);
   assert.equal(store.db.prepare('SELECT COUNT(*) AS n FROM installs').get().n, 1);
-  store.db.prepare('INSERT INTO installs VALUES (?, NULL, NULL, NULL, NULL, 3, 4)').run(hex(2));
+  store.db
+    .prepare(
+      `INSERT INTO installs (id, first_seen_ts, last_seen_ts, mining_seconds) VALUES (?, 3, 4, 60)`
+    )
+    .run(hex(2));
+  store.db.close();
+});
+
+test('a database from before the leaderboard gains its columns and keeps its rows', async () => {
+  const path = join(mkdtempSync(join(tmpdir(), 'androminer-')), 'v1.db');
+  const old = new DatabaseSync(path);
+  old.exec(`CREATE TABLE installs (id TEXT PRIMARY KEY, country TEXT, app_version TEXT,
+    android_major INTEGER, variant TEXT, first_seen_ts INTEGER NOT NULL,
+    last_seen_ts INTEGER NOT NULL) STRICT;
+    INSERT INTO installs VALUES ('${hex(1)}', 'ID', '1.4.0', 13, 'tls', 1, 2);`);
+  old.close();
+  const store = createSqliteStore(path);
+  assert.equal(store.db.prepare('SELECT COUNT(*) AS n FROM installs').get().n, 1);
+  assert.deepEqual(await store.readLeaderboard(50), []);
   store.db.close();
 });
 
@@ -302,4 +321,79 @@ test('error responses never echo request text', async (t) => {
   assert.equal(text.includes('onerror'), false);
   assert.match(res.headers.get('content-type'), /^application\/json/);
   assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
+});
+
+test('the public ID is a fixed one-way code of the installation ID', () => {
+  assert.equal(publicIdOf('0123456789abcdef0123456789abcdef'), 'H5DC-568W');
+  assert.equal(publicIdOf(hex(1)), '08D3-R2G9');
+  assert.match(publicIdOf(hex(2)), /^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/);
+});
+
+test('activity totals are validated like every other field', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  for (const bad of [
+    { miningSeconds: -1 },
+    { miningSeconds: 1.5 },
+    { miningSeconds: '60' },
+    { miningSeconds: 11 * 365 * 86_400 },
+    { acceptedShares: -3 },
+    { acceptedShares: 1e12 }
+  ]) {
+    assert.equal((await s.post(baseCheckin(20, bad))).status, 400, JSON.stringify(bad));
+  }
+  assert.equal(
+    (await s.post(baseCheckin(20, { miningSeconds: 0, acceptedShares: 0 }))).status,
+    200
+  );
+  assert.equal((await s.post(baseCheckin(21))).status, 200, 'older clients omit the fields');
+});
+
+test('the leaderboard ranks shared activity under public IDs and never exposes the secret', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  await s.post(baseCheckin(1, { miningSeconds: 3600, acceptedShares: 10 }));
+  await s.post(baseCheckin(2, { miningSeconds: 7200, acceptedShares: 4, country: null }));
+  await s.post(baseCheckin(3));
+  await s.post(baseCheckin(4, { miningSeconds: 60, acceptedShares: null }));
+  const board = await (await s.call('/v1/leaderboard')).json();
+  assert.deepEqual(board.entries, [
+    { rank: 1, id: publicIdOf(hex(2)), country: null, miningSeconds: 7200, acceptedShares: 4 },
+    { rank: 2, id: publicIdOf(hex(1)), country: 'ID', miningSeconds: 3600, acceptedShares: 10 },
+    { rank: 3, id: publicIdOf(hex(4)), country: 'ID', miningSeconds: 60, acceptedShares: null }
+  ]);
+  const text = JSON.stringify(board);
+  for (const n of [1, 2, 3, 4]) assert.equal(text.includes(hex(n)), false);
+
+  s.clock.t += DAY;
+  await s.post(baseCheckin(4, { miningSeconds: 9000, acceptedShares: 1 }));
+  await s.post(baseCheckin(1, { miningSeconds: null, acceptedShares: null }));
+  const next = await (await s.call('/v1/leaderboard')).json();
+  assert.deepEqual(
+    next.entries.map((entry) => [entry.rank, entry.id]),
+    [
+      [1, publicIdOf(hex(4))],
+      [2, publicIdOf(hex(2))]
+    ],
+    'new totals re-rank, and turning activity off removes the entry'
+  );
+
+  await s.call(`/v1/installations/${hex(4)}`, { method: 'DELETE' });
+  const after = await (await s.call('/v1/leaderboard')).json();
+  assert.deepEqual(
+    after.entries.map((entry) => entry.id),
+    [publicIdOf(hex(2))]
+  );
+});
+
+test('the leaderboard shows at most 50 installations', async (t) => {
+  const s = await start({
+    env: { MAX_NEW_INSTALLS_PER_HOUR: '1000', RATE_LIMIT_PER_MINUTE: '1000' }
+  });
+  t.after(s.stop);
+  for (let n = 1; n <= 55; n += 1) await s.post(baseCheckin(n, { miningSeconds: n * 60 }));
+  const board = await (await s.call('/v1/leaderboard')).json();
+  assert.equal(board.entries.length, 50);
+  assert.equal(board.entries[0].miningSeconds, 55 * 60);
+  assert.equal(board.entries[49].rank, 50);
 });

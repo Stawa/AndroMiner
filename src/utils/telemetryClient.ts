@@ -11,6 +11,8 @@ export interface ShareFlags {
   androidVersion: boolean;
   appVersion: boolean;
   variant: boolean;
+  /** Total mining time and accepted shares, which place the installation on the leaderboard. */
+  activity: boolean;
 }
 
 export type ShareField = keyof ShareFlags;
@@ -23,6 +25,10 @@ export interface TelemetryState {
   lastCheckinAt: number | null;
   lastAttemptAt: number | null;
   pendingDeletion: string[];
+  /** Lifetime totals kept on this phone; sessions are added once, in order of when they ended. */
+  miningSeconds: number;
+  acceptedShares: number;
+  countedUntil: number;
 }
 
 export interface TelemetryEnvironment {
@@ -38,6 +44,23 @@ export interface CheckinPayload {
   appVersion: string | null;
   androidMajor: number | null;
   variant: ApkVariant | null;
+  miningSeconds: number | null;
+  acceptedShares: number | null;
+}
+
+export interface LeaderboardEntry {
+  rank: number;
+  /** Public code such as `7K3F-92QD`, derived from the installation ID. */
+  id: string;
+  country: string | null;
+  miningSeconds: number;
+  acceptedShares: number | null;
+}
+
+export interface FinishedSession {
+  endedAt: string;
+  durationSeconds: number;
+  acceptedShares: number;
 }
 
 export type CheckinResult =
@@ -67,21 +90,34 @@ export const defaultShare = (): ShareFlags => ({
   country: true,
   androidVersion: true,
   appVersion: true,
-  variant: true
+  variant: true,
+  activity: true
 });
 
+/** Reporting is on for a fresh install; saved choices, including "off", always win. */
 export const defaultState = (): TelemetryState => ({
-  enabled: false,
+  enabled: true,
   installationId: '',
   country: null,
   share: defaultShare(),
   lastCheckinAt: null,
   lastAttemptAt: null,
-  pendingDeletion: []
+  pendingDeletion: [],
+  miningSeconds: 0,
+  acceptedShares: 0,
+  countedUntil: 0
 });
+
+/** Used when the saved record cannot be read: an unknown choice is treated as "off". */
+const disabledState = (): TelemetryState => ({ ...defaultState(), enabled: false });
 
 const finiteOrNull = (value: unknown): number | null =>
   typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+const counter = (value: unknown): number => {
+  const number = finiteOrNull(value);
+  return number !== null && number > 0 ? Math.floor(number) : 0;
+};
 
 const normalizeShare = (raw: unknown): ShareFlags => {
   const defaults = defaultShare();
@@ -91,16 +127,16 @@ const normalizeShare = (raw: unknown): ShareFlags => {
     country: source.country !== false,
     androidVersion: source.androidVersion !== false,
     appVersion: source.appVersion !== false,
-    variant: source.variant !== false
+    variant: source.variant !== false,
+    activity: source.activity !== false
   };
 };
 
 export const normalizeState = (raw: unknown): TelemetryState => {
-  const defaults = defaultState();
-  if (!raw || typeof raw !== 'object') return defaults;
+  if (!raw || typeof raw !== 'object') return disabledState();
   const source = raw as Partial<Record<keyof TelemetryState, unknown>>;
   return {
-    enabled: source.enabled === true,
+    enabled: typeof source.enabled === 'boolean' ? source.enabled : defaultState().enabled,
     installationId:
       typeof source.installationId === 'string' && idPattern.test(source.installationId)
         ? source.installationId
@@ -116,7 +152,10 @@ export const normalizeState = (raw: unknown): TelemetryState => {
       ? source.pendingDeletion.filter(
           (id): id is string => typeof id === 'string' && idPattern.test(id)
         )
-      : []
+      : [],
+    miningSeconds: counter(source.miningSeconds),
+    acceptedShares: counter(source.acceptedShares),
+    countedUntil: counter(source.countedUntil)
   };
 };
 
@@ -124,6 +163,28 @@ export const generateInstallationId = (
   randomBytes: (length: number) => Uint8Array = (length) =>
     crypto.getRandomValues(new Uint8Array(length))
 ): string => Array.from(randomBytes(16), (byte) => byte.toString(16).padStart(2, '0')).join('');
+
+const BASE32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+/**
+ * The short code shown on the leaderboard, a one-way hash of the secret installation ID (which
+ * authorizes deleting the record and so is never displayed). Mirrors `server/src/identity.mjs`.
+ */
+export const derivePublicId = async (installationId: string): Promise<string> => {
+  const digest = new Uint8Array(
+    await crypto.subtle.digest(
+      'SHA-256',
+      new TextEncoder().encode(`androminer:public-id:v1:${installationId}`)
+    )
+  );
+  let code = '';
+  for (let i = 0; i < 8; i += 1) {
+    const bit = i * 5;
+    const window = (digest[bit >> 3]! << 8) | digest[(bit >> 3) + 1]!;
+    code += BASE32[(window >> (11 - (bit & 7))) & 31];
+  }
+  return `${code.slice(0, 4)}-${code.slice(4)}`;
+};
 
 /** The complete set of fields ever transmitted. Nothing else is read from the app or device. */
 export const buildPayload = (
@@ -135,7 +196,9 @@ export const buildPayload = (
   country: state.share.country ? state.country : null,
   appVersion: state.share.appVersion ? environment.appVersion : null,
   androidMajor: state.share.androidVersion ? environment.androidMajor : null,
-  variant: state.share.variant ? environment.variant : null
+  variant: state.share.variant ? environment.variant : null,
+  miningSeconds: state.share.activity ? state.miningSeconds : null,
+  acceptedShares: state.share.activity ? state.acceptedShares : null
 });
 
 export const isAcceptableEndpoint = (endpoint: string): boolean => {
@@ -161,7 +224,12 @@ export const createTelemetryClient = (options: TelemetryClientOptions) => {
       const raw = options.storage.getItem(TELEMETRY_STORAGE_KEY);
       state = raw ? normalizeState(JSON.parse(raw)) : defaultState();
     } catch {
-      state = defaultState();
+      state = disabledState();
+    }
+    // A fresh install is opted in, so it needs its random ID before the first check-in.
+    if (available && state.enabled && !state.installationId) {
+      state.installationId = generateInstallationId(options.randomBytes);
+      save();
     }
     return state;
   };
@@ -231,6 +299,34 @@ export const createTelemetryClient = (options: TelemetryClientOptions) => {
       save();
     },
 
+    /** Adds sessions that ended after the last one counted. Safe to call with the same list again. */
+    recordSessions(sessions: FinishedSession[]): void {
+      const fresh = sessions
+        .map((session) => ({ ...session, ended: Date.parse(session.endedAt) }))
+        .filter((session) => Number.isFinite(session.ended) && session.ended > state.countedUntil)
+        .sort((a, b) => a.ended - b.ended);
+      if (fresh.length === 0) return;
+      for (const session of fresh) {
+        state.miningSeconds += counter(session.durationSeconds);
+        state.acceptedShares += counter(session.acceptedShares);
+      }
+      state.countedUntil = fresh[fresh.length - 1]!.ended;
+      save();
+    },
+
+    /** The public ranking, or null when the service cannot be reached. */
+    async fetchLeaderboard(): Promise<LeaderboardEntry[] | null> {
+      if (!available) return null;
+      try {
+        const response = await request('/v1/leaderboard', { method: 'GET' });
+        if (!response.ok) return null;
+        const body = (await response.json()) as { entries?: LeaderboardEntry[] };
+        return Array.isArray(body.entries) ? body.entries : null;
+      } catch {
+        return null;
+      }
+    },
+
     /** Issues a new random ID and asks the service to forget the old one. */
     async resetInstallationId(): Promise<void> {
       queueDeletion(state.installationId);
@@ -244,7 +340,7 @@ export const createTelemetryClient = (options: TelemetryClientOptions) => {
     /** Stops reporting, forgets local identity, and asks the service to delete the record. */
     async withdraw(): Promise<void> {
       queueDeletion(state.installationId);
-      state = { ...defaultState(), pendingDeletion: state.pendingDeletion };
+      state = { ...disabledState(), pendingDeletion: state.pendingDeletion };
       save();
       await flushDeletions();
     },

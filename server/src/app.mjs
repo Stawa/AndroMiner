@@ -6,6 +6,7 @@ import { computeStats } from './stats.mjs';
 import { isInstallationId, validateCheckin } from './validate.mjs';
 
 const MAX_BODY_BYTES = 1024;
+const LEADERBOARD_SIZE = 50;
 const CLIENT_ERRORS = {
   contentType: 'Content-Type must be application/json.',
   tooLarge: 'Request body is too large.',
@@ -93,6 +94,14 @@ export const createApp = ({ config, store, now = Date.now, fetchImpl }) => {
         downloads.get()
       ]);
       const payload = computeStats(inputs, nowSeconds(), config, downloadSummary);
+      return send(response, 200, payload, { 'Cache-Control': 'public, max-age=300' });
+    }
+
+    if (request.method === 'GET' && pathname === '/v1/leaderboard') {
+      limit(readLimiter, request, 'read');
+      const rows = await store.readLeaderboard(LEADERBOARD_SIZE, nowSeconds());
+      const entries = rows.map((row, index) => ({ rank: index + 1, ...row }));
+      const payload = { generatedAt: new Date(now()).toISOString(), entries };
       return send(response, 200, payload, { 'Cache-Control': 'public, max-age=300' });
     }
 

@@ -5,6 +5,7 @@ import {
   buildPayload,
   createTelemetryClient,
   defaultState,
+  derivePublicId,
   generateInstallationId,
   isAcceptableEndpoint,
   normalizeState
@@ -46,12 +47,31 @@ const setup = ({ environment, fetchImpl, storage = memoryStorage(), endpoint } =
   return { client, calls, clock, storage };
 };
 
-test('telemetry is disabled by default and sends nothing', async () => {
-  const { client, calls } = setup();
-  assert.equal(client.getState().enabled, false);
+test('a fresh install is opted in with a random local ID, and an opt-out is kept', async () => {
+  const { client, storage } = setup();
+  assert.equal(client.getState().enabled, true);
+  assert.match(client.getState().installationId, /^[0-9a-f]{32}$/);
+  client.setEnabled(false);
+  const reloaded = setup({ storage });
+  assert.equal(reloaded.client.getState().enabled, false);
+  assert.equal(await reloaded.client.checkinIfDue(), 'disabled');
+  assert.equal(reloaded.calls.length, 0);
+});
+
+test('deleting my data is not undone by the opt-in default', async () => {
+  const { client, storage } = setup();
+  await client.withdraw();
+  const reloaded = setup({ storage });
+  assert.equal(reloaded.client.getState().enabled, false);
+  assert.equal(reloaded.client.getState().installationId, '');
+  assert.equal(await reloaded.client.checkinIfDue(), 'disabled');
+  assert.equal(reloaded.calls.length, 0);
+});
+
+test('a build without an endpoint creates no ID and saves nothing', () => {
+  const { client, storage } = setup({ endpoint: '' });
   assert.equal(client.getState().installationId, '');
-  assert.equal(await client.checkinIfDue(), 'disabled');
-  assert.equal(calls.length, 0);
+  assert.equal(storage.data.size, 0);
 });
 
 test('a build without an endpoint is unavailable and never sends', async () => {
@@ -68,9 +88,8 @@ test('only https endpoints (or localhost) are accepted', () => {
   assert.equal(isAcceptableEndpoint('not a url'), false);
 });
 
-test('opt-in generates a random local ID and sends exactly the documented fields', async () => {
+test('a check-in sends exactly the documented fields', async () => {
   const { client, calls } = setup();
-  client.setEnabled(true);
   client.setCountry('ID');
   assert.match(client.getState().installationId, /^[0-9a-f]{32}$/);
   assert.equal(await client.checkinIfDue(), 'sent');
@@ -79,10 +98,12 @@ test('opt-in generates a random local ID and sends exactly the documented fields
   assert.equal(calls[0].init.credentials, 'omit');
   const body = JSON.parse(calls[0].init.body);
   assert.deepEqual(Object.keys(body).sort(), [
+    'acceptedShares',
     'androidMajor',
     'appVersion',
     'country',
     'installationId',
+    'miningSeconds',
     'v',
     'variant'
   ]);
@@ -212,7 +233,8 @@ test('withdrawal forgets identity locally and queues deletion until it succeeds'
 
 test('state persists and survives corrupt or hostile storage', () => {
   const storage = memoryStorage({ [TELEMETRY_STORAGE_KEY]: '{not json' });
-  assert.deepEqual(setup({ storage }).client.getState(), defaultState());
+  // An unreadable record is an unknown choice, so it never turns reporting on.
+  assert.deepEqual(setup({ storage }).client.getState(), { ...defaultState(), enabled: false });
   assert.deepEqual(
     normalizeState({
       enabled: 'yes',
@@ -250,7 +272,7 @@ test('payload contains no mining, wallet, or device data even if state carries e
   });
   assert.equal(JSON.stringify(payload).includes('4ABC'), false);
   assert.equal(JSON.stringify(payload).includes('pool'), false);
-  assert.equal(Object.keys(payload).length, 6);
+  assert.equal(Object.keys(payload).length, 8);
 });
 
 test('no console output contains the installation ID or endpoint payload', async (t) => {
@@ -292,7 +314,7 @@ test('fields the user switched off are sent as null and the rest are unchanged',
   assert.equal(body.country, null);
   assert.equal(body.appVersion, '1.4.0');
   assert.equal(body.variant, 'tls');
-  assert.equal(Object.keys(body).length, 6);
+  assert.equal(Object.keys(body).length, 8);
 });
 
 test('sharing choices persist, and saved state from before they existed shares everything', () => {
@@ -307,6 +329,66 @@ test('sharing choices persist, and saved state from before they existed shares e
     country: true,
     androidVersion: true,
     appVersion: true,
-    variant: true
+    variant: true,
+    activity: true
   });
+});
+
+test('finished sessions are counted once, in order, and reported as totals', async () => {
+  const { client, calls } = setup();
+  const sessions = [
+    { endedAt: '2026-10-02T10:00:00Z', durationSeconds: 600, acceptedShares: 5 },
+    { endedAt: '2026-10-01T10:00:00Z', durationSeconds: 3600.9, acceptedShares: 20 }
+  ];
+  client.recordSessions(sessions);
+  client.recordSessions(sessions);
+  client.recordSessions([
+    { endedAt: 'not a date', durationSeconds: 99, acceptedShares: 99 },
+    { endedAt: '2026-10-03T10:00:00Z', durationSeconds: -5, acceptedShares: Number.NaN }
+  ]);
+  assert.equal(client.getState().miningSeconds, 4200);
+  assert.equal(client.getState().acceptedShares, 25);
+  assert.equal(await client.checkinIfDue(), 'sent');
+  const body = JSON.parse(calls[0].init.body);
+  assert.equal(body.miningSeconds, 4200);
+  assert.equal(body.acceptedShares, 25);
+});
+
+test('switching mining activity off keeps it local and out of the check-in', async () => {
+  const { client, calls } = setup();
+  client.recordSessions([
+    { endedAt: '2026-10-01T10:00:00Z', durationSeconds: 60, acceptedShares: 1 }
+  ]);
+  client.setShare('activity', false);
+  await client.checkinIfDue();
+  const body = JSON.parse(calls[0].init.body);
+  assert.equal(body.miningSeconds, null);
+  assert.equal(body.acceptedShares, null);
+});
+
+test('the public ID is a stable one-way code that matches the server', async () => {
+  const id = '0123456789abcdef0123456789abcdef';
+  assert.equal(await derivePublicId(id), 'H5DC-568W');
+  assert.equal(await derivePublicId(id), await derivePublicId(id));
+  assert.match(
+    await derivePublicId(generateInstallationId()),
+    /^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/
+  );
+});
+
+test('the leaderboard is read from the service and fails soft', async () => {
+  const entries = [
+    { rank: 1, id: 'H5DC-568W', country: 'ID', miningSeconds: 60, acceptedShares: 1 }
+  ];
+  const ok = setup({
+    fetchImpl: async (url) => {
+      assert.equal(url, 'https://stats.example.org/v1/leaderboard');
+      return new Response(JSON.stringify({ entries }), { status: 200 });
+    }
+  });
+  assert.deepEqual(await ok.client.fetchLeaderboard(), entries);
+  const down = setup({ fetchImpl: async () => new Response('{}', { status: 503 }) });
+  assert.equal(await down.client.fetchLeaderboard(), null);
+  const bad = setup({ fetchImpl: async () => new Response('{"entries":5}', { status: 200 }) });
+  assert.equal(await bad.client.fetchLeaderboard(), null);
 });

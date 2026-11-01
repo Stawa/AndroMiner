@@ -6,7 +6,9 @@ import { useNativeMinerInfo } from './useNativeMinerInfo';
 import {
   createTelemetryClient,
   defaultState,
+  derivePublicId,
   type CheckinResult,
+  type FinishedSession,
   type ShareField,
   type TelemetryEnvironment,
   type TelemetryState
@@ -39,6 +41,8 @@ const client = createTelemetryClient({
 const state = ref<TelemetryState>(defaultState());
 const busy = ref(false);
 const lastResult = ref<CheckinResult | ''>('');
+/** The short leaderboard code for the current installation ID; empty while reporting is off. */
+const publicId = ref('');
 let started = false;
 
 const sync = (): void => {
@@ -48,6 +52,18 @@ const sync = (): void => {
     share: { ...current.share },
     pendingDeletion: [...current.pendingDeletion]
   };
+  const installationId = current.enabled ? current.installationId : '';
+  if (!installationId) {
+    publicId.value = '';
+  } else {
+    void derivePublicId(installationId)
+      .then((code) => {
+        if (state.value.installationId === installationId) publicId.value = code;
+      })
+      .catch(() => {
+        publicId.value = '';
+      });
+  }
 };
 
 const run = async (task: () => Promise<void>): Promise<void> => {
@@ -61,7 +77,7 @@ const run = async (task: () => Promise<void>): Promise<void> => {
 };
 
 /**
- * Opt-in anonymous statistics. Everything here is fire-and-forget and swallows its own errors, so
+ * Anonymous usage statistics, on by default and switchable off at any time. Everything here is fire-and-forget and swallows its own errors, so
  * it can never delay startup or interact with mining. The statistics state lives under its own
  * storage key and is deliberately excluded from configuration export.
  */
@@ -69,6 +85,7 @@ export const useTelemetry = () => ({
   state: readonly(state),
   busy: readonly(busy),
   lastResult: readonly(lastResult),
+  publicId: readonly(publicId),
   /** False in builds without a configured endpoint and in the web build. */
   supported: client.available && nativePlatform,
   buildHasEndpoint: client.available,
@@ -114,6 +131,15 @@ export const useTelemetry = () => ({
     client.setShare(field, shared);
     sync();
   },
+
+  recordSessions(sessions: FinishedSession[]): void {
+    // Before start() the saved state is not loaded yet, and saving now would overwrite it.
+    if (!started) return;
+    client.recordSessions(sessions);
+    sync();
+  },
+
+  fetchLeaderboard: () => client.fetchLeaderboard(),
 
   resetInstallationId: () => run(() => client.resetInstallationId()),
   withdraw: () => run(() => client.withdraw())
