@@ -36,6 +36,47 @@ android/key.properties
 *.pfx
 *.jks.base64
 *.keystore.base64
+keystore.properties
+signing.properties
+*.keystore.properties
+
+# Private keys, tokens and cloud credentials
+*.pem
+*.key
+*.p8
+*.pk8
+*.pfx
+id_rsa*
+id_ed25519*
+*.gpg
+*.token
+secrets/
+*.secret
+*.secrets
+service-account*.json
+*serviceAccount*.json
+*-firebase-adminsdk-*.json
+google-services.json
+GoogleService-Info.plist
+.npmrc
+.netrc
+.vercel/
+
+# Compiled binaries and release artifacts (built from source, never committed)
+*.apk
+*.aab
+*.aar
+*.dex
+*.class
+*.so
+*.dll
+*.dylib
+*.exe
+*.tgz
+miner-builder/work/
+miner-builder/baseline/
+miner-builder/variants/
+miner-builder/host/
 
 # Environment files
 .env
@@ -71,11 +112,48 @@ Pods/
 Carthage/
 *.xcframework.zip
 
-# Statistics service data
+# Statistics service data and local databases
 server/data/*.sqlite*
+*.sqlite
+*.sqlite3
+*.db
+*.db-wal
+*.db-shm
+
+# Crash dumps, profiles and traces
+*.hprof
+*.dmp
+*.trace
+*.pid
+
+# Tool caches and temporary files
+.cache/
+.vite/
+.eslintcache
+.parcel-cache/
+.turbo/
+.npm/
+.pnpm-store/
+.gradle/
+__pycache__/
+*.pyc
+*.bak
+*.orig
+*.rej
+*.tmp
+*~
+.history/
+desktop.ini
+$RECYCLE.BIN/
 
 # JVM crash dumps and local tooling
 hs_err_pid*
 replay_pid*
 .claude/
+CLAUDE.local.md
+.cursor/
 *.base64
+
+# local
+PLAN.md
+results/

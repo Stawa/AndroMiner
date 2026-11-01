@@ -2,7 +2,7 @@
 import MaterialIcon from './MaterialIcon.vue';
 
 export type AppTab =
-  'dashboard' | 'mining' | 'statistics' | 'settings' | 'profiles' | 'help' | 'about';
+  'dashboard' | 'mining' | 'statistics' | 'device' | 'settings' | 'profiles' | 'help' | 'about';
 
 interface NavItem {
   id: AppTab;
@@ -21,9 +21,10 @@ const emit = defineEmits<{
 }>();
 
 const items: NavItem[] = [
-  { id: 'dashboard', label: 'nav.overview', icon: 'speed' },
+  { id: 'dashboard', label: 'nav.overview', icon: 'home' },
   { id: 'mining', label: 'nav.miner', icon: 'tune' },
-  { id: 'statistics', label: 'nav.history', icon: 'history' },
+  { id: 'statistics', label: 'nav.history', icon: 'bar_chart' },
+  { id: 'device', label: 'nav.device', icon: 'smartphone' },
   { id: 'settings', label: 'nav.settings', icon: 'settings' }
 ];
 const secondaryItems: NavItem[] = [
@@ -36,7 +37,7 @@ const secondaryItems: NavItem[] = [
 <template>
   <nav class="app-bottom-nav" :aria-label="$t('nav.main')">
     <div
-      class="nav-primary mx-auto grid h-18 max-w-phone grid-cols-4 px-2 md:flex md:h-auto md:flex-col md:gap-1.5"
+      class="nav-primary mx-auto grid h-18 max-w-phone grid-cols-5 px-2 md:flex md:h-auto md:flex-col md:gap-1.5"
     >
       <button
         v-for="item in items"

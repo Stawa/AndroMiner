@@ -250,7 +250,7 @@ Mining keeps the CPU under sustained load. It can overheat a phone, degrade the
 battery, and reduce responsiveness. Prefer a spare device and supervise every run.
 
 AndroMiner checks temperature, battery level, charging rules, and Android thermal
-status. A battery reading of 45 °C or severe thermal throttling stops mining.
+status. A battery temperature at or above your temperature limit, or severe thermal throttling, stops mining.
 Configured limits and protection checks reduce risk; they are not guarantees.
 
 ## Contributing & issues

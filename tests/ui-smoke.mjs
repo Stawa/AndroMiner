@@ -21,15 +21,15 @@ try {
         localStorage.setItem('androminer-theme', mode);
       }, theme);
       await page.goto(process.env.UI_BASE_URL || 'http://127.0.0.1:5173');
-      await page.getByRole('button', { name: 'Miner', exact: true }).click();
-      await page.getByRole('button', { name: 'Safety', exact: true }).click();
+      await page.getByRole('button', { name: 'Edit mining setup' }).click();
+      await page.getByRole('tab', { name: 'Safety', exact: true }).click();
       const duration = page.getByRole('spinbutton', { name: 'Maximum session duration (minutes)' });
       await duration.fill('1441');
       await page.getByText('Use a session duration between 0 and 1440 minutes.').waitFor();
       await duration.fill('10');
       assert.equal(await duration.inputValue(), '10');
       await page.screenshot({ path: `artifacts/ui/safety-${width}-${theme}.png`, fullPage: true });
-      await page.getByRole('button', { name: 'Pool', exact: true }).click();
+      await page.getByRole('tab', { name: 'Pool', exact: true }).click();
       await page.getByRole('button', { name: 'Test pool connection', exact: true }).click();
       await page.getByText('Connection testing is available in the Android app.').waitFor();
       await page.screenshot({ path: `artifacts/ui/pool-${width}-${theme}.png`, fullPage: true });
@@ -54,7 +54,7 @@ try {
   await page.goto(process.env.UI_BASE_URL || 'http://127.0.0.1:5173');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: /^Language/ }).click();
-  await page.getByRole('button', { name: '简体中文' }).click();
+  await page.getByRole('option', { name: '简体中文' }).click();
   await page.getByRole('heading', { name: '设置', level: 1 }).waitFor();
   assert.equal(await page.evaluate(() => document.documentElement.lang), 'zh-CN');
   await page.reload();

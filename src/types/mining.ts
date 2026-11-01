@@ -187,9 +187,9 @@ export interface DeviceTelemetry {
   cpuName: string;
   cpuClockGhz: number | null;
   cpuClockLabel: string;
+  cpuMaxClockGhz: number | null;
+  cpuMaxClockLabel: string;
   gpuName: string;
-  gpuClockMhz: number | null;
-  gpuClockLabel: string;
   batteryCurrentMa: number | null;
   batteryVoltageV: number | null;
   powerDrawW: number | null;

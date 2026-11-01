@@ -19,7 +19,7 @@ withDefaults(defineProps<MiningMetricProps>(), {
       class="mt-1 break-words text-[1.25rem] font-semibold leading-6"
       :class="{
         'text-app-on': tone === 'normal',
-        'text-app-green': tone === 'good',
+        'text-app-green-ink': tone === 'good',
         'text-app-yellow': tone === 'warning',
         'text-red-400': tone === 'danger'
       }"

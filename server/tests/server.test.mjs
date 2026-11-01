@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { loadConfig } from '../src/config.mjs';
 import { createApp } from '../src/app.mjs';
 import { createSqliteStore } from '../src/sqliteStore.mjs';
@@ -257,4 +261,32 @@ test('requests, addresses and identifiers are never logged', async (t) => {
   await s.call(`/v1/installations/${hex(7)}`, { method: 'DELETE' });
   await s.call('/v1/stats');
   assert.deepEqual(lines, []);
+});
+
+test('accepts check-ins with fields the user chose not to share', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const res = await s.post(
+    baseCheckin(7, { country: null, appVersion: null, androidMajor: null, variant: null })
+  );
+  assert.equal(res.status, 200);
+  const stats = await (await s.call('/v1/stats')).json();
+  assert.equal(stats.active.daily, 1);
+  assert.equal(stats.history.appVersionsByDay.length, 0);
+  assert.equal((await s.post(baseCheckin(8, { variant: undefined }))).status, 200);
+});
+
+test('rebuilds an older database whose install columns were required', () => {
+  const path = join(mkdtempSync(join(tmpdir(), 'androminer-')), 'old.db');
+  const old = new DatabaseSync(path);
+  old.exec(`CREATE TABLE installs (id TEXT PRIMARY KEY, country TEXT, app_version TEXT NOT NULL,
+    android_major INTEGER NOT NULL, variant TEXT NOT NULL, first_seen_ts INTEGER NOT NULL,
+    last_seen_ts INTEGER NOT NULL) STRICT;
+    CREATE INDEX installs_last_seen ON installs (last_seen_ts);
+    INSERT INTO installs VALUES ('${hex(1)}', 'ID', '1.4.0', 13, 'tls', 1, 2);`);
+  old.close();
+  const store = createSqliteStore(path);
+  assert.equal(store.db.prepare('SELECT COUNT(*) AS n FROM installs').get().n, 1);
+  store.db.prepare('INSERT INTO installs VALUES (?, NULL, NULL, NULL, NULL, 3, 4)').run(hex(2));
+  store.db.close();
 });

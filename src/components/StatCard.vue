@@ -25,7 +25,7 @@ withDefaults(defineProps<StatCardProps>(), {
         :name="icon"
         :size="20"
         :class="{
-          'text-app-green': tone === 'good',
+          'text-app-green-ink': tone === 'good',
           'text-app-yellow': tone === 'warning',
           'text-app-muted': tone === 'normal'
         }"

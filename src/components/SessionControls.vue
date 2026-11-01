@@ -21,7 +21,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="session-controls grid gap-2" role="group" :aria-label="$t('controls.group')">
+  <div class="session-controls" role="group" :aria-label="$t('controls.group')">
     <button
       class="session-action ripple"
       type="button"
@@ -37,10 +37,10 @@ const emit = defineEmits<{
       <MaterialIcon
         v-if="pendingAction === 'pause' || pendingAction === 'resume'"
         :name="animationsEnabled ? 'progress_activity' : 'hourglass_empty'"
-        :size="28"
+        :size="24"
         :class="{ 'animate-spin': animationsEnabled }"
       />
-      <MaterialIcon v-else :name="state === 'paused' ? 'play_arrow' : 'pause'" :size="28" filled />
+      <MaterialIcon v-else :name="state === 'paused' ? 'play_arrow' : 'pause'" :size="24" filled />
       <span>{{
         pendingAction === 'pause'
           ? $t('controls.pausing')
@@ -61,14 +61,14 @@ const emit = defineEmits<{
       <MaterialIcon
         v-if="pendingAction === 'stop'"
         :name="animationsEnabled ? 'progress_activity' : 'hourglass_empty'"
-        :size="28"
+        :size="24"
         :class="{ 'animate-spin': animationsEnabled }"
       />
-      <MaterialIcon v-else name="stop" :size="28" filled />
+      <MaterialIcon v-else name="stop" :size="24" filled />
       <span>{{ pendingAction === 'stop' ? $t('controls.stopping') : $t('controls.stop') }}</span>
     </button>
     <button
-      class="session-action ripple"
+      class="session-profile ripple"
       type="button"
       :disabled="
         Boolean(pendingAction) ||
@@ -78,8 +78,14 @@ const emit = defineEmits<{
       "
       @click="emit('profile')"
     >
-      <MaterialIcon name="tune" :size="28" />
-      <span>{{ profileLabel }}</span>
+      <span class="session-profile-icon" aria-hidden="true"
+        ><MaterialIcon name="tune" :size="22"
+      /></span>
+      <span class="session-profile-text">
+        <small>{{ $t('config.powerProfile') }}</small>
+        <strong>{{ profileLabel }}</strong>
+      </span>
+      <MaterialIcon name="chevron_right" :size="22" />
     </button>
   </div>
 </template>

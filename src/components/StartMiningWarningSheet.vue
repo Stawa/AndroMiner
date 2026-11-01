@@ -68,7 +68,11 @@ useDialogFocus(
         </div>
         <div>
           <dt>{{ $t('start.tempLimit') }}</dt>
-          <dd>{{ config.thermalThreshold }} °C</dd>
+          <dd>
+            {{
+              config.thermalThreshold > 0 ? `${config.thermalThreshold} °C` : $t('config.limitOff')
+            }}
+          </dd>
         </div>
         <div>
           <dt>{{ $t('start.background') }}</dt>

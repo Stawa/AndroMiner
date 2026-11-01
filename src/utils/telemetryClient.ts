@@ -5,10 +5,21 @@ const REQUEST_TIMEOUT_MS = 10_000;
 
 export type ApkVariant = 'download' | 'tls' | 'notls';
 
+/** Which optional fields a check-in includes. An off field is sent as null. */
+export interface ShareFlags {
+  country: boolean;
+  androidVersion: boolean;
+  appVersion: boolean;
+  variant: boolean;
+}
+
+export type ShareField = keyof ShareFlags;
+
 export interface TelemetryState {
   enabled: boolean;
   installationId: string;
   country: string | null;
+  share: ShareFlags;
   lastCheckinAt: number | null;
   lastAttemptAt: number | null;
   pendingDeletion: string[];
@@ -24,9 +35,9 @@ export interface CheckinPayload {
   v: 1;
   installationId: string;
   country: string | null;
-  appVersion: string;
-  androidMajor: number;
-  variant: ApkVariant;
+  appVersion: string | null;
+  androidMajor: number | null;
+  variant: ApkVariant | null;
 }
 
 export type CheckinResult =
@@ -52,10 +63,18 @@ export interface TelemetryClientOptions {
 const idPattern = /^[0-9a-f]{32}$/;
 const countryPattern = /^[A-Z]{2}$/;
 
+export const defaultShare = (): ShareFlags => ({
+  country: true,
+  androidVersion: true,
+  appVersion: true,
+  variant: true
+});
+
 export const defaultState = (): TelemetryState => ({
   enabled: false,
   installationId: '',
   country: null,
+  share: defaultShare(),
   lastCheckinAt: null,
   lastAttemptAt: null,
   pendingDeletion: []
@@ -63,6 +82,18 @@ export const defaultState = (): TelemetryState => ({
 
 const finiteOrNull = (value: unknown): number | null =>
   typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+const normalizeShare = (raw: unknown): ShareFlags => {
+  const defaults = defaultShare();
+  if (!raw || typeof raw !== 'object') return defaults;
+  const source = raw as Partial<Record<ShareField, unknown>>;
+  return {
+    country: source.country !== false,
+    androidVersion: source.androidVersion !== false,
+    appVersion: source.appVersion !== false,
+    variant: source.variant !== false
+  };
+};
 
 export const normalizeState = (raw: unknown): TelemetryState => {
   const defaults = defaultState();
@@ -78,6 +109,7 @@ export const normalizeState = (raw: unknown): TelemetryState => {
       typeof source.country === 'string' && countryPattern.test(source.country)
         ? source.country
         : null,
+    share: normalizeShare(source.share),
     lastCheckinAt: finiteOrNull(source.lastCheckinAt),
     lastAttemptAt: finiteOrNull(source.lastAttemptAt),
     pendingDeletion: Array.isArray(source.pendingDeletion)
@@ -100,10 +132,10 @@ export const buildPayload = (
 ): CheckinPayload => ({
   v: 1,
   installationId: state.installationId,
-  country: state.country,
-  appVersion: environment.appVersion,
-  androidMajor: environment.androidMajor,
-  variant: environment.variant
+  country: state.share.country ? state.country : null,
+  appVersion: state.share.appVersion ? environment.appVersion : null,
+  androidMajor: state.share.androidVersion ? environment.androidMajor : null,
+  variant: state.share.variant ? environment.variant : null
 });
 
 export const isAcceptableEndpoint = (endpoint: string): boolean => {
@@ -191,6 +223,11 @@ export const createTelemetryClient = (options: TelemetryClientOptions) => {
 
     setCountry(country: string | null): void {
       state.country = country && countryPattern.test(country) ? country : null;
+      save();
+    },
+
+    setShare(field: ShareField, shared: boolean): void {
+      state.share = { ...state.share, [field]: shared };
       save();
     },
 

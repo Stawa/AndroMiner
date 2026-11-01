@@ -13,7 +13,7 @@ const props = withDefaults(defineProps<StatusIndicatorProps>(), {
 });
 
 const toneClasses: Record<NonNullable<StatusIndicatorProps['tone']>, string> = {
-  good: 'text-app-green',
+  good: 'text-app-green-ink',
   warning: 'text-app-yellow',
   danger: 'text-red-300',
   muted: 'text-app-muted'

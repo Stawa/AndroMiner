@@ -279,3 +279,34 @@ test('all three APK variants are reported verbatim', async () => {
     assert.equal(JSON.parse(calls[0].init.body).variant, variant);
   }
 });
+
+test('fields the user switched off are sent as null and the rest are unchanged', async () => {
+  const { client, calls } = setup();
+  client.setEnabled(true);
+  client.setCountry('ID');
+  client.setShare('androidVersion', false);
+  client.setShare('country', false);
+  assert.equal(await client.checkinIfDue(), 'sent');
+  const body = JSON.parse(calls[0].init.body);
+  assert.equal(body.androidMajor, null);
+  assert.equal(body.country, null);
+  assert.equal(body.appVersion, '1.4.0');
+  assert.equal(body.variant, 'tls');
+  assert.equal(Object.keys(body).length, 6);
+});
+
+test('sharing choices persist, and saved state from before they existed shares everything', () => {
+  const { client, storage } = setup();
+  client.setEnabled(true);
+  client.setShare('variant', false);
+  const saved = JSON.parse(storage.data.get(TELEMETRY_STORAGE_KEY));
+  assert.equal(saved.share.variant, false);
+  assert.equal(saved.share.appVersion, true);
+  const legacy = normalizeState({ enabled: true, installationId: 'a'.repeat(32) });
+  assert.deepEqual(legacy.share, {
+    country: true,
+    androidVersion: true,
+    appVersion: true,
+    variant: true
+  });
+});

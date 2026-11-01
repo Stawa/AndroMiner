@@ -250,8 +250,13 @@ build_openssl() (
     make distclean
   fi
 
+  # OpenSSL's ARMv8-crypto assembly objects do not link into a 32-bit ARM binary, and TLS speed does
+  # not affect RandomX hashrate, so armeabi-v7a uses OpenSSL's portable C code.
+  local arch_flags=()
+  [[ "$target" == "android-arm" ]] && arch_flags+=(no-asm)
+
   # Android supplies OS entropy; these optional external libraries are unnecessary.
-  perl Configure "$target" no-shared no-tests no-unit-test no-apps no-jitter no-zstd \
+  perl Configure "$target" no-shared no-tests no-unit-test no-apps no-jitter no-zstd "${arch_flags[@]}" \
     --with-rand-seed=os --libdir=lib \
     "--prefix=$prefix" \
     "--openssldir=$prefix/ssl" \

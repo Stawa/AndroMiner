@@ -35,23 +35,30 @@ export const validateCheckin = (body) => {
   if (country !== null && !isCountryCode(country)) {
     return { ok: false, error: 'country must be an ISO 3166-1 alpha-2 code or null.' };
   }
-  if (typeof body.appVersion !== 'string' || !versionPattern.test(body.appVersion)) {
-    return { ok: false, error: 'appVersion is not a valid version string.' };
+  // A user may switch any of these off; the client then sends null and nothing is stored for it.
+  const appVersion = body.appVersion ?? null;
+  const androidMajor = body.androidMajor ?? null;
+  const variant = body.variant ?? null;
+  if (appVersion !== null && (typeof appVersion !== 'string' || !versionPattern.test(appVersion))) {
+    return { ok: false, error: 'appVersion is not a valid version string or null.' };
   }
-  if (!Number.isInteger(body.androidMajor) || body.androidMajor < 5 || body.androidMajor > 40) {
-    return { ok: false, error: 'androidMajor must be an integer between 5 and 40.' };
+  if (
+    androidMajor !== null &&
+    (!Number.isInteger(androidMajor) || androidMajor < 5 || androidMajor > 40)
+  ) {
+    return { ok: false, error: 'androidMajor must be an integer between 5 and 40, or null.' };
   }
-  if (!VARIANTS.includes(body.variant)) {
-    return { ok: false, error: `variant must be one of: ${VARIANTS.join(', ')}.` };
+  if (variant !== null && !VARIANTS.includes(variant)) {
+    return { ok: false, error: `variant must be one of: ${VARIANTS.join(', ')}, or null.` };
   }
   return {
     ok: true,
     value: {
       installationId: body.installationId,
       country,
-      appVersion: body.appVersion,
-      androidMajor: body.androidMajor,
-      variant: body.variant
+      appVersion,
+      androidMajor,
+      variant
     }
   };
 };

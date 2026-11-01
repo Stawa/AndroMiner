@@ -10,40 +10,47 @@ Android app (WebView)                 Statistics service (server/)            Pu
                                               └───────────────┘
 ```
 
-## Decisions
+The app sends a small check-in to the service. The service validates it, applies rate limits, stores one row per installation, and serves public totals to the statistics page.
 
-- **Backend:** a dependency-free Node.js service with built-in `node:sqlite`. Alternatives considered: Cloudflare Workers + D1 (cheap, but ties hosting to one vendor and makes "no IP in logs" depend on their platform), Plausible/Umami (full analytics products with a page-view model, heavier than needed), and a GitHub-only approach (no installation data at all). One small process and one file meet the cost, auditability and self-hosting goals. The public instance runs the same app on Vercel with Firestore as the store (`server/src/firestoreStore.mjs`), because Vercel has no persistent disk; both stores implement one async interface and publish through the same code (`tallyInstalls`, `computeStats`).
-- **Client:** all logic lives in `src/utils/telemetryClient.ts`, a pure module with injected storage and network, so it is testable without Android. It adds no native code and is not connected to the mining engine, CPU protection or the background service.
-- **Country:** user-selected only. No IP geolocation is performed anywhere, so no raw address is processed for location.
-- **Identity:** 128-bit random ID from `crypto.getRandomValues`, stored under its own `localStorage` key, excluded from configuration export, resettable, never linked to a wallet or session.
-- **No heartbeat:** the app compares a local timestamp hourly and transmits only when 24 hours have passed, with a one-hour backoff after failures. A fixed delay after startup means it never blocks launch.
-- **Strict schema:** the server rejects unknown fields, so extra data cannot be smuggled into a request by accident or a future bug.
+## Design decisions
+
+- **Backend:** a Node.js service with no dependencies, using the built-in `node:sqlite`. One small process and one file keep it cheap, easy to audit and easy to self-host. Alternatives we rejected:
+  - Cloudflare Workers + D1: cheap, but it ties hosting to one vendor, and "no IP in logs" would depend on their platform.
+  - Plausible or Umami: full analytics products built around page views, which is more than we need.
+  - GitHub data only: it gives no installation data.
+- **Public instance:** it runs the same app on Vercel and stores data in Firestore (`server/src/firestoreStore.mjs`), because Vercel has no persistent disk. Both stores implement the same async interface and publish through the same code (`tallyInstalls`, `computeStats`).
+- **Client:** all logic is in `src/utils/telemetryClient.ts`. Storage and network are passed in, so it can be tested without Android. It adds no native code and has no connection to the mining engine, CPU protection or the background service.
+- **Country:** chosen by the user. Nothing in the system looks up a location from an IP address, so no raw address is processed for location.
+- **Identity:** a 128-bit random ID from `crypto.getRandomValues`, stored under its own `localStorage` key. It is left out of configuration exports, can be reset, and is never linked to a wallet or session.
+- **No heartbeat:** the app checks a local timestamp every hour and sends only after 24 hours have passed. After a failure it waits one hour before trying again. A fixed delay after startup means it never slows down launch.
+- **Per-field opt-out:** the user can switch off country, Android version, app version and APK type individually. The client sends an off field as `null`, the server stores `NULL`, and public breakdowns count it as "not shared". Mining sessions, hashrate and uptime are not part of the check-in at all. Installations that share no app version are left out of the daily version history. Existing SQLite databases are rebuilt once on startup so those columns accept `NULL`.
+- **Strict schema:** the server rejects unknown fields, so extra data can't slip into a request through a mistake or a future bug.
 
 ## Data schema (SQLite)
 
-| Table                             | Columns                                                                                     | Purpose                                                          |
-| --------------------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `installs`                        | `id`, `country`, `app_version`, `android_major`, `variant`, `first_seen_ts`, `last_seen_ts` | One row per ID; deleted on request or after the retention period |
-| `daily_active` / `monthly_active` | day or month, count                                                                         | Aggregate trend counters                                         |
-| `daily_versions`                  | day, app version, count                                                                     | Release adoption over time (aggregate)                           |
-| `download_snapshots`              | day, total, per-variant JSON                                                                | Download history                                                 |
+| Table                             | Columns                                                                                     | Purpose                                                           |
+| --------------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `installs`                        | `id`, `country`, `app_version`, `android_major`, `variant`, `first_seen_ts`, `last_seen_ts` | One row per ID. Deleted on request or after the retention period. |
+| `daily_active` / `monthly_active` | day or month, count                                                                         | Aggregate trend counters.                                         |
+| `daily_versions`                  | day, app version, count                                                                     | How fast new releases are adopted (aggregate).                    |
+| `download_snapshots`              | day, total, per-variant JSON                                                                | Download history.                                                 |
 
-## Risks and mitigations
+## Risks and how we handle them
 
-| Risk                               | Mitigation                                                                                                              |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| IP address retention               | Not stored or logged by the service; in-memory keyed hash for rate limits; host/proxy logs may exist and are documented |
-| Small groups reveal individuals    | Minimum group size with a subtraction guard; per-row data never exposed                                                 |
-| Tracking across resets / linkage   | ID is random and local; resetting deletes the old record; no link to wallet or hardware                                 |
-| Fake or flooded check-ins          | Strict validation, per-address rate limit, hourly new-installation cap; figures are estimates                           |
-| Secrets in the APK                 | None. The client only knows a public HTTPS URL; the optional GitHub token lives on the server                           |
-| Backend outage affecting the app   | All calls are best effort with a 10 s timeout and swallow errors; nothing awaits them at startup                        |
-| Accidentally collecting more       | Payload built by a fixed six-field function; tests assert the exact key set                                             |
-| Cross-site abuse of the public API | Public endpoints return aggregates only; writes need a well-formed random ID and are rate limited                       |
+| Risk                               | Mitigation                                                                                                                      |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| IP address retention               | The service doesn't store or log IPs. Rate limits use an in-memory keyed hash. Host or proxy logs may exist and are documented. |
+| Small groups reveal individuals    | A minimum group size with a guard against subtraction. Per-row data is never exposed.                                           |
+| Tracking across resets or linkage  | The ID is random and local. Resetting deletes the old record. Nothing links it to a wallet or hardware.                         |
+| Fake or flooded check-ins          | Strict validation, a per-address rate limit and an hourly cap on new installations. Figures are labeled as estimates.           |
+| Secrets in the APK                 | None. The client knows only a public HTTPS URL. The optional GitHub token stays on the server.                                  |
+| Backend outage affecting the app   | Every call is best effort with a 10 s timeout and ignores errors. Nothing waits on them at startup.                             |
+| Accidentally collecting more       | A fixed function builds the payload with six fields, and tests check the exact set of keys.                                     |
+| Cross-site abuse of the public API | Public endpoints return totals only. Writes need a well-formed random ID and are rate limited.                                  |
 
 ## Build-time configuration
 
-| Variable                  | Effect                                                                    |
-| ------------------------- | ------------------------------------------------------------------------- |
-| `VITE_TELEMETRY_ENDPOINT` | Base URL of the service. **Unset = the feature is absent from the build** |
-| `VITE_STATS_PAGE_URL`     | Optional link to the public statistics page shown in Settings             |
+| Variable                  | Effect                                                                       |
+| ------------------------- | ---------------------------------------------------------------------------- |
+| `VITE_TELEMETRY_ENDPOINT` | Base URL of the service. **If unset, the feature is left out of the build.** |
+| `VITE_STATS_PAGE_URL`     | Optional link to the public statistics page, shown in Settings.              |

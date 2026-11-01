@@ -29,9 +29,10 @@ const emit = defineEmits<{
 }>();
 
 const primaryItems: DrawerItem[] = [
-  { label: 'nav.overview', icon: 'speed', tab: 'dashboard' },
+  { label: 'nav.overview', icon: 'home', tab: 'dashboard' },
   { label: 'nav.miner', icon: 'tune', tab: 'mining' },
-  { label: 'nav.history', icon: 'history', tab: 'statistics' },
+  { label: 'nav.history', icon: 'bar_chart', tab: 'statistics' },
+  { label: 'nav.device', icon: 'smartphone', tab: 'device' },
   { label: 'nav.settings', icon: 'settings', tab: 'settings' }
 ];
 

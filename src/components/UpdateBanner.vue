@@ -19,7 +19,7 @@ const emit = defineEmits<{ view: []; dismiss: [] }>();
         @click="emit('view')"
       >
         <span
-          class="grid size-9 shrink-0 place-items-center rounded-control bg-app-green-dim text-app-green"
+          class="grid size-9 shrink-0 place-items-center rounded-control bg-app-green-dim text-app-green-ink"
         >
           <MaterialIcon name="new_releases" :size="22" />
         </span>

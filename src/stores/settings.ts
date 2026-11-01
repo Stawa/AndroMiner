@@ -78,7 +78,7 @@ const normalizeSettings = (settings: Partial<SettingsState>): SettingsState => {
     batterySafety: {
       stopBelowPercent:
         typeof floor === 'number' && Number.isFinite(floor)
-          ? Math.min(60, Math.max(10, Math.round(floor)))
+          ? Math.min(50, Math.max(0, Math.round(floor)))
           : defaults.batterySafety.stopBelowPercent,
       mineOnlyCharging:
         typeof settings?.batterySafety?.mineOnlyCharging === 'boolean'

@@ -1,16 +1,13 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import AppUpdatesCard from '../components/AppUpdatesCard.vue';
-import RangeSlider from '../components/RangeSlider.vue';
 import UsageStatisticsCard from '../components/UsageStatisticsCard.vue';
 import MaterialIcon from '../components/MaterialIcon.vue';
 import ToggleRow from '../components/ToggleRow.vue';
-import { useTheme } from '../composables/useTheme';
+import { useTheme, type ThemePreference } from '../composables/useTheme';
 import { t, useLanguage } from '../i18n';
 import { isLanguagePreference, nativeLanguageNames, supportedLocales } from '../i18n/locale';
 import { useSettingsStore } from '../stores/settings';
-import type { DeviceTelemetry, MiningConfig } from '../types/mining';
-const props = defineProps<{ config: MiningConfig; device: DeviceTelemetry; locked?: boolean }>();
 const settings = useSettingsStore();
 const { theme, setTheme } = useTheme();
 const { preference, locale, setLanguage } = useLanguage();
@@ -31,22 +28,36 @@ const languageOptions = computed(() => [
   }))
 ]);
 
-const sensorText = computed(() =>
-  t('config.sensorNow', {
-    source:
-      props.device.thermalSource === 'battery'
-        ? t('config.sourceBattery')
-        : t('config.sourceDevice'),
-    value:
-      props.device.temperatureC === null
-        ? t('common.unavailable')
-        : `${props.device.temperatureC} °C`
-  })
+const themeOptions = computed<Array<{ value: ThemePreference; icon: string; label: string }>>(
+  () => [
+    { value: 'dark', icon: 'dark_mode', label: t('settings.dark') },
+    { value: 'light', icon: 'light_mode', label: t('settings.light') }
+  ]
+);
+
+const languageOpen = ref(false);
+const languagePicker = ref<HTMLElement | null>(null);
+const selectedLanguage = computed(
+  () => languageOptions.value.find((o) => o.value === preference.value) ?? languageOptions.value[0]
 );
 
 const changeLanguage = (value: string): void => {
   if (isLanguagePreference(value)) setLanguage(value);
+  languageOpen.value = false;
 };
+
+const onPickerFocusOut = (e: FocusEvent): void => {
+  const next = e.relatedTarget as Node | null;
+  if (next && !languagePicker.value?.contains(next)) languageOpen.value = false;
+};
+
+const onDocumentPointerDown = (e: PointerEvent): void => {
+  if (languageOpen.value && !languagePicker.value?.contains(e.target as Node)) {
+    languageOpen.value = false;
+  }
+};
+onMounted(() => document.addEventListener('pointerdown', onDocumentPointerDown));
+onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocumentPointerDown));
 </script>
 <template>
   <div class="app-page phone-page redesign-page settings-page">
@@ -60,47 +71,88 @@ const changeLanguage = (value: string): void => {
           <h3>{{ $t('settings.general') }}</h3>
           <MaterialIcon name="settings" :size="20" />
         </div>
-        <div class="language-list" role="radiogroup" :aria-label="$t('settings.language')">
+        <div
+          ref="languagePicker"
+          class="language-picker"
+          @keydown.esc="languageOpen = false"
+          @focusout="onPickerFocusOut"
+        >
           <button
-            v-for="option in languageOptions"
-            :key="option.value"
-            class="language-option ripple"
+            class="language-option language-trigger ripple"
             type="button"
-            role="radio"
-            :aria-checked="option.value === preference"
-            @click="changeLanguage(option.value)"
+            aria-haspopup="listbox"
+            :aria-expanded="languageOpen"
+            :aria-label="$t('settings.language')"
+            @click="languageOpen = !languageOpen"
           >
             <span class="language-option-code">
-              <MaterialIcon v-if="!option.code" name="translate" :size="18" />
-              <template v-else>{{ option.code }}</template>
+              <MaterialIcon v-if="!selectedLanguage.code" name="translate" :size="18" />
+              <template v-else>{{ selectedLanguage.code }}</template>
             </span>
             <span class="language-option-text">
-              <span class="language-option-name">{{ option.label }}</span>
-              <span v-if="option.supportingText" class="language-option-sub">{{
-                option.supportingText
+              <span class="language-option-name">{{ selectedLanguage.label }}</span>
+              <span v-if="selectedLanguage.supportingText" class="language-option-sub">{{
+                selectedLanguage.supportingText
               }}</span>
             </span>
             <MaterialIcon
-              v-if="option.value === preference"
-              class="text-app-green"
-              name="check_circle"
+              class="language-chevron"
+              :class="{ 'is-open': languageOpen }"
+              name="expand_more"
               :size="22"
-              filled
             />
           </button>
+          <div
+            v-if="languageOpen"
+            class="language-menu"
+            role="listbox"
+            :aria-label="$t('settings.language')"
+          >
+            <button
+              v-for="option in languageOptions"
+              :key="option.value"
+              class="language-option ripple"
+              type="button"
+              role="option"
+              :aria-selected="option.value === preference"
+              :aria-checked="option.value === preference"
+              @click="changeLanguage(option.value)"
+            >
+              <span class="language-option-code">
+                <MaterialIcon v-if="!option.code" name="translate" :size="18" />
+                <template v-else>{{ option.code }}</template>
+              </span>
+              <span class="language-option-text">
+                <span class="language-option-name">{{ option.label }}</span>
+                <span v-if="option.supportingText" class="language-option-sub">{{
+                  option.supportingText
+                }}</span>
+              </span>
+              <MaterialIcon
+                v-if="option.value === preference"
+                class="text-app-green-ink"
+                name="check"
+                :size="20"
+              />
+            </button>
+          </div>
         </div>
         <p class="section-copy mt-3">{{ $t('settings.languageHint') }}</p>
       </section>
       <section class="surface">
         <div class="section-heading">
           <h3>{{ $t('settings.appearance') }}</h3>
-          <div class="segment">
-            <button :aria-pressed="theme === 'light'" @click="setTheme('light')">
-              <MaterialIcon name="light_mode" :size="17" />{{ $t('settings.light') }}</button
-            ><button :aria-pressed="theme === 'dark'" @click="setTheme('dark')">
-              <MaterialIcon name="dark_mode" :size="17" />{{ $t('settings.dark') }}
-            </button>
-          </div>
+        </div>
+        <div class="segment segment-full" role="group" :aria-label="$t('settings.appearance')">
+          <button
+            v-for="option in themeOptions"
+            :key="option.value"
+            type="button"
+            :aria-pressed="theme === option.value"
+            @click="setTheme(option.value)"
+          >
+            <MaterialIcon :name="option.icon" :size="18" />{{ option.label }}
+          </button>
         </div>
         <ToggleRow
           v-model="settings.performance.animationsEnabled"
@@ -127,42 +179,6 @@ const changeLanguage = (value: string): void => {
         </div>
       </section>
       <AppUpdatesCard />
-      <section class="surface">
-        <div class="section-heading">
-          <h3>{{ $t('settings.power') }}</h3>
-          <MaterialIcon name="shield" :size="20" />
-        </div>
-        <ToggleRow
-          v-model="settings.batterySafety.mineOnlyCharging"
-          :label="$t('settings.chargingOnly')"
-          :supporting-text="$t('settings.chargingOnlyHint')"
-        />
-        <div class="power-group">
-          <RangeSlider
-            v-model="settings.batterySafety.stopBelowPercent"
-            :label="$t('settings.pauseBelowLabel')"
-            :min="10"
-            :max="60"
-            :step="5"
-            unit="%"
-          />
-          <p class="section-copy">{{ $t('settings.batteryNote') }}</p>
-          <RangeSlider
-            v-model="config.thermalThreshold"
-            :label="$t('config.tempLimit')"
-            :min="20"
-            :max="85"
-            unit=" °C"
-            :disabled="locked"
-          />
-          <p v-if="locked" class="section-copy">{{ $t('config.locked') }}</p>
-          <div class="sensor-chip">
-            <MaterialIcon name="thermostat" :size="18" />{{ sensorText }}
-          </div>
-          <p class="section-copy">{{ $t('config.protectionCopy') }}</p>
-        </div>
-        <p class="section-copy">{{ $t('settings.notificationNote') }}</p>
-      </section>
       <UsageStatisticsCard />
       <details class="surface unsupported">
         <summary>{{ $t('settings.unsupported') }}</summary>

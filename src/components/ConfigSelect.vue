@@ -178,7 +178,7 @@ useDialogFocus(() => open.value, panel, closeSheet);
             <span class="min-w-0 flex-1">
               <span
                 class="block break-words text-[0.9375rem] font-medium leading-5"
-                :class="option.value === modelValue ? 'text-app-green' : 'text-app-on'"
+                :class="option.value === modelValue ? 'text-app-green-ink' : 'text-app-on'"
                 >{{ option.label }}</span
               >
               <span
@@ -189,7 +189,7 @@ useDialogFocus(() => open.value, panel, closeSheet);
             </span>
             <MaterialIcon
               v-if="option.value === modelValue"
-              class="shrink-0 text-app-green"
+              class="shrink-0 text-app-green-ink"
               name="check_circle"
               :size="22"
               filled

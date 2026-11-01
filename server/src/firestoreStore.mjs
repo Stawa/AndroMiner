@@ -74,11 +74,13 @@ export const createFirestoreStore = ({ firestore, statsCacheSeconds = 3600 }) =>
             { day: today, count: FieldValue.increment(1) },
             { merge: true }
           );
-          tx.set(
-            dailyVersions.doc(`${today}_${checkin.appVersion}`),
-            { day: today, appVersion: checkin.appVersion, count: FieldValue.increment(1) },
-            { merge: true }
-          );
+          if (checkin.appVersion !== null) {
+            tx.set(
+              dailyVersions.doc(`${today}_${checkin.appVersion}`),
+              { day: today, appVersion: checkin.appVersion, count: FieldValue.increment(1) },
+              { merge: true }
+            );
+          }
         }
         if (!existing || monthOf(existing.lastSeen) !== month) {
           tx.set(

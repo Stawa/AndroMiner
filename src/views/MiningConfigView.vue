@@ -1,15 +1,21 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import ConfigCard from '../components/ConfigCard.vue';
 import ConfigInput from '../components/ConfigInput.vue';
 import PoolConnectionTest from '../components/PoolConnectionTest.vue';
 import ConfigSelect from '../components/ConfigSelect.vue';
 import MaterialIcon from '../components/MaterialIcon.vue';
 import SavedSetupPicker from '../components/SavedSetupPicker.vue';
 import ProfileChip from '../components/ProfileChip.vue';
+import RangeSlider from '../components/RangeSlider.vue';
 import ToggleRow from '../components/ToggleRow.vue';
 import { profilePresets, type MinerBackendState } from '../composables/useMiningController';
 import { cryptocurrencies } from '../data/miningCatalog';
-import { validateMiningSetup } from '../utils/configValidation';
+import {
+  maxBatteryStopPercent,
+  maxTemperatureLimitC,
+  validateMiningSetup
+} from '../utils/configValidation';
 import { useProfilesStore } from '../stores/profiles';
 import { useSettingsStore } from '../stores/settings';
 import { t } from '../i18n';
@@ -183,7 +189,7 @@ const activeSavedProfile = computed(() => savedProfiles.activeProfile);
 const cpuHardwareName = computed(
   () => props.device.cpuName || props.device.model || t('device.androidCpu')
 );
-const cpuClockLabel = computed(() => props.device.cpuClockLabel || '-');
+const cpuClockLabel = computed(() => props.device.cpuMaxClockLabel || '-');
 const detectedThreadCount = computed(() =>
   Math.max(
     1,
@@ -199,7 +205,7 @@ const engineDescription = computed(
 const backendStatus = computed(() => {
   const labels: Record<MinerBackendState, { label: string; icon: string; tone: string }> = {
     checking: { label: t('config.checking'), icon: 'sync', tone: 'text-app-muted' },
-    ready: { label: t('config.minerReady'), icon: 'check_circle', tone: 'text-app-green' },
+    ready: { label: t('config.minerReady'), icon: 'check_circle', tone: 'text-app-green-ink' },
     missing: { label: t('backend.missing'), icon: 'download', tone: 'text-app-yellow' },
     downloading: { label: t('backend.downloading'), icon: 'downloading', tone: 'text-app-yellow' },
     'web-unavailable': {
@@ -213,11 +219,24 @@ const backendStatus = computed(() => {
   return labels[props.backendState];
 });
 
+const safetyAlert = computed(() => {
+  const { temperatureC, batteryLevel, isCharging } = props.device;
+  const limit = Math.min(props.config.thermalThreshold, maxTemperatureLimitC);
+  const floor = settings.batterySafety.stopBelowPercent;
+  if (limit > 0 && temperatureC !== null && temperatureC >= limit) return t('msg.tooHot');
+  if (floor > 0 && batteryLevel !== null && batteryLevel <= floor)
+    return t('msg.batteryLow', { percent: floor });
+  if (!isCharging && (props.config.autoPauseOnBattery || settings.batterySafety.mineOnlyCharging))
+    return t('msg.needCharger');
+  return '';
+});
+
 const canStartMining = computed(
   () =>
-    props.backendState === 'ready' ||
-    props.backendState === 'missing' ||
-    props.backendState === 'error'
+    !safetyAlert.value &&
+    (props.backendState === 'ready' ||
+      props.backendState === 'missing' ||
+      props.backendState === 'error')
 );
 
 const startButtonLabel = computed(() =>
@@ -234,6 +253,18 @@ const saveButtonLabel = computed(() =>
     : saveFeedbackVisible.value
       ? t('config.saved')
       : t('config.saveChanges')
+);
+const sensorText = computed(() =>
+  t('config.sensorNow', {
+    source:
+      props.device.thermalSource === 'battery'
+        ? t('config.sourceBattery')
+        : t('config.sourceDevice'),
+    value:
+      props.device.temperatureC === null
+        ? t('common.unavailable')
+        : `${props.device.temperatureC} °C`
+  })
 );
 const hasTasksetMaskError = computed(() => /taskset|tasket|bad mask/i.test(props.backendMessage));
 const setupNoticeTitle = computed(() => {
@@ -399,45 +430,44 @@ onBeforeUnmount(() => {
         <p>{{ setupNoticeText }}</p>
       </div>
     </div>
-    <div class="setup-tabs" role="group" :aria-label="$t('config.sections')">
-      <button
-        v-for="section in setupSections"
-        :key="section.id"
-        :aria-pressed="setupSection === section.id"
-        @click="setupSection = section.id"
-      >
-        {{ $t(section.label) }}
-      </button>
-    </div>
     <div v-if="locked" class="notice">
       <p>{{ $t('config.locked') }}</p>
     </div>
-    <fieldset :disabled="locked" class="config-fields">
-      <section
-        v-if="setupSection === 'setup'"
-        class="config-section-grid grid min-w-0 gap-layout content-start md:grid-cols-2 items-stretch"
-      >
-        <section class="surface setup-identity-fields">
-          <div>
-            <h3 class="section-title">{{ $t('config.currency') }}</h3>
-            <ConfigSelect
-              :model-value="config.coin.id"
-              :label="$t('config.coin')"
-              :options="coinOptions"
-              :supporting-text="$t('config.algorithmLine', { algorithm: config.algorithm })"
-              @update:model-value="handleCoinChange"
-            />
-          </div>
-          <div>
-            <h3 class="section-title">{{ $t('config.walletWorker') }}</h3>
-            <ConfigInput
-              v-model="config.walletAddress"
-              :error="validationVisible ? errorText(errors.wallet) : ''"
-              :label="$t('config.walletLabel', { symbol: config.coin.symbol })"
-              :supporting-text="$t('config.walletHint')"
-            /><ConfigInput v-model="config.workerName" :label="$t('config.workerName')" />
-          </div>
-        </section>
+    <div class="cfg-tabs-wrap">
+      <div class="cfg-tabs" role="tablist" :aria-label="$t('config.sections')">
+        <button
+          v-for="section in setupSections"
+          :key="section.id"
+          role="tab"
+          type="button"
+          :aria-selected="setupSection === section.id"
+          @click="setupSection = section.id"
+        >
+          <MaterialIcon :name="section.icon" :size="21" />
+          <span>{{ $t(section.label) }}</span>
+        </button>
+      </div>
+    </div>
+    <fieldset :disabled="locked" class="config-fields grid gap-5">
+      <div v-if="setupSection === 'setup'" class="cfg-grid">
+        <ConfigCard icon="currency_bitcoin" :title="$t('config.currency')">
+          <ConfigSelect
+            :model-value="config.coin.id"
+            :label="$t('config.coin')"
+            :options="coinOptions"
+            :supporting-text="$t('config.algorithmLine', { algorithm: config.algorithm })"
+            @update:model-value="handleCoinChange"
+          />
+        </ConfigCard>
+        <ConfigCard icon="account_balance_wallet" :title="$t('config.walletWorker')">
+          <ConfigInput
+            v-model="config.walletAddress"
+            :error="validationVisible ? errorText(errors.wallet) : ''"
+            :label="$t('config.walletLabel', { symbol: config.coin.symbol })"
+            :supporting-text="$t('config.walletHint')"
+          />
+          <ConfigInput v-model="config.workerName" :label="$t('config.workerName')" />
+        </ConfigCard>
         <SavedSetupPicker
           v-model:name="profileNameDraft"
           :profiles="savedProfiles.profiles"
@@ -448,68 +478,61 @@ onBeforeUnmount(() => {
           @duplicate="duplicateActiveProfile"
           @delete="deleteActiveProfile"
         />
-      </section>
+      </div>
 
-      <section v-else-if="setupSection === 'pool'" class="app-card overflow-hidden">
-        <div class="flex min-h-14 items-center gap-3 px-4">
-          <MaterialIcon class="text-app-green" name="hub" :size="21" />
-          <div class="min-w-0">
-            <h2 class="text-[0.9375rem] font-semibold leading-5 text-app-on">
-              {{ $t('config.poolConnection') }}
-            </h2>
-            <p class="mt-0.5 text-[0.75rem] leading-4 text-app-muted">{{ config.protocol }}</p>
-          </div>
-        </div>
-        <div class="pool-field-grid grid min-w-0 gap-4 md:grid-cols-2 border-t border-app-line p-4">
-          <div class="grid grid-cols-[1fr_96px] gap-2">
+      <div v-else-if="setupSection === 'pool'" class="cfg-grid">
+        <ConfigCard
+          class="cfg-wide"
+          icon="hub"
+          :title="$t('config.poolConnection')"
+          :subtitle="config.protocol"
+        >
+          <div class="cfg-split">
+            <div class="cfg-pool-row cfg-wide">
+              <ConfigInput
+                v-model="config.poolUrl"
+                :label="$t('config.poolUrl')"
+                inputmode="url"
+                :error="validationVisible ? errorText(errors.pool) : ''"
+              />
+              <ConfigInput
+                v-model="config.poolPort"
+                :label="$t('config.port')"
+                type="number"
+                inputmode="numeric"
+                :error="validationVisible ? errorText(errors.port) : ''"
+              />
+            </div>
             <ConfigInput
-              v-model="config.poolUrl"
-              :label="$t('config.poolUrl')"
-              inputmode="url"
-              :error="validationVisible ? errorText(errors.pool) : ''"
+              v-model="config.password"
+              :label="$t('config.password')"
+              type="password"
+              :supporting-text="$t('config.passwordHint')"
+              revealable
             />
-            <ConfigInput
-              v-model="config.poolPort"
-              :label="$t('config.port')"
-              type="number"
-              inputmode="numeric"
-              :error="validationVisible ? errorText(errors.port) : ''"
+            <ConfigSelect
+              :model-value="config.protocol"
+              :label="$t('config.protocol')"
+              :options="protocolSelectOptions"
+              @update:model-value="handleProtocolChange"
             />
           </div>
-          <ConfigInput
-            v-model="config.password"
-            :label="$t('config.password')"
-            type="password"
-            :supporting-text="$t('config.passwordHint')"
-            revealable
-          />
-          <ConfigSelect
-            :model-value="config.protocol"
-            :label="$t('config.protocol')"
-            :options="protocolSelectOptions"
-            @update:model-value="handleProtocolChange"
-          />
           <PoolConnectionTest :config="config" />
-        </div>
-      </section>
+        </ConfigCard>
+      </div>
 
-      <section
-        v-else-if="setupSection === 'performance'"
-        class="config-section-grid performance-grid grid min-w-0 gap-layout content-start md:grid-cols-2 items-stretch"
-      >
-        <section class="surface">
-          <div class="section-heading">
-            <h3>{{ $t('config.cpuAllocation') }}</h3>
-            <span class="supporting-label">{{
+      <div v-else-if="setupSection === 'performance'" class="cfg-grid">
+        <ConfigCard class="cfg-wide" icon="memory" :title="$t('config.cpuAllocation')">
+          <template #aside>
+            <span class="cfg-badge">{{
               $t('config.threadsBadge', { count: config.threadCount, total: detectedThreadCount })
             }}</span>
-          </div>
-          <p class="section-copy">
-            {{ $t('config.cpuCopy', { engine: engineDescription }) }}
-          </p>
-          <div class="thread-stepper">
+          </template>
+          <p class="section-copy">{{ $t('config.cpuCopy', { engine: engineDescription }) }}</p>
+          <div class="cfg-stepper">
             <button
               class="outline-button"
+              type="button"
               :aria-label="$t('config.decreaseThreads')"
               :disabled="config.threadCount <= 1"
               @click="adjustThreads(-1)"
@@ -517,11 +540,12 @@ onBeforeUnmount(() => {
               <MaterialIcon name="remove" :size="20" />
             </button>
             <div>
-              <strong>{{ config.threadCount }}</strong
-              ><small>{{ $t('config.workerThreads') }}</small>
+              <strong>{{ config.threadCount }}</strong>
+              <small>{{ $t('config.workerThreads') }}</small>
             </div>
             <button
               class="outline-button"
+              type="button"
               :aria-label="$t('config.increaseThreads')"
               :disabled="config.threadCount >= detectedThreadCount"
               @click="adjustThreads(1)"
@@ -529,11 +553,11 @@ onBeforeUnmount(() => {
               <MaterialIcon name="add" :size="20" />
             </button>
           </div>
-          <div class="section-heading">
-            <h3>{{ $t('config.powerProfile') }}</h3>
-            <span class="supporting-label">{{ selectedProfileLabel }}</span>
+          <div class="cfg-subhead">
+            <h4>{{ $t('config.powerProfile') }}</h4>
+            <span class="cfg-badge">{{ selectedProfileLabel }}</span>
           </div>
-          <div class="profile-options">
+          <div class="cfg-profiles">
             <ProfileChip
               v-for="profile in profiles"
               :key="profile.id"
@@ -547,62 +571,64 @@ onBeforeUnmount(() => {
               @select="emit('profile', $event)"
             />
           </div>
-        </section>
-        <section class="surface">
-          <h3 class="section-title">{{ $t('config.scheduling') }}</h3>
-          <ConfigSelect
-            :model-value="config.priority"
-            :label="$t('config.priority')"
-            :options="prioritySelectOptions"
-            @update:model-value="handlePriorityChange"
-          /><ConfigSelect
-            :model-value="config.affinity"
-            :label="$t('config.coreSelection')"
-            :options="affinitySelectOptions"
-            @update:model-value="handleAffinityChange"
-          /><ToggleRow
-            v-model="config.backgroundMining"
-            :label="$t('config.background')"
-            :supporting-text="$t('config.backgroundHint')"
-          /><ToggleRow
-            v-model="settings.performance.liteSessionMode"
-            :label="$t('settings.lite')"
-            :supporting-text="$t('config.liteHint')"
-          />
-        </section>
-        <details class="surface">
-          <summary>{{ $t('config.donation') }}</summary>
-          <p class="section-copy">{{ $t('config.donationCopy') }}</p>
-          <ConfigInput
-            v-model="config.donateLevel"
-            :label="$t('config.donationLevel')"
-            type="number"
-            inputmode="numeric"
-            suffix="%"
-          /><ConfigSelect
-            :model-value="String(config.donateOverProxy)"
-            :label="$t('config.donateOverProxy')"
-            :options="donateOverProxySelectOptions"
-            @update:model-value="handleDonateOverProxyChange"
-          />
-        </details>
-      </section>
-
-      <section v-else class="app-card overflow-hidden">
-        <div class="flex min-h-14 items-center gap-3 px-4">
-          <MaterialIcon class="text-app-green" name="health_and_safety" :size="21" />
-          <div class="min-w-0">
-            <h2 class="text-[0.9375rem] font-semibold leading-5 text-app-on">
-              {{ $t('config.protection') }}
-            </h2>
-            <p class="mt-0.5 text-[0.75rem] leading-4 text-app-muted">
-              {{ $t('config.protectionSub') }}
-            </p>
+        </ConfigCard>
+        <details class="cfg-card cfg-details cfg-wide">
+          <summary>{{ $t('config.advanced') }}</summary>
+          <div class="cfg-card-body">
+            <h3 class="cfg-subtitle">{{ $t('config.scheduling') }}</h3>
+            <div class="cfg-split">
+              <ConfigSelect
+                :model-value="config.priority"
+                :label="$t('config.priority')"
+                :options="prioritySelectOptions"
+                @update:model-value="handlePriorityChange"
+              />
+              <ConfigSelect
+                :model-value="config.affinity"
+                :label="$t('config.coreSelection')"
+                :options="affinitySelectOptions"
+                @update:model-value="handleAffinityChange"
+              />
+            </div>
+            <ToggleRow
+              v-model="config.backgroundMining"
+              :label="$t('config.background')"
+              :supporting-text="$t('config.backgroundHint')"
+            />
+            <ToggleRow
+              v-model="settings.performance.liteSessionMode"
+              :label="$t('settings.lite')"
+              :supporting-text="$t('config.liteHint')"
+            />
+            <div class="cfg-divider" />
+            <h3 class="cfg-subtitle">{{ $t('config.donation') }}</h3>
+            <p class="section-copy">{{ $t('config.donationCopy') }}</p>
+            <div class="cfg-split">
+              <ConfigInput
+                v-model="config.donateLevel"
+                :label="$t('config.donationLevel')"
+                type="number"
+                inputmode="numeric"
+                suffix="%"
+              />
+              <ConfigSelect
+                :model-value="String(config.donateOverProxy)"
+                :label="$t('config.donateOverProxy')"
+                :options="donateOverProxySelectOptions"
+                @update:model-value="handleDonateOverProxyChange"
+              />
+            </div>
           </div>
-        </div>
-        <div class="space-y-3 border-t border-app-line p-4">
+        </details>
+      </div>
+
+      <div v-else class="cfg-grid">
+        <ConfigCard
+          icon="health_and_safety"
+          :title="$t('config.protection')"
+          :subtitle="$t('config.protectionSub')"
+        >
           <p class="section-copy">{{ $t('config.protectionCopy') }}</p>
-          <p class="section-copy">{{ $t('config.limitsInSettings') }}</p>
           <ConfigInput
             v-model.number="config.maxDurationMinutes"
             :label="$t('config.maxDuration')"
@@ -613,6 +639,7 @@ onBeforeUnmount(() => {
             inputmode="numeric"
           />
           <p class="section-copy">{{ $t('config.durationCopy') }}</p>
+          <div class="cfg-divider" />
           <ToggleRow
             v-model="config.autoPauseScreenOff"
             :label="$t('config.pauseHidden')"
@@ -623,31 +650,62 @@ onBeforeUnmount(() => {
             :label="$t('config.requirePower')"
             :supporting-text="$t('config.requirePowerHint')"
           />
-        </div>
-      </section>
+        </ConfigCard>
+        <ConfigCard icon="battery_charging_full" :title="$t('settings.power')">
+          <ToggleRow
+            v-model="settings.batterySafety.mineOnlyCharging"
+            :label="$t('settings.chargingOnly')"
+            :supporting-text="$t('settings.chargingOnlyHint')"
+          />
+          <RangeSlider
+            v-model="settings.batterySafety.stopBelowPercent"
+            :label="$t('settings.pauseBelowLabel')"
+            :min="0"
+            :max="maxBatteryStopPercent"
+            :step="5"
+            unit="%"
+            :off-label="$t('config.limitOff')"
+          />
+          <p class="section-copy">{{ $t('settings.batteryNote') }}</p>
+          <div class="cfg-divider" />
+          <RangeSlider
+            v-model="config.thermalThreshold"
+            :label="$t('config.tempLimit')"
+            :min="0"
+            :max="maxTemperatureLimitC"
+            unit=" °C"
+            :off-label="$t('config.limitOff')"
+          />
+          <div class="sensor-chip">
+            <MaterialIcon name="thermostat" :size="18" />{{ sensorText }}
+          </div>
+          <p class="section-copy">{{ $t('settings.notificationNote') }}</p>
+        </ConfigCard>
+      </div>
 
-      <section class="setup-action-bar">
-        <div class="grid">
-          <button
-            class="outline-button"
-            type="button"
-            :aria-label="saveButtonLabel"
-            @click="saveCurrentSetup"
-          >
-            <MaterialIcon :name="saveFeedbackVisible ? 'check_circle' : 'save'" :size="21" />
-            <span role="status">{{ saveButtonLabel }}</span>
-          </button>
-          <button
-            class="primary-button"
-            type="button"
-            :disabled="!canStartMining"
-            @click="saveAndStartMining"
-          >
-            <MaterialIcon name="play_arrow" :size="22" filled />
-            <span>{{ startButtonLabel }}</span>
-          </button>
-        </div>
-      </section>
+      <p v-if="safetyAlert" class="cfg-alert" role="alert">
+        <MaterialIcon name="health_and_safety" :size="20" />{{ safetyAlert }}
+      </p>
+      <div class="cfg-actions">
+        <button
+          class="outline-button"
+          type="button"
+          :aria-label="saveButtonLabel"
+          @click="saveCurrentSetup"
+        >
+          <MaterialIcon :name="saveFeedbackVisible ? 'check_circle' : 'save'" :size="21" />
+          <span role="status">{{ saveButtonLabel }}</span>
+        </button>
+        <button
+          class="primary-button"
+          type="button"
+          :disabled="!canStartMining"
+          @click="saveAndStartMining"
+        >
+          <MaterialIcon name="play_arrow" :size="22" filled />
+          <span>{{ startButtonLabel }}</span>
+        </button>
+      </div>
     </fieldset>
   </div>
 </template>

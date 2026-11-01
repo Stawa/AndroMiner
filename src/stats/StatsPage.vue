@@ -354,7 +354,7 @@ h2 {
 }
 .big .value {
   font-size: clamp(3.5rem, 9vw, 6rem);
-  color: rgb(var(--color-app-green));
+  color: rgb(var(--color-app-green-ink));
 }
 .dl .value {
   font-size: 2.25rem;

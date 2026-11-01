@@ -20,9 +20,9 @@ interface NativeDeviceStatus {
   cpuName?: string;
   cpuClockGhz?: number | null;
   cpuClockLabel?: string;
+  cpuMaxClockGhz?: number | null;
+  cpuMaxClockLabel?: string;
   gpuName?: string;
-  gpuClockMhz?: number | null;
-  gpuClockLabel?: string;
   batteryCurrentMa?: number | null;
   batteryVoltageV?: number | null;
   powerDrawW?: number | null;
@@ -92,9 +92,9 @@ export const useDeviceTelemetry = () => {
     cpuName: t('device.androidCpu'),
     cpuClockGhz: null,
     cpuClockLabel: '-',
+    cpuMaxClockGhz: null,
+    cpuMaxClockLabel: '-',
     gpuName: 'Android GPU',
-    gpuClockMhz: null,
-    gpuClockLabel: '-',
     batteryCurrentMa: null,
     batteryVoltageV: null,
     powerDrawW: null,
@@ -144,10 +144,10 @@ export const useDeviceTelemetry = () => {
       device.cpuClockGhz =
         typeof nativeStatus?.cpuClockGhz === 'number' ? nativeStatus.cpuClockGhz : null;
       device.cpuClockLabel = nativeStatus?.cpuClockLabel || '-';
+      device.cpuMaxClockGhz =
+        typeof nativeStatus?.cpuMaxClockGhz === 'number' ? nativeStatus.cpuMaxClockGhz : null;
+      device.cpuMaxClockLabel = nativeStatus?.cpuMaxClockLabel || '-';
       device.gpuName = nativeStatus?.gpuName || 'Android GPU';
-      device.gpuClockMhz =
-        typeof nativeStatus?.gpuClockMhz === 'number' ? nativeStatus.gpuClockMhz : null;
-      device.gpuClockLabel = nativeStatus?.gpuClockLabel || '-';
       device.batteryCurrentMa =
         typeof nativeStatus?.batteryCurrentMa === 'number'
           ? Number(nativeStatus.batteryCurrentMa.toFixed(0))
@@ -176,9 +176,9 @@ export const useDeviceTelemetry = () => {
       device.cpuName = t('device.androidCpu');
       device.cpuClockGhz = null;
       device.cpuClockLabel = '-';
+      device.cpuMaxClockGhz = null;
+      device.cpuMaxClockLabel = '-';
       device.gpuName = 'Android GPU';
-      device.gpuClockMhz = null;
-      device.gpuClockLabel = '-';
       device.batteryCurrentMa = null;
       device.batteryVoltageV = null;
       device.powerDrawW = null;

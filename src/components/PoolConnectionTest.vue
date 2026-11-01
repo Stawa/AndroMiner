@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Clipboard } from '@capacitor/clipboard';
+import MaterialIcon from './MaterialIcon.vue';
 import type { MiningConfig } from '../types/mining';
 import { t } from '../i18n';
 
@@ -23,6 +24,10 @@ const error = ref('');
 const report = ref<Report | null>(null);
 const preview = ref('');
 const copied = ref(false);
+const target = computed(() => `${props.config.poolUrl}:${props.config.poolPort}`);
+const failedCount = computed(
+  () => report.value?.stages.filter((stage) => !stage.passed).length ?? 0
+);
 
 async function testConnection() {
   if (busy.value) return;
@@ -68,30 +73,58 @@ async function copyReport() {
 </script>
 
 <template>
-  <div class="space-y-3">
-    <button class="outline-button" type="button" :disabled="busy" @click="testConnection">
-      {{ busy ? $t('pool.testing') : $t('pool.test') }}
-    </button>
-    <p class="section-copy">
-      {{ $t('pool.testCopy') }}
+  <section class="pool-test" :aria-busy="busy">
+    <header class="pool-test-head">
+      <span class="pool-test-icon" aria-hidden="true"><MaterialIcon name="lan" :size="22" /></span>
+      <div>
+        <h4>{{ $t('pool.test') }}</h4>
+        <code class="pool-test-target">{{ target }}</code>
+      </div>
+      <button class="pool-test-run" type="button" :disabled="busy" @click="testConnection">
+        <MaterialIcon
+          :name="busy ? 'progress_activity' : report ? 'refresh' : 'play_arrow'"
+          :size="20"
+          :class="{ 'pool-test-spin': busy }"
+        />
+        <span>{{ busy ? $t('pool.testing') : report ? $t('pool.retest') : $t('pool.run') }}</span>
+      </button>
+    </header>
+    <p v-if="!report && !error" class="pool-test-copy">{{ $t('pool.testCopy') }}</p>
+    <p v-if="error" role="alert" class="pool-test-banner" data-tone="bad">
+      <MaterialIcon name="error" :size="20" />{{ error }}
     </p>
-    <p v-if="error" role="alert" class="field-error">{{ error }}</p>
-    <ol v-if="report" class="section-copy" aria-live="polite">
-      <li v-for="(stage, index) in report.stages" :key="index">
-        <strong
-          >{{ stage.stage }} · {{ stage.passed ? $t('pool.passed') : $t('pool.failed') }}</strong
-        >: {{ stage.detail }}
-      </li>
-    </ol>
-    <details v-if="preview">
-      <summary>{{ $t('pool.preview') }}</summary>
-      <p class="section-copy">
-        {{ $t('pool.previewCopy') }}
+    <div v-if="report" aria-live="polite">
+      <p class="pool-test-banner" :data-tone="failedCount ? 'bad' : 'good'">
+        <MaterialIcon :name="failedCount ? 'cancel' : 'check_circle'" :size="20" filled />
+        {{
+          failedCount
+            ? $t('pool.summaryFailed', { count: failedCount, total: report.stages.length })
+            : $t('pool.summaryPassed')
+        }}
       </p>
-      <pre class="section-copy overflow-x-auto" tabindex="0">{{ preview }}</pre>
+      <ol class="pool-test-stages">
+        <li
+          v-for="(stage, index) in report.stages"
+          :key="index"
+          :data-tone="stage.passed ? 'good' : 'bad'"
+        >
+          <MaterialIcon :name="stage.passed ? 'check_circle' : 'cancel'" :size="20" filled />
+          <div>
+            <strong>{{ stage.stage }}</strong>
+            <span class="sr-only">{{ stage.passed ? $t('pool.passed') : $t('pool.failed') }}</span>
+            <small>{{ stage.detail }}</small>
+          </div>
+        </li>
+      </ol>
+    </div>
+    <details v-if="preview" class="pool-test-preview">
+      <summary>{{ $t('pool.preview') }}</summary>
+      <p class="pool-test-copy">{{ $t('pool.previewCopy') }}</p>
+      <pre tabindex="0">{{ preview }}</pre>
       <button class="outline-button" type="button" @click="copyReport">
+        <MaterialIcon :name="copied ? 'check' : 'content_copy'" :size="18" />
         {{ copied ? $t('pool.copied') : $t('pool.copy') }}
       </button>
     </details>
-  </div>
+  </section>
 </template>

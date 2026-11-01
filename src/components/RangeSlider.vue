@@ -9,12 +9,14 @@ interface RangeSliderProps {
   step?: number;
   unit?: string;
   disabled?: boolean;
+  offLabel?: string;
 }
 
 const props = withDefaults(defineProps<RangeSliderProps>(), {
   step: 1,
   unit: '',
-  disabled: false
+  disabled: false,
+  offLabel: ''
 });
 
 const emit = defineEmits<{ 'update:modelValue': [value: number] }>();
@@ -23,6 +25,10 @@ const fill = computed(
   () =>
     `${Math.min(100, Math.max(0, ((props.modelValue - props.min) / (props.max - props.min)) * 100))}%`
 );
+
+const isOff = computed(() => props.offLabel !== '' && props.modelValue === props.min);
+const format = (value: number): string =>
+  props.offLabel !== '' && value === props.min ? props.offLabel : `${value}${props.unit}`;
 
 const handleInput = (event: Event): void => {
   emit('update:modelValue', Number((event.target as HTMLInputElement).value));
@@ -33,7 +39,9 @@ const handleInput = (event: Event): void => {
   <div class="range-slider" :class="{ 'is-disabled': disabled }">
     <div class="range-slider-head">
       <span class="range-slider-label">{{ label }}</span>
-      <strong class="range-slider-value">{{ modelValue }}{{ unit }}</strong>
+      <strong class="range-slider-value" :class="{ 'is-off': isOff }">{{
+        format(modelValue)
+      }}</strong>
     </div>
     <input
       class="range-slider-input"
@@ -48,8 +56,8 @@ const handleInput = (event: Event): void => {
       @input="handleInput"
     />
     <div class="range-slider-scale" aria-hidden="true">
-      <span>{{ min }}{{ unit }}</span
-      ><span>{{ max }}{{ unit }}</span>
+      <span>{{ format(min) }}</span
+      ><span>{{ format(max) }}</span>
     </div>
   </div>
 </template>

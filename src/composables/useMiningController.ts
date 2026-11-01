@@ -2,7 +2,7 @@ import { mergeNativeHistory, type NativeSessionRecord } from '../utils/sessionHi
 import { App } from '@capacitor/app';
 import { useSettingsStore } from '../stores/settings';
 import { formatDate, t } from '../i18n';
-import { validateMiningSetup } from '../utils/configValidation';
+import { maxTemperatureLimitC, validateMiningSetup } from '../utils/configValidation';
 import { isFresh, nonNegative, readHashrates } from '../utils/miningTelemetry';
 import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
@@ -605,15 +605,18 @@ export const useMiningController = () => {
       return;
     }
 
-    if (externalTemperature !== null && externalTemperature >= config.thermalThreshold) {
+    const temperatureLimit = Math.min(config.thermalThreshold, maxTemperatureLimitC);
+    const batteryFloor = settings.batterySafety.stopBelowPercent;
+    if (
+      temperatureLimit > 0 &&
+      externalTemperature !== null &&
+      externalTemperature >= temperatureLimit
+    ) {
       setBackendError(t('msg.tooHot'));
       return;
     }
-    if (
-      externalBatteryLevel !== null &&
-      externalBatteryLevel <= settings.batterySafety.stopBelowPercent
-    ) {
-      setBackendError(t('msg.batteryLow', { percent: settings.batterySafety.stopBelowPercent }));
+    if (batteryFloor > 0 && externalBatteryLevel !== null && externalBatteryLevel <= batteryFloor) {
+      setBackendError(t('msg.batteryLow', { percent: batteryFloor }));
       return;
     }
     if (

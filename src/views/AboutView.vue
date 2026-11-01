@@ -1,21 +1,19 @@
 <script setup lang="ts">
-import { formatSensor } from '../utils/miningTelemetry';
 import { computed, onMounted } from 'vue';
 import BrandLogo from '../components/BrandLogo.vue';
 import { useAppVersion } from '../composables/useAppVersion';
 import { useNativeMinerInfo } from '../composables/useNativeMinerInfo';
+import MaterialIcon from '../components/MaterialIcon.vue';
 import { formatNumber, t } from '../i18n';
-import type { DeviceTelemetry } from '../types/mining';
 
-interface AboutViewProps {
-  device: DeviceTelemetry;
-}
-
-defineProps<AboutViewProps>();
-
-const { displayVersion, refreshAppVersion } = useAppVersion();
+const { build, variantLabel, version, refreshAppVersion } = useAppVersion();
 const { minerInfo } = useNativeMinerInfo();
-const versionLabel = computed(() => t('about.version', { version: displayVersion.value }));
+const appDetails = computed(() => [
+  { label: t('about.versionLabel'), value: version.value },
+  { label: t('about.build'), value: build.value || t('common.unavailable') },
+  { label: t('about.variant'), value: variantLabel.value },
+  { label: t('check.platform'), value: 'Capacitor Android' }
+]);
 
 // Permission names are Android identifiers and stay as-is; only the explanation is localized.
 const androidPermissions = [
@@ -105,85 +103,56 @@ onMounted(() => {
 });
 </script>
 <template>
-  <div class="app-page phone-page redesign-page about-page md:grid md:grid-cols-2 md:items-stretch">
+  <div class="app-page phone-page about-page">
     <header class="screen-heading">
       <h1>{{ $t('settings.about') }}</h1>
-      <p>{{ versionLabel }}</p>
     </header>
-    <section class="brand-banner">
-      <div class="brand-logo"><BrandLogo /></div>
-      <div>
-        <strong>AndroMiner</strong>
-        <p>{{ $t('about.tagline') }}</p>
-      </div>
+
+    <section class="about-id">
+      <div class="about-logo"><BrandLogo /></div>
+      <p>{{ $t('about.tagline') }}</p>
     </section>
-    <section class="surface">
-      <h3 class="section-title">{{ $t('about.yourDevice') }}</h3>
-      <dl class="definition-list">
-        <div>
-          <dt>{{ $t('about.model') }}</dt>
-          <dd>{{ device.model }}</dd>
-        </div>
-        <div>
-          <dt>{{ $t('check.platform') }}</dt>
-          <dd>{{ device.operatingSystem }} {{ device.osVersion }}</dd>
-        </div>
-        <div>
-          <dt>CPU</dt>
-          <dd>{{ device.cpuName }}</dd>
-        </div>
-        <div>
-          <dt>{{ $t('about.threads') }}</dt>
-          <dd>{{ device.cpuThreads }}</dd>
-        </div>
-        <div>
-          <dt>{{ $t('check.memory') }}</dt>
-          <dd>
-            {{
-              device.deviceMemoryGb === null
-                ? $t('common.unavailable')
-                : device.deviceMemoryGb + ' GB'
-            }}
-          </dd>
-        </div>
-        <div>
-          <dt>{{ $t('about.clock') }}</dt>
-          <dd>{{ device.cpuClockLabel }}</dd>
-        </div>
-        <div>
-          <dt>{{ $t('metric.battery') }}</dt>
-          <dd>{{ formatSensor(device.batteryLevel, '%') }}</dd>
-        </div>
-        <div>
-          <dt>{{ $t('metric.temperature') }}</dt>
-          <dd>
-            {{ formatSensor(device.temperatureC, ' °C') }} ·
-            {{ $t(`thermalSource.${device.thermalSource}`) }}
-          </dd>
-        </div>
-      </dl>
-    </section>
-    <details class="surface" open>
-      <summary>{{ $t('about.engine') }}</summary>
-      <dl class="definition-list">
-        <div v-for="row in minerDetails" :key="row.label">
+
+    <section class="dv-group" :aria-label="$t('about.app')">
+      <h2 class="eyebrow">{{ $t('about.app') }}</h2>
+      <dl class="dv-list">
+        <div v-for="row in appDetails" :key="row.label">
           <dt>{{ row.label }}</dt>
           <dd>{{ row.value }}</dd>
         </div>
       </dl>
+    </section>
+
+    <section class="dv-group" :aria-label="$t('about.engine')">
+      <h2 class="eyebrow">{{ $t('about.engine') }}</h2>
+      <dl class="dv-list">
+        <div v-for="row in minerDetails.slice(0, 8)" :key="row.label">
+          <dt>{{ row.label }}</dt>
+          <dd>{{ row.value }}</dd>
+        </div>
+        <div class="about-stack">
+          <dt>{{ minerDetails[8].label }}</dt>
+          <dd>{{ minerDetails[8].value }}</dd>
+        </div>
+      </dl>
+    </section>
+
+    <details class="dv-group about-permissions">
+      <summary>
+        <h2 class="eyebrow">{{ $t('about.permissions') }}</h2>
+        <MaterialIcon name="expand_more" :size="20" />
+      </summary>
+      <ul class="dv-list">
+        <li v-for="permission in androidPermissions" :key="permission.name">
+          <code>{{ permission.name }}</code>
+          <p>{{ $t(`about.permission.${permission.key}`) }}</p>
+        </li>
+      </ul>
     </details>
-    <details class="surface">
-      <summary>{{ $t('about.permissions') }}</summary>
-      <div v-for="permission in androidPermissions" :key="permission.name" class="permission-row">
-        <strong>{{ permission.name }}</strong>
-        <p class="section-copy">{{ $t(`about.permission.${permission.key}`) }}</p>
-      </div>
-    </details>
-    <div class="notice">
-      <div>
-        <strong>{{ $t('about.experimental') }}</strong>
-        <p>{{ $t('about.experimentalBody') }}</p>
-      </div>
-    </div>
+
+    <p class="about-note">
+      <strong>{{ $t('about.experimental') }}</strong>
+      {{ $t('about.experimentalBody') }}
+    </p>
   </div>
 </template>

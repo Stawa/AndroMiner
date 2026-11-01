@@ -42,8 +42,6 @@
 .app-card {
   border-radius: var(--radius-panel);
 }
-.config-page .surface,
-.config-page .app-card,
 .settings-layout > .surface,
 .insights-page > .surface,
 .profiles-page > .surface,
@@ -55,8 +53,7 @@
 .open-section,
 .settings-layout > .surface,
 .insights-page > .surface,
-.profiles-page > .surface,
-.config-page .saved-setups {
+.profiles-page > .surface {
   border-top: 1px solid rgb(var(--color-app-line) / 0.7);
   padding-top: 24px;
 }
@@ -250,7 +247,7 @@
   padding-bottom: 4px;
 }
 .configuration-name > .material-symbols-rounded {
-  color: rgb(var(--color-app-green));
+  color: rgb(var(--color-app-green-ink));
   background: rgb(var(--color-app-green-dim));
   padding: 9px;
   border-radius: 11px;
@@ -306,35 +303,7 @@
   margin-top: 4px;
   padding-top: 14px;
 }
-.pool-field-grid > .config-field + .config-field {
-  margin-top: 0;
-}
-.pool-field-grid > .grid {
-  grid-template-columns: minmax(0, 1fr) 86px;
-}
-.config-fields > .setup-action-bar {
-  padding-top: 16px;
-  border-top: 1px solid rgb(var(--color-app-line));
-}
-.setup-tabs {
-  background: transparent;
-  border-bottom: 1px solid rgb(var(--color-app-line));
-  border-radius: 0;
-  padding: 0;
-  gap: 0;
-}
-.setup-tabs button {
-  border: 0;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
-  min-height: 48px;
-  transition:
-    color 180ms,
-    border-color 180ms;
-}
-.setup-tabs button[aria-pressed='true'] {
-  background: transparent;
-  border-bottom-color: rgb(var(--color-app-green));
+@media (min-width: 48rem) {
 }
 .hash-hero {
   border-radius: var(--radius-panel);
@@ -420,13 +389,6 @@
 .profile-library > :only-child {
   grid-column: 1 / -1;
 }
-.setup-identity-fields {
-  display: grid;
-  gap: 24px;
-}
-.setup-identity-fields > div {
-  min-width: 0;
-}
 .settings-layout > .updates-card {
   display: flex;
   flex-direction: column;
@@ -456,7 +418,7 @@
   flex-shrink: 0;
 }
 .saved-setup-option[aria-pressed='true'] > .material-symbols-rounded {
-  color: rgb(var(--color-app-green));
+  color: rgb(var(--color-app-green-ink));
 }
 .saved-setup-option .coin-mark {
   width: 34px;
@@ -526,9 +488,6 @@
   overflow-wrap: anywhere;
 }
 @media (min-width: 480px) {
-  .setup-action-bar > div {
-    grid-template-columns: 1fr 1fr;
-  }
 }
 @media (min-width: 48rem) {
   .app-shell-ready {
@@ -669,47 +628,6 @@
   .insights-history .empty-state p {
     max-width: 60ch;
   }
-  .config-section-grid > .saved-setups {
-    grid-column: 1 / -1;
-  }
-  .setup-identity-fields {
-    grid-column: 1 / -1;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .setup-identity-fields > div + div {
-    border-left: 1px solid rgb(var(--color-app-line));
-    padding-left: 24px;
-  }
-  .performance-grid > * {
-    grid-column: 1 / -1;
-  }
-  .performance-grid .profile-options {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .performance-grid > section:nth-child(2) {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px 24px;
-    align-content: start;
-  }
-  .performance-grid > section:nth-child(2) > h3 {
-    grid-column: 1 / -1;
-    margin-bottom: 0;
-  }
-  .performance-grid > section:nth-child(2) > .config-field {
-    margin: 0;
-  }
-  .config-fields > .app-card > .pool-field-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    padding: 22px;
-  }
-  .config-fields > .app-card > .pool-field-grid > .grid {
-    grid-column: 1 / -1;
-  }
-  .config-fields > .setup-action-bar > div {
-    max-width: 600px;
-    margin-left: auto;
-  }
   .detail-sheet {
     border-radius: 22px;
     margin: 24px;
@@ -754,7 +672,6 @@
   .surface {
     padding: var(--spacing-panel);
   }
-  .config-page .surface,
   .settings-layout > .surface,
   .insights-page > .surface,
   .profiles-page > .surface,
@@ -781,11 +698,6 @@
     font-size: 0.75rem;
   }
   .device-tiles small {
-    font-size: 0.75rem;
-  }
-  .setup-tabs button {
-    flex-direction: column;
-    gap: 4px;
     font-size: 0.75rem;
   }
   .configuration-list > div {

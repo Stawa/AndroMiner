@@ -22,3 +22,8 @@ export const validateMiningSetup = (config: MiningConfig) => ({
       ? 'validation.port'
       : ''
 });
+
+/** Highest temperature limit a user may set. 0 disables the temperature limit. */
+export const maxTemperatureLimitC = 85;
+/** Highest battery stop level a user may set. 0 disables the battery limit. */
+export const maxBatteryStopPercent = 50;

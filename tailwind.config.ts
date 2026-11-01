@@ -15,6 +15,7 @@ export default {
           muted: 'rgb(var(--color-app-muted) / <alpha-value>)',
           on: 'rgb(var(--color-app-on) / <alpha-value>)',
           green: 'rgb(var(--color-app-green) / <alpha-value>)',
+          'green-ink': 'rgb(var(--color-app-green-ink) / <alpha-value>)',
           'green-dim': 'rgb(var(--color-app-green-dim) / <alpha-value>)',
           yellow: 'rgb(var(--color-app-yellow) / <alpha-value>)'
         }

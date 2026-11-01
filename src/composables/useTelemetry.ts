@@ -7,6 +7,7 @@ import {
   createTelemetryClient,
   defaultState,
   type CheckinResult,
+  type ShareField,
   type TelemetryEnvironment,
   type TelemetryState
 } from '../utils/telemetryClient';
@@ -41,7 +42,12 @@ const lastResult = ref<CheckinResult | ''>('');
 let started = false;
 
 const sync = (): void => {
-  state.value = { ...client.getState(), pendingDeletion: [...client.getState().pendingDeletion] };
+  const current = client.getState();
+  state.value = {
+    ...current,
+    share: { ...current.share },
+    pendingDeletion: [...current.pendingDeletion]
+  };
 };
 
 const run = async (task: () => Promise<void>): Promise<void> => {
@@ -101,6 +107,11 @@ export const useTelemetry = () => ({
 
   setCountry(country: string | null): void {
     client.setCountry(country);
+    sync();
+  },
+
+  setShare(field: ShareField, shared: boolean): void {
+    client.setShare(field, shared);
     sync();
   },
 

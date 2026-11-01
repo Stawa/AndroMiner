@@ -40,6 +40,7 @@ const titles: Record<AppTab, string> = {
   dashboard: 'header.dashboard',
   mining: 'header.mining',
   statistics: 'header.statistics',
+  device: 'nav.device',
   settings: 'nav.settings',
   profiles: 'nav.profiles',
   help: 'nav.helpSupport',

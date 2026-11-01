@@ -430,6 +430,9 @@ function Build-OpenSsl {
     throw "Android NDK LLVM toolchain was not found at $LlvmBin."
   }
 
+  # OpenSSL's ARMv8-crypto assembly objects do not link into a 32-bit ARM binary, and TLS speed does
+  # not affect RandomX hashrate, so the armeabi-v7a build uses OpenSSL's portable C code.
+  $ArchConfigure = if ($Target -eq "android-arm") { "no-asm" } else { "" }
   $MsysBash = Find-MsysBash
   if ($MsysBash) {
     $MsysSourceDir = ConvertTo-MsysPath $SourceDir
@@ -444,7 +447,7 @@ function Build-OpenSsl {
       "export ANDROID_NDK_HOME=$(Quote-Bash $MsysNdk)",
       "export PATH=$(Quote-Bash $MsysLlvmBin):`$PATH",
       "if [ -f Makefile ]; then make clean || true; fi",
-      "perl Configure $Target no-shared no-tests no-unit-test no-apps --prefix=$(Quote-Bash $MsysPrefix) --openssldir=$(Quote-Bash "$MsysPrefix/ssl") -D__ANDROID_API__=$ApiLevel",
+      "perl Configure $Target no-shared no-tests no-unit-test no-apps $ArchConfigure --prefix=$(Quote-Bash $MsysPrefix) --openssldir=$(Quote-Bash "$MsysPrefix/ssl") -D__ANDROID_API__=$ApiLevel",
       "make -j $Jobs",
       "make install_sw"
     ) -join "; "

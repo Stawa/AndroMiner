@@ -32,6 +32,16 @@ export default defineConfig({
   build: {
     target: 'es2020',
     outDir: 'dist',
-    emptyOutDir: true
+    emptyOutDir: true,
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            { name: 'vendor', test: /node_modules[\/](vue|@vue|vue-i18n|@intlify)[\/]/ },
+            { name: 'locales', test: /src[\/]i18n[\/]locales[\/]/ }
+          ]
+        }
+      }
+    }
   }
 });

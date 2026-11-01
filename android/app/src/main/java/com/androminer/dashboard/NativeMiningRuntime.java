@@ -299,7 +299,7 @@ final class NativeMiningRuntime {
     public void updateSafety(PluginCall call) {
         controlExecutor.execute(
                 () -> {
-                    batteryFloor = Math.max(10, Math.min(60, call.getInt("batteryFloor", 25)));
+                    batteryFloor = MiningSafety.clampBatteryFloor(call.getInt("batteryFloor", 25));
                     chargingOnly = call.getBoolean("chargingOnly", false);
                     if (isRunning() && activeConfig != null) {
                         String reason =

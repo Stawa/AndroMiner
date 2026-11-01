@@ -10,9 +10,9 @@ const schema = `
 CREATE TABLE IF NOT EXISTS installs (
   id TEXT PRIMARY KEY,
   country TEXT,
-  app_version TEXT NOT NULL,
-  android_major INTEGER NOT NULL,
-  variant TEXT NOT NULL,
+  app_version TEXT,
+  android_major INTEGER,
+  variant TEXT,
   first_seen_ts INTEGER NOT NULL,
   last_seen_ts INTEGER NOT NULL
 ) STRICT;
@@ -29,6 +29,38 @@ CREATE TABLE IF NOT EXISTS download_snapshots (
 `;
 
 /**
+ * Older databases declared the shareable columns NOT NULL. SQLite cannot drop that constraint in
+ * place, so the table is rebuilt once, keeping every row.
+ */
+const migrateNullableInstallColumns = (db) => {
+  const strict = db.prepare('PRAGMA table_info(installs)').all();
+  if (!strict.some((column) => column.notnull === 1 && column.name === 'app_version')) return;
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    db.exec(`
+      ALTER TABLE installs RENAME TO installs_old;
+      DROP INDEX IF EXISTS installs_last_seen;
+      CREATE TABLE installs (
+        id TEXT PRIMARY KEY,
+        country TEXT,
+        app_version TEXT,
+        android_major INTEGER,
+        variant TEXT,
+        first_seen_ts INTEGER NOT NULL,
+        last_seen_ts INTEGER NOT NULL
+      ) STRICT;
+      INSERT INTO installs SELECT * FROM installs_old;
+      DROP TABLE installs_old;
+      CREATE INDEX installs_last_seen ON installs (last_seen_ts);
+    `);
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+};
+
+/**
  * Self-hosted storage on a single SQLite file. Every method is async so it is interchangeable with
  * the Firestore store; `db` is exposed for tests and tooling.
  */
@@ -37,6 +69,7 @@ export const createSqliteStore = (path) => {
   const db = new DatabaseSync(path);
   db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;');
   db.exec(schema);
+  migrateNullableInstallColumns(db);
 
   return {
     db,
@@ -90,10 +123,12 @@ export const createSqliteStore = (path) => {
             `INSERT INTO daily_active (day, count) VALUES (?, 1)
              ON CONFLICT(day) DO UPDATE SET count = count + 1`
           ).run(today);
-          db.prepare(
-            `INSERT INTO daily_versions (day, app_version, count) VALUES (?, ?, 1)
-             ON CONFLICT(day, app_version) DO UPDATE SET count = count + 1`
-          ).run(today, checkin.appVersion);
+          if (checkin.appVersion !== null) {
+            db.prepare(
+              `INSERT INTO daily_versions (day, app_version, count) VALUES (?, ?, 1)
+               ON CONFLICT(day, app_version) DO UPDATE SET count = count + 1`
+            ).run(today, checkin.appVersion);
+          }
         }
         if (newMonth) {
           db.prepare(

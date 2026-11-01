@@ -1,2 +1,7 @@
 work/
 *.log
+*.so
+*.exe
+baseline/
+variants/
+host/

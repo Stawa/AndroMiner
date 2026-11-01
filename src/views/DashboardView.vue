@@ -5,7 +5,8 @@ import MaterialIcon from '../components/MaterialIcon.vue';
 import CoinIcon from '../components/CoinIcon.vue';
 import RecentRunCard from '../components/RecentRunCard.vue';
 import { formatSensor, formatHashrate } from '../utils/miningTelemetry';
-import { validateMiningSetup } from '../utils/configValidation';
+import { maxTemperatureLimitC, validateMiningSetup } from '../utils/configValidation';
+import { useSettingsStore } from '../stores/settings';
 import { formatDate, formatDuration, t } from '../i18n';
 import type {
   DeviceTelemetry,
@@ -29,13 +30,118 @@ const emit = defineEmits<{
   configure: [];
   statistics: [];
   profiles: [];
+  device: [];
   deleteSession: [id: string];
   clearSessions: [];
 }>();
+const settings = useSettingsStore();
 const selected = ref<MiningSessionHistoryItem | null>(null);
 const walletReady = computed(() => !validateMiningSetup(props.config).wallet);
 const setupReady = computed(() => !Object.values(validateMiningSetup(props.config)).some(Boolean));
 const canStart = computed(() => ['ready', 'missing', 'error'].includes(props.backendState));
+type CheckState = 'ok' | 'warn' | 'fail' | 'off';
+interface ReadyCheck {
+  id: string;
+  label: string;
+  value: string;
+  state: CheckState;
+  /** Safety checks hold back Start; the others are fixed from the setup screen. */
+  blocksStart?: boolean;
+}
+
+const temperatureLimit = computed(() =>
+  Math.min(props.config.thermalThreshold, maxTemperatureLimitC)
+);
+const batteryFloor = computed(() => settings.batterySafety.stopBelowPercent);
+const chargerRequired = computed(
+  () => props.config.autoPauseOnBattery || settings.batterySafety.mineOnlyCharging
+);
+const engineState = computed<CheckState>(() =>
+  props.backendState === 'ready' ? 'ok' : props.backendState === 'error' ? 'fail' : 'warn'
+);
+const checks = computed<ReadyCheck[]>(() => {
+  const validation = validateMiningSetup(props.config);
+  const temperature = props.device.temperatureC;
+  const level = props.device.batteryLevel;
+  const list: ReadyCheck[] = [
+    {
+      id: 'wallet',
+      label: t('dashboard.checkWallet'),
+      value: validation.wallet ? t('dashboard.checkRequired') : t('dashboard.checkAdded'),
+      state: validation.wallet ? 'fail' : 'ok'
+    },
+    {
+      id: 'pool',
+      label: t('metric.pool'),
+      value:
+        validation.pool || validation.port
+          ? t('dashboard.checkRequired')
+          : `${props.config.poolUrl}:${props.config.poolPort}`,
+      state: validation.pool || validation.port ? 'fail' : 'ok'
+    },
+    {
+      id: 'engine',
+      label: t('dashboard.checkEngine'),
+      value: stateLabel.value,
+      state: engineState.value
+    },
+    {
+      id: 'temperature',
+      label: t('metric.temperature'),
+      value: `${formatSensor(temperature, ' °C')} · ${
+        temperatureLimit.value > 0
+          ? t('dashboard.limitValue', { value: `${temperatureLimit.value} °C` })
+          : t('config.limitOff')
+      }`,
+      state:
+        temperatureLimit.value === 0
+          ? 'off'
+          : temperature === null
+            ? 'warn'
+            : temperature >= temperatureLimit.value
+              ? 'fail'
+              : 'ok',
+      blocksStart: true
+    },
+    {
+      id: 'battery',
+      label: t('metric.battery'),
+      value: `${formatSensor(level, '%')} · ${
+        batteryFloor.value > 0
+          ? t('dashboard.limitValue', { value: `${batteryFloor.value}%` })
+          : t('config.limitOff')
+      }`,
+      state:
+        batteryFloor.value === 0
+          ? 'off'
+          : level === null
+            ? 'warn'
+            : level <= batteryFloor.value
+              ? 'fail'
+              : 'ok',
+      blocksStart: true
+    }
+  ];
+  if (chargerRequired.value) {
+    list.push({
+      id: 'charger',
+      label: t('dashboard.checkCharger'),
+      value: props.device.isCharging ? t('dashboard.checkConnected') : t('dashboard.checkRequired'),
+      state: props.device.isCharging ? 'ok' : 'fail',
+      blocksStart: true
+    });
+  }
+  return list;
+});
+const safetyBlocked = computed(() =>
+  checks.value.some((check) => check.blocksStart && check.state === 'fail')
+);
+const checkIcon: Record<CheckState, string> = {
+  ok: 'check_circle',
+  warn: 'error',
+  fail: 'cancel',
+  off: 'do_not_disturb_on'
+};
 const action = computed(() =>
   !setupReady.value
     ? t('dashboard.completeSetup')
@@ -77,56 +183,53 @@ useDialogFocus(
 );
 </script>
 <template>
-  <div
-    class="app-page phone-page redesign-page dashboard-page md:grid md:grid-cols-2 md:items-stretch"
-  >
-    <header class="screen-heading overview-heading">
-      <div>
+  <div class="app-page phone-page dashboard-page md:grid md:grid-cols-2 md:items-start">
+    <header class="hm-top md:col-span-2">
+      <div class="min-w-0">
         <h1>{{ $t('nav.overview') }}</h1>
         <p>{{ config.coin.symbol }} · {{ config.algorithm }} · {{ config.workerName }}</p>
       </div>
       <span
-        class="hero-pill"
+        class="status-chip"
         :data-tone="
-          backendState === 'error' ? 'error' : backendState === 'ready' ? 'success' : 'warning'
+          backendState === 'error' ? 'danger' : backendState === 'ready' ? 'accent' : 'warn'
         "
         role="status"
         >{{ stateLabel }}</span
       >
     </header>
-    <section class="overview-miner" :aria-label="$t('dashboard.miningControl')">
-      <div class="overview-coin">
-        <CoinIcon :symbol="config.coin.symbol" :name="config.coin.name" :size="44" />
-        <div>
-          <h3>{{ config.coin.name }}</h3>
+    <section class="hm-hero" :aria-label="$t('dashboard.miningControl')">
+      <div class="hm-coin">
+        <CoinIcon :symbol="config.coin.symbol" :name="config.coin.name" :size="36" />
+        <div class="min-w-0">
+          <h2>{{ config.coin.name }}</h2>
           <p>{{ $t('dashboard.cpuMining', { algorithm: config.algorithm }) }}</p>
         </div>
       </div>
-      <div class="overview-speed">
-        <div>
-          <p class="metric-label">{{ $t('dashboard.currentHashrate') }}</p>
-          <strong>— <span>H/s</span></strong>
-        </div>
-        <div class="idle-explanation">
-          <span>{{ $t('dashboard.noSession') }}</span>
-        </div>
-      </div>
-      <div class="action-row overview-actions">
+      <ul class="hm-checks" :aria-label="$t('dashboard.readyTitle')">
+        <li v-for="check in checks" :key="check.id" :data-state="check.state">
+          <MaterialIcon :name="checkIcon[check.state]" :size="20" filled />
+          <span>{{ check.label }}</span>
+          <strong>{{ check.value }}</strong>
+        </li>
+      </ul>
+      <div class="hm-actions">
         <button
           class="primary-button"
-          :disabled="setupReady && !canStart"
+          :disabled="setupReady && (!canStart || safetyBlocked)"
           @click="setupReady ? emit('start') : emit('configure')"
         >
-          <MaterialIcon name="play_arrow" :size="21" />{{ action }}</button
-        ><button
-          class="outline-button"
+          <MaterialIcon name="play_arrow" :size="22" filled />{{ action }}
+        </button>
+        <button
+          class="outline-button hm-tune"
           :aria-label="$t('dashboard.editSetup')"
           @click="emit('configure')"
         >
           <MaterialIcon name="tune" :size="21" />
         </button>
       </div>
-      <p class="overview-hint">
+      <p class="hm-hint">
         {{
           !setupReady
             ? $t('dashboard.hintSetup')
@@ -147,53 +250,30 @@ useDialogFocus(
         </div>
       </div>
     </section>
-    <section class="overview-device" :aria-label="$t('dashboard.deviceReadings')">
-      <div class="section-heading">
-        <h3>{{ $t('dashboard.device') }}</h3>
-        <span class="supporting-label">{{
-          device.platform === 'web'
-            ? $t('dashboard.browserReadings')
-            : $t('dashboard.nativeReadings')
+    <section class="hm-vitals" :aria-label="$t('dashboard.deviceReadings')">
+      <article>
+        <span class="eyebrow">{{
+          device.thermalSource === 'battery' ? $t('metric.batteryTemp') : $t('metric.temperature')
         }}</span>
-      </div>
-      <div class="device-tiles">
-        <article>
-          <p>
-            {{
-              device.thermalSource === 'battery'
-                ? $t('metric.batteryTemp')
-                : $t('metric.temperature')
-            }}
-          </p>
-          <strong :data-unavailable="device.temperatureC === null">{{
-            formatSensor(device.temperatureC, ' °C')
-          }}</strong
-          ><small>{{
-            device.temperatureC === null
-              ? $t('dashboard.sensorMissing')
-              : $t('dashboard.deviceReading')
-          }}</small>
-        </article>
-        <article>
-          <p>{{ $t('metric.battery') }}</p>
-          <strong :data-unavailable="device.batteryLevel === null">{{
-            formatSensor(device.batteryLevel, '%')
-          }}</strong
-          ><small>{{
-            device.batteryLevel === null
-              ? $t('dashboard.noReading')
-              : device.isCharging
-                ? $t('metric.charging')
-                : $t('dashboard.onBattery')
-          }}</small>
-        </article>
-        <article>
-          <p>{{ $t('metric.cpuThreads') }}</p>
-          <strong
-            >{{ config.threadCount }} <span>/ {{ config.totalDetectedThreads }}</span></strong
-          ><small>{{ $t('dashboard.configuredDetected') }}</small>
-        </article>
-      </div>
+        <strong :data-unavailable="device.temperatureC === null">{{
+          formatSensor(device.temperatureC, ' °C')
+        }}</strong>
+      </article>
+      <article>
+        <span class="eyebrow">{{ $t('metric.battery') }}</span>
+        <strong :data-unavailable="device.batteryLevel === null">{{
+          formatSensor(device.batteryLevel, '%')
+        }}</strong>
+      </article>
+      <article>
+        <span class="eyebrow">{{ $t('metric.cpuThreads') }}</span>
+        <strong
+          >{{ config.threadCount }} <small>/ {{ config.totalDetectedThreads }}</small></strong
+        >
+      </article>
+      <button class="hm-vitals-link text-button" @click="emit('device')">
+        {{ $t('dashboard.allDevice') }}<MaterialIcon name="arrow_forward" :size="18" />
+      </button>
     </section>
     <section class="setup-surface open-section">
       <div class="section-heading">

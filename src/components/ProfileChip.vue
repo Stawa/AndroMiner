@@ -20,14 +20,18 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <button class="profile-option" :aria-pressed="selected" @click="emit('select', value)">
-    <MaterialIcon v-if="icon" :name="icon" :size="21" /><span
-      ><strong>{{ label }}</strong
-      ><small>{{ supportingText }}</small
-      ><small>{{ threadLabel }} · {{ coreLabel }}</small></span
-    ><MaterialIcon
-      :name="selected ? 'radio_button_checked' : 'radio_button_unchecked'"
-      :size="21"
-    />
+  <button class="profile-option pc" :aria-pressed="selected" @click="emit('select', value)">
+    <span class="pc-icon" aria-hidden="true"
+      ><MaterialIcon v-if="icon" :name="icon" :size="22"
+    /></span>
+    <span class="pc-text">
+      <strong>{{ label }}</strong>
+      <small>{{ supportingText }}</small>
+      <span class="pc-meta">
+        <span v-if="threadLabel">{{ threadLabel }}</span>
+        <span v-if="coreLabel">{{ coreLabel }}</span>
+      </span>
+    </span>
+    <span class="pc-radio" aria-hidden="true" />
   </button>
 </template>

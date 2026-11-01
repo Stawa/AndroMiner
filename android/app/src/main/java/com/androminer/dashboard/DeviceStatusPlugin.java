@@ -45,9 +45,12 @@ public class DeviceStatusPlugin extends Plugin {
         result.put("cpuName", cpu.name);
         result.put("cpuClockGhz", cpu.clockValue);
         result.put("cpuClockLabel", cpu.clockLabel);
+        Double cpuMaxClockGhz = readMaxCpuClockGhz();
+        result.put("cpuMaxClockGhz", cpuMaxClockGhz);
+        result.put(
+                "cpuMaxClockLabel",
+                cpuMaxClockGhz == null ? "-" : String.format(Locale.US, "%.2f GHz", cpuMaxClockGhz));
         result.put("gpuName", gpu.name);
-        result.put("gpuClockMhz", gpu.clockValue);
-        result.put("gpuClockLabel", gpu.clockLabel);
         if (temperature != null) {
             result.put("temperatureC", temperature.valueC);
             result.put("temperatureSource", temperature.source);
@@ -100,12 +103,11 @@ public class DeviceStatusPlugin extends Plugin {
         String reason =
                 MiningSafety.violation(
                         reading == null ? null : reading.valueC,
-                        reader.getBatteryTemperatureC(battery),
                         level == null ? null : level * 100,
                         reader.isCharging(battery),
                         severity,
-                        Math.max(20, Math.min(85, config.getInteger("thermalThreshold", 42))),
-                        Math.max(10, Math.min(60, batteryFloor)),
+                        MiningSafety.clampTemperatureLimit(config.getInteger("thermalThreshold", 42)),
+                        MiningSafety.clampBatteryFloor(batteryFloor),
                         chargingOnly);
         if (reason == null
                 && config.optBoolean("autoPauseScreenOff", false)
@@ -126,8 +128,8 @@ public class DeviceStatusPlugin extends Plugin {
                 "thermalStatus", Build.VERSION.SDK_INT >= 29 ? severity : org.json.JSONObject.NULL);
         details.put(
                 "temperatureLimitC",
-                Math.max(20, Math.min(85, config.optInt("thermalThreshold", 42))));
-        details.put("batteryFloorPercent", Math.max(10, Math.min(60, batteryFloor)));
+                MiningSafety.clampTemperatureLimit(config.optInt("thermalThreshold", 42)));
+        details.put("batteryFloorPercent", MiningSafety.clampBatteryFloor(batteryFloor));
         details.put("chargingOnly", chargingOnly);
         details.put("action", reason == null ? "continue" : "stop");
         return new SafetyObservation(reason, details);
@@ -415,12 +417,7 @@ public class DeviceStatusPlugin extends Plugin {
                         readFirstLine(new File("/sys/class/kgsl/kgsl-3d0/gpu_model")),
                         findDevfreqGpuName(),
                         inferGpuFamilyName());
-        Double clockMhz = readBestGpuClockMhz();
-
-        return new HardwareInfo(
-                cleanHardwareName(name, "GPU"),
-                clockMhz,
-                clockMhz == null ? "-" : String.format(Locale.US, "%.0f MHz", clockMhz));
+        return new HardwareInfo(cleanHardwareName(name, "GPU"), null, "-");
     }
 
     private String getSocName() {
@@ -478,9 +475,9 @@ public class DeviceStatusPlugin extends Plugin {
         return null;
     }
 
+    /** Current (live) frequency of the fastest core. */
     private Double readBestCpuClockGhz() {
-        File cpuDirectory = new File("/sys/devices/system/cpu");
-        File[] cpuEntries = cpuDirectory.listFiles();
+        File[] cpuEntries = new File("/sys/devices/system/cpu").listFiles();
         long bestKhz = -1;
 
         if (cpuEntries == null) {
@@ -492,13 +489,36 @@ public class DeviceStatusPlugin extends Plugin {
                 continue;
             }
 
-            long currentKhz = readFirstFrequencyKhz(new File(cpuEntry, "cpufreq/scaling_cur_freq"));
-            long fallbackKhz =
-                    readBestFrequencyKhz(
-                            new File(cpuEntry, "cpufreq/cpuinfo_cur_freq"),
-                            new File(cpuEntry, "cpufreq/scaling_max_freq"),
-                            new File(cpuEntry, "cpufreq/cpuinfo_max_freq"));
-            bestKhz = Math.max(bestKhz, currentKhz > 0 ? currentKhz : fallbackKhz);
+            bestKhz =
+                    Math.max(
+                            bestKhz,
+                            readFirstFrequencyKhz(
+                                    new File(cpuEntry, "cpufreq/scaling_cur_freq"),
+                                    new File(cpuEntry, "cpufreq/cpuinfo_cur_freq")));
+        }
+
+        return bestKhz > 0 ? bestKhz / 1_000_000.0 : null;
+    }
+
+    /** Hardware maximum of the fastest core; unlike the live clock it never changes. */
+    private Double readMaxCpuClockGhz() {
+        File[] cpuEntries = new File("/sys/devices/system/cpu").listFiles();
+        long bestKhz = -1;
+
+        if (cpuEntries == null) {
+            return null;
+        }
+
+        for (File cpuEntry : cpuEntries) {
+            if (!cpuEntry.getName().matches("cpu\\d+")) {
+                continue;
+            }
+
+            long khz = readFirstFrequencyKhz(new File(cpuEntry, "cpufreq/cpuinfo_max_freq"));
+            if (khz <= 0) {
+                khz = readFirstFrequencyKhz(new File(cpuEntry, "cpufreq/scaling_max_freq"));
+            }
+            bestKhz = Math.max(bestKhz, khz);
         }
 
         return bestKhz > 0 ? bestKhz / 1_000_000.0 : null;
@@ -533,57 +553,6 @@ public class DeviceStatusPlugin extends Plugin {
         return null;
     }
 
-    private Double readBestGpuClockMhz() {
-        long bestRaw =
-                readBestRawFrequency(
-                        new File("/sys/class/kgsl/kgsl-3d0/devfreq/max_freq"),
-                        new File("/sys/class/kgsl/kgsl-3d0/max_gpuclk"),
-                        new File("/sys/class/kgsl/kgsl-3d0/devfreq/cur_freq"),
-                        new File("/sys/class/kgsl/kgsl-3d0/gpuclk"));
-
-        File devfreqDirectory = new File("/sys/class/devfreq");
-        File[] entries = devfreqDirectory.listFiles();
-
-        if (entries != null) {
-            for (File entry : entries) {
-                String descriptor =
-                        (entry.getName()
-                                        + " "
-                                        + readNullable(new File(entry, "name"))
-                                        + " "
-                                        + readNullable(new File(entry, "device/name")))
-                                .toLowerCase(Locale.US);
-                if (!looksLikeGpuDescriptor(descriptor)) {
-                    continue;
-                }
-
-                bestRaw =
-                        Math.max(
-                                bestRaw,
-                                readBestRawFrequency(
-                                        new File(entry, "max_freq"), new File(entry, "cur_freq")));
-            }
-        }
-
-        return normalizeGpuFrequencyMhz(bestRaw);
-    }
-
-    private long readBestFrequencyKhz(File... files) {
-        long best = -1;
-
-        for (File file : files) {
-            Long raw = readLong(file);
-            if (raw == null || raw <= 0) {
-                continue;
-            }
-
-            long khz = raw > 10_000_000L ? raw / 1000L : raw;
-            best = Math.max(best, khz);
-        }
-
-        return best;
-    }
-
     private long readFirstFrequencyKhz(File... files) {
         for (File file : files) {
             Long raw = readLong(file);
@@ -595,36 +564,6 @@ public class DeviceStatusPlugin extends Plugin {
         }
 
         return -1;
-    }
-
-    private long readBestRawFrequency(File... files) {
-        long best = -1;
-
-        for (File file : files) {
-            Long raw = readLong(file);
-            if (raw != null && raw > 0) {
-                best = Math.max(best, raw);
-            }
-        }
-
-        return best;
-    }
-
-    private Double normalizeGpuFrequencyMhz(long rawFrequency) {
-        if (rawFrequency <= 0) {
-            return null;
-        }
-
-        double mhz;
-        if (rawFrequency >= 1_000_000L) {
-            mhz = rawFrequency / 1_000_000.0;
-        } else if (rawFrequency >= 10_000L) {
-            mhz = rawFrequency / 1000.0;
-        } else {
-            mhz = rawFrequency;
-        }
-
-        return mhz > 0 && mhz < 5000 ? mhz : null;
     }
 
     private Long readLong(File file) {

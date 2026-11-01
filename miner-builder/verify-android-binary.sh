@@ -5,7 +5,9 @@ binary="${1:?Usage: verify-android-binary.sh BINARY NDK_DIR ABI WITH_TLS}"
 ndk_dir="${2:?NDK_DIR is required}"
 abi="${3:?ABI is required}"
 with_tls="${4:?WITH_TLS is required}"
-llvm_bin="$ndk_dir/toolchains/llvm/prebuilt/linux-x86_64/bin"
+stripped="${5:-}"   # pass --stripped to skip the symbol-table checks
+llvm_bin="$(ls -d "$ndk_dir"/toolchains/llvm/prebuilt/*/bin | head -n 1)"
+exe=""; [[ -f "$llvm_bin/llvm-readelf.exe" ]] && exe=".exe"
 
 case "$abi" in
   arm64-v8a) machine=AArch64; interpreter=/system/bin/linker64 ;;
@@ -16,7 +18,7 @@ case "$abi" in
 esac
 
 test -s "$binary"
-elf_info="$("$llvm_bin/llvm-readelf" --wide --file-header --program-headers --dynamic "$binary")"
+elf_info="$("$llvm_bin/llvm-readelf$exe" --wide --file-header --program-headers --dynamic "$binary")"
 printf '%s\n' "$elf_info"
 if ! grep -Eq "Machine: +$machine$" <<< "$elf_info"; then
   echo "Expected an Android $abi executable ($machine)." >&2
@@ -35,22 +37,25 @@ while IFS= read -r dependency; do
   esac
 done < <(sed -n 's/.*(NEEDED).*Shared library: \[\([^]]*\)\].*/\1/p' <<< "$elf_info")
 
-symbols="$("$llvm_bin/llvm-nm" --defined-only --extern-only "$binary")"
-if [[ "$with_tls" == ON ]]; then
-  for symbol in SSL_do_handshake X509_verify_cert RAND_bytes; do
-    if ! grep -Eq " [A-Za-z] $symbol$" <<< "$symbols"; then
-      echo "TLS executable is missing the required symbol $symbol." >&2
+if [[ "$stripped" != --stripped ]]; then
+  symbols="$("$llvm_bin/llvm-nm$exe" --defined-only --extern-only "$binary")"
+  if [[ "$with_tls" == ON ]]; then
+    for symbol in SSL_do_handshake X509_verify_cert RAND_bytes; do
+      if ! grep -Eq " [A-Za-z] $symbol$" <<< "$symbols"; then
+        echo "TLS executable is missing the required symbol $symbol." >&2
+        exit 1
+      fi
+    done
+  elif [[ "$with_tls" == OFF ]]; then
+    if grep -Eq ' [A-Za-z] (SSL_|OPENSSL_|X509_)' <<< "$symbols"; then
+      echo "The no-TLS binary unexpectedly contains OpenSSL symbols." >&2
       exit 1
     fi
-  done
-elif [[ "$with_tls" == OFF ]]; then
-  if grep -Eq ' [A-Za-z] (SSL_|OPENSSL_|X509_)' <<< "$symbols"; then
-    echo "The no-TLS binary unexpectedly contains OpenSSL symbols." >&2
+  else
+    echo "WITH_TLS must be ON or OFF." >&2
     exit 1
   fi
-else
-  echo "WITH_TLS must be ON or OFF." >&2
-  exit 1
+
 fi
 
 echo "Verified $abi Android executable (TLS=$with_tls)."

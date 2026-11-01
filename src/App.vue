@@ -1,5 +1,13 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import {
+  computed,
+  defineAsyncComponent,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch
+} from 'vue';
 import { Capacitor } from '@capacitor/core';
 import { App as NativeApp } from '@capacitor/app';
 import { validateMiningSetup } from './utils/configValidation';
@@ -23,15 +31,17 @@ import { usePageSwipe } from './composables/usePageSwipe';
 import { useProfilesStore } from './stores/profiles';
 import { useSettingsStore, type SettingsState } from './stores/settings';
 import DashboardView from './views/DashboardView.vue';
-import AboutView from './views/AboutView.vue';
-import HelpSupportView from './views/HelpSupportView.vue';
-import MiningConfigView from './views/MiningConfigView.vue';
-import MiningSessionView from './views/MiningSessionView.vue';
-import ProfilesView from './views/ProfilesView.vue';
-import SettingsView from './views/SettingsView.vue';
-import StatisticsView from './views/StatisticsView.vue';
 import SystemCheckView from './views/SystemCheckView.vue';
 import type { MiningConfig, MiningProfile, SavedMiningProfile } from './types/mining';
+
+const AboutView = defineAsyncComponent(() => import('./views/AboutView.vue'));
+const HelpSupportView = defineAsyncComponent(() => import('./views/HelpSupportView.vue'));
+const MiningConfigView = defineAsyncComponent(() => import('./views/MiningConfigView.vue'));
+const MiningSessionView = defineAsyncComponent(() => import('./views/MiningSessionView.vue'));
+const ProfilesView = defineAsyncComponent(() => import('./views/ProfilesView.vue'));
+const DeviceView = defineAsyncComponent(() => import('./views/DeviceView.vue'));
+const SettingsView = defineAsyncComponent(() => import('./views/SettingsView.vue'));
+const StatisticsView = defineAsyncComponent(() => import('./views/StatisticsView.vue'));
 
 const systemCheckKey = 'androminer-system-check-complete';
 const phoneRiskWarningKey = 'androminer-phone-risk-warning-accepted';
@@ -47,8 +57,7 @@ const dataFeedback = ref('');
 let removeBackListener: (() => Promise<void>) | undefined;
 const updateBanner = ref({
   visible: false,
-  title: '',
-  message: ''
+  version: ''
 });
 const miner = useMiningController();
 const settings = useSettingsStore();
@@ -61,7 +70,7 @@ const sessionActive = computed(() => !['idle', 'error'].includes(miner.state.val
 const sessionFullscreen = ref(false);
 const sessionView = ref<InstanceType<typeof MiningSessionView> | null>(null);
 const pageSwipe = usePageSwipe<AppTab>(
-  ['dashboard', 'mining', 'statistics', 'settings'],
+  ['dashboard', 'mining', 'statistics', 'device', 'settings'],
   activeTab,
   () =>
     systemCheckComplete.value &&
@@ -174,11 +183,7 @@ const hideUpdateBanner = (): void => {
 };
 
 const showUpdateBanner = (version: string): void => {
-  updateBanner.value = {
-    visible: true,
-    title: t('app.updateAvailable'),
-    message: t('app.updateReady', { version })
-  };
+  updateBanner.value = { visible: true, version };
 };
 
 const notifyForAvailableUpdate = (): void => {
@@ -563,8 +568,8 @@ onBeforeUnmount(() => {
       <Transition name="banner">
         <UpdateBanner
           v-if="systemCheckComplete && !sessionActive && updateBanner.visible"
-          :title="updateBanner.title"
-          :message="updateBanner.message"
+          :title="$t('app.updateAvailable')"
+          :message="$t('app.updateReady', { version: updateBanner.version })"
           @view="openUpdateSettings"
           @dismiss="hideUpdateBanner"
         />
@@ -619,6 +624,7 @@ onBeforeUnmount(() => {
             @configure="navigateToSetup"
             @statistics="navigateToStatistics"
             @profiles="navigateToProfiles"
+            @device="activeTab = 'device'"
             @delete-session="miner.deleteSessionHistoryItem"
             @clear-sessions="miner.clearSessionHistory"
           />
@@ -638,12 +644,12 @@ onBeforeUnmount(() => {
             v-else-if="activeTab === 'statistics'"
             :config="miner.config"
             :session-history="miner.sessionHistory.value"
+            @delete-session="miner.deleteSessionHistoryItem"
+            @clear-sessions="miner.clearSessionHistory"
           />
+          <DeviceView v-else-if="activeTab === 'device'" :device="device" :config="miner.config" />
           <SettingsView
             v-else-if="activeTab === 'settings'"
-            :config="miner.config"
-            :device="device"
-            :locked="sessionActive"
             @export-config="exportConfig"
             @import-config="openImportPicker"
             @open-about="activeTab = 'about'"
@@ -656,7 +662,7 @@ onBeforeUnmount(() => {
             @save-current="saveCurrentProfile"
           />
           <HelpSupportView v-else-if="activeTab === 'help'" />
-          <AboutView v-else :device="device" />
+          <AboutView v-else />
         </Transition>
       </main>
 

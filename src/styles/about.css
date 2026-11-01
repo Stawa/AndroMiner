@@ -1,0 +1,97 @@
+/* About page: same flat sections and hairline lists as the Device page */
+.about-page {
+  display: grid;
+  gap: 28px;
+  align-content: start;
+}
+.about-id {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.about-logo {
+  flex: none;
+  width: 52px;
+  height: 52px;
+}
+.about-id p {
+  font-size: 0.9375rem;
+  color: rgb(var(--color-app-muted));
+}
+.about-stack {
+  display: block !important;
+}
+.about-stack dd {
+  margin-top: 6px;
+  text-align: left;
+  font:
+    400 0.75rem/1.5 ui-monospace,
+    Consolas,
+    monospace;
+  color: rgb(var(--color-app-muted));
+}
+.about-permissions > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+  cursor: pointer;
+  list-style: none;
+}
+.about-permissions > summary::-webkit-details-marker,
+.about-permissions > summary::after {
+  display: none;
+  content: none;
+}
+.about-permissions > summary > .material-symbols-rounded {
+  color: rgb(var(--color-app-muted));
+  transition: transform 200ms;
+}
+.about-permissions[open] > summary > .material-symbols-rounded {
+  transform: rotate(180deg);
+}
+.about-permissions ul {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.about-permissions li {
+  padding: 13px 0;
+  border-top: 1px solid rgb(var(--color-app-line));
+  overflow-wrap: anywhere;
+}
+.about-permissions code {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.about-permissions li p {
+  margin-top: 3px;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: rgb(var(--color-app-muted));
+}
+.about-note {
+  padding-top: 20px;
+  border-top: 1px solid rgb(var(--color-app-line));
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: rgb(var(--color-app-muted));
+}
+.about-note strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.875rem;
+  color: rgb(var(--color-app-on));
+}
+@media (min-width: 48rem) {
+  .about-page {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 48px;
+    align-items: start;
+  }
+  .about-page > .screen-heading,
+  .about-page > .about-id,
+  .about-page > .about-note {
+    grid-column: 1 / -1;
+  }
+}

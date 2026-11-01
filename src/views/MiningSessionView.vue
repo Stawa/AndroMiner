@@ -5,7 +5,6 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 import TelemetrySparkline from '../components/TelemetrySparkline.vue';
 import MaterialIcon from '../components/MaterialIcon.vue';
 import SessionControls from '../components/SessionControls.vue';
-import StatusIndicator from '../components/StatusIndicator.vue';
 import WarningBottomSheet, { type WarningType } from '../components/WarningBottomSheet.vue';
 import { profilePresets } from '../composables/useMiningController';
 import { useSheetDrag } from '../composables/useSheetDrag';
@@ -97,8 +96,22 @@ const totalHashesLabel = computed(() => {
 
   return formatNumber(Math.round(totalHashes));
 });
+const temperatureLimitOn = computed(() => props.config.thermalThreshold > 0);
+const batteryLimitOn = computed(() => settings.batterySafety.stopBelowPercent > 0);
+const protectionMissing = computed(
+  () =>
+    (temperatureLimitOn.value && props.device.temperatureC === null) ||
+    (batteryLimitOn.value && props.device.batteryLevel === null)
+);
+const shareTotal = computed(() => props.stats.acceptedShares + props.stats.rejectedShares);
+const acceptancePercent = computed(() =>
+  shareTotal.value > 0 ? ((props.stats.acceptedShares / shareTotal.value) * 100).toFixed(1) : '0'
+);
+const protectionOff = computed(() => !temperatureLimitOn.value && !batteryLimitOn.value);
 const thermalTone = computed(() =>
-  props.stats.temperature !== null && props.stats.temperature >= props.config.thermalThreshold - 5
+  temperatureLimitOn.value &&
+  props.stats.temperature !== null &&
+  props.stats.temperature >= props.config.thermalThreshold - 5
     ? 'warning'
     : 'normal'
 );
@@ -127,20 +140,23 @@ const classifyLogLine = (line: string): LogTone => {
   return 'muted';
 };
 
+const logTimePattern = /^\[?(?:\d{4}-\d\d-\d\d[ T])?(\d\d:\d\d:\d\d)(?:\.\d+)?\]?\s+(.+)$/;
+
 const toLogRows = (lines: string[], prefix: string) =>
-  lines.map((line, index) => ({
-    id: `${prefix}-${index}-${line}`,
-    text: line,
-    tone: classifyLogLine(line)
-  }));
+  lines.map((line, index) => {
+    const match = logTimePattern.exec(line);
+    return {
+      id: `${prefix}-${index}-${line}`,
+      text: match ? match[2] : line,
+      time: match ? match[1] : '',
+      tone: classifyLogLine(line)
+    };
+  });
 
 const latestLogs = computed(() => toLogRows(props.logs.slice(-12).reverse(), 'latest'));
 const detailLogs = computed(() => toLogRows(props.logs.slice().reverse(), 'detail'));
-const latestLogCountLabel = computed(() =>
-  latestLogs.value.length > 0
-    ? t('session.latestCount', { count: latestLogs.value.length })
-    : t('session.waiting').toLowerCase()
-);
+const logToneLabel = (tone: LogTone): string =>
+  tone === 'danger' ? t('session.logErrors') : tone === 'warning' ? t('session.logWarnings') : '';
 const telemetrySourceLabel = computed(() =>
   props.apiTelemetry.available ? 'XMRig HTTP API' : t('session.logParser')
 );
@@ -210,7 +226,7 @@ const logToneClass = (tone: LogTone): string => {
   const classes: Record<LogTone, string> = {
     danger: 'border-red-400/70 bg-red-500/10 text-red-700 dark:text-red-100',
     warning: 'border-app-yellow/70 bg-app-yellow/10 text-amber-800 dark:text-yellow-100',
-    success: 'border-app-green/70 bg-app-green-dim text-app-green',
+    success: 'border-app-green/70 bg-app-green-dim text-app-green-ink',
     muted: 'border-white/10 text-app-muted'
   };
 
@@ -325,6 +341,48 @@ const diagnosticGroups = computed(() => [
     ]
   }
 ]);
+
+const barPercent = (value: number | null | undefined, max: number): number =>
+  typeof value === 'number' && Number.isFinite(value) && max > 0
+    ? Math.min(100, Math.max(0, (value / max) * 100))
+    : 0;
+
+const vitals = computed(() => {
+  const floor = settings.batterySafety.stopBelowPercent;
+  const battery = props.stats.batteryLevel;
+  return [
+    {
+      id: 'temperature',
+      icon: 'device_thermostat',
+      label:
+        props.device.thermalSource === 'battery'
+          ? t('metric.batteryTemp')
+          : t('metric.temperature'),
+      value: formatSensor(props.stats.temperature, ' °C'),
+      percent: barPercent(
+        props.stats.temperature,
+        temperatureLimitOn.value ? props.config.thermalThreshold : 85
+      ),
+      tone: thermalTone.value === 'warning' ? 'warning' : 'normal'
+    },
+    {
+      id: 'battery',
+      icon: props.stats.isCharging ? 'battery_charging_full' : 'battery_5_bar',
+      label: props.stats.isCharging ? t('metric.charging') : t('metric.battery'),
+      value: formatSensor(battery, '%'),
+      percent: barPercent(battery, 100),
+      tone: floor > 0 && battery !== null && battery <= floor + 10 ? 'warning' : 'normal'
+    },
+    {
+      id: 'cpu',
+      icon: 'memory',
+      label: t('metric.minerCpu'),
+      value: formatCpuUsage(props.stats.minerCpuUsage),
+      percent: barPercent(props.stats.minerCpuUsage, 100),
+      tone: 'normal'
+    }
+  ];
+});
 
 const closeDetails = (): void => {
   detailsOpen.value = false;
@@ -636,32 +694,42 @@ const remainingLabel = computed(() =>
           @stop="requestStop"
           @profile="openProfilePicker"
         />
-        <div
-          class="session-protection"
-          :data-tone="
-            device.temperatureC === null || device.batteryLevel === null ? 'warning' : 'normal'
-          "
+        <section
+          class="protect-card"
+          :data-tone="protectionMissing ? 'warning' : protectionOff ? 'off' : 'normal'"
         >
-          <MaterialIcon name="shield" :size="20" />
-          <p>
+          <header>
+            <span class="protect-badge"><MaterialIcon name="shield" :size="22" filled /></span>
             <strong>{{
-              device.temperatureC === null || device.batteryLevel === null
+              protectionMissing
                 ? $t('session.protectionMissing')
-                : $t('session.protectionActive')
+                : protectionOff
+                  ? $t('session.protectionOff')
+                  : $t('session.protectionActive')
             }}</strong>
-            <span>{{
-              $t('session.protectionLine', {
-                source:
-                  device.thermalSource === 'battery'
-                    ? $t('session.sourceBattery')
-                    : $t('session.sourceSensor'),
-                temp: formatSensor(device.temperatureC, ' °C'),
-                limit: config.thermalThreshold,
-                battery: formatSensor(device.batteryLevel, '%')
-              })
+            <span class="protect-source">{{
+              device.thermalSource === 'battery'
+                ? $t('session.sourceBattery')
+                : $t('session.sourceSensor')
             }}</span>
-          </p>
-        </div>
+          </header>
+          <dl>
+            <div :data-off="!temperatureLimitOn">
+              <dt>
+                <MaterialIcon name="device_thermostat" :size="18" />{{ $t('config.tempLimit') }}
+              </dt>
+              <dd>
+                {{ temperatureLimitOn ? `${config.thermalThreshold} °C` : $t('config.limitOff') }}
+              </dd>
+            </div>
+            <div :data-off="!batteryLimitOn">
+              <dt>
+                <MaterialIcon name="battery_alert" :size="18" />{{ $t('settings.pauseBelowLabel') }}
+              </dt>
+              <dd>{{ batteryLimitOn ? `${batterySafetyLimit}%` : $t('config.limitOff') }}</dd>
+            </div>
+          </dl>
+        </section>
         <div v-if="actionFailure" class="notice notice-error" role="alert">
           <MaterialIcon name="error" :size="20" />
           <div>
@@ -671,20 +739,30 @@ const remainingLabel = computed(() =>
         </div>
       </div>
       <div class="session-column grid min-w-0 gap-layout content-start">
-        <section class="share-strip">
-          <div>
-            <span class="status-dot"></span><strong>{{ stats.acceptedShares }}</strong
-            ><small>{{ $t('session.acceptedShares') }}</small>
+        <section class="share-card" :aria-label="$t('session.shares')">
+          <header>
+            <h3>{{ $t('session.shares') }}</h3>
+            <span v-if="shareTotal > 0" class="share-rate">{{
+              $t('history.acceptance', { percent: acceptancePercent })
+            }}</span>
+          </header>
+          <div class="share-figures">
+            <div>
+              <strong>{{ formatNumber(stats.acceptedShares) }}</strong>
+              <small
+                ><i class="share-key" data-tone="good" />{{ $t('session.acceptedShares') }}</small
+              >
+            </div>
+            <div :data-bad="stats.rejectedShares > 0">
+              <strong>{{ formatNumber(stats.rejectedShares) }}</strong>
+              <small
+                ><i class="share-key" data-tone="bad" />{{ $t('session.rejectedShares') }}</small
+              >
+            </div>
           </div>
-          <div>
-            <strong>{{ stats.rejectedShares }}</strong
-            ><small>{{ $t('session.rejectedShares') }}</small>
-          </div>
-          <div>
-            <StatusIndicator
-              :connected="connected"
-              :label="connected ? $t('metric.connected') : $t('metric.disconnected')"
-            /><small>{{ $t('session.poolConnection') }}</small>
+          <div class="share-bar" aria-hidden="true">
+            <i class="share-bar-ok" :style="{ flexGrow: stats.acceptedShares }" />
+            <i class="share-bar-bad" :style="{ flexGrow: stats.rejectedShares }" />
           </div>
         </section>
         <div
@@ -718,28 +796,15 @@ const remainingLabel = computed(() =>
           </button>
         </div>
         <template v-if="!liteSessionMode">
-          <section class="device-strip">
-            <div :class="{ 'text-app-yellow': thermalTone === 'warning' }">
-              <MaterialIcon name="device_thermostat" :size="20" /><strong>{{
-                formatSensor(stats.temperature, ' °C')
-              }}</strong
-              ><small>{{
-                device.thermalSource === 'battery'
-                  ? $t('metric.batteryTemp')
-                  : $t('metric.temperature')
-              }}</small>
-            </div>
-            <div>
-              <MaterialIcon name="battery_5_bar" :size="20" /><strong>{{
-                formatSensor(stats.batteryLevel, '%')
-              }}</strong
-              ><small>{{ stats.isCharging ? $t('metric.charging') : $t('metric.battery') }}</small>
-            </div>
-            <div>
-              <MaterialIcon name="memory" :size="20" /><strong>{{
-                formatCpuUsage(stats.minerCpuUsage)
-              }}</strong
-              ><small>{{ $t('metric.minerCpu') }}</small>
+          <section class="vitals">
+            <div v-for="item in vitals" :key="item.id" class="vital" :data-tone="item.tone">
+              <span class="vital-label"
+                ><MaterialIcon :name="item.icon" :size="18" />{{ item.label }}</span
+              >
+              <strong>{{ item.value }}</strong>
+              <span class="vital-bar" aria-hidden="true"
+                ><i :style="{ width: `${item.percent}%` }"
+              /></span>
             </div>
           </section>
           <section class="surface">
@@ -766,18 +831,26 @@ const remainingLabel = computed(() =>
               </div>
             </dl>
           </section>
-          <details class="surface log-disclosure" open>
-            <summary>
-              <span>{{ $t('session.minerOutput') }}</span
-              ><small>{{ latestLogCountLabel }}</small>
-            </summary>
-            <div class="terminal">
-              <p v-if="!latestLogs.length">{{ backendMessage || $t('session.waitingOutput') }}</p>
-              <p v-for="line in latestLogs" :key="line.id" :class="logToneClass(line.tone)">
-                {{ line.text }}
-              </p>
-            </div>
-          </details>
+          <section class="out-card" :aria-label="$t('session.minerOutput')">
+            <header>
+              <h3>{{ $t('session.minerOutput') }}</h3>
+              <button type="button" class="text-button" @click="toggleDetails">
+                {{ $t('session.viewAll') }}
+              </button>
+            </header>
+            <ol class="out-list" role="log" aria-live="off">
+              <li v-if="!latestLogs.length" class="out-empty">
+                {{ backendMessage || $t('session.waitingOutput') }}
+              </li>
+              <li v-for="line in latestLogs" :key="line.id" :data-tone="line.tone">
+                <span v-if="logToneLabel(line.tone)" class="sr-only">{{
+                  logToneLabel(line.tone)
+                }}</span>
+                <time v-if="line.time">{{ line.time }}</time>
+                <span class="out-text">{{ line.text }}</span>
+              </li>
+            </ol>
+          </section>
         </template>
       </div>
     </div>

@@ -43,21 +43,41 @@ public class MiningPolicyTest {
     }
 
     @Test
-    public void mandatoryReadingsFailClosed() {
+    public void enabledLimitsFailClosedWithoutReadings() {
         for (Double temperature : new Double[] {null, Double.NaN, Double.POSITIVE_INFINITY})
-            assertNotNull(MiningSafety.violation(temperature, 30.0, 80.0, true, 0, 42, 25, false));
+            assertNotNull(MiningSafety.violation(temperature, 80.0, true, 0, 42, 25, false));
         for (Double battery : new Double[] {null, Double.NaN, -1.0, 101.0})
-            assertNotNull(MiningSafety.violation(30.0, 30.0, battery, true, 0, 42, 25, false));
+            assertNotNull(MiningSafety.violation(30.0, battery, true, 0, 42, 25, false));
+    }
+
+    @Test
+    public void zeroDisablesEachLimitAndItsReading() {
+        assertNull(MiningSafety.violation(null, 80.0, true, 0, 0, 25, false));
+        assertNull(MiningSafety.violation(90.0, 80.0, true, 0, 0, 25, false));
+        assertNull(MiningSafety.violation(30.0, null, true, 0, 42, 0, false));
+        assertNull(MiningSafety.violation(30.0, 1.0, true, 0, 42, 0, false));
+        assertNull(MiningSafety.violation(null, null, true, 2, 0, 0, false));
+        assertNotNull(MiningSafety.violation(null, null, true, 3, 0, 0, false));
+        assertNotNull(MiningSafety.violation(null, null, false, 0, 0, 0, true));
+    }
+
+    @Test
+    public void limitsAreClamped() {
+        assertEquals(0, MiningSafety.clampTemperatureLimit(-5));
+        assertEquals(85, MiningSafety.clampTemperatureLimit(200));
+        assertEquals(0, MiningSafety.clampBatteryFloor(-1));
+        assertEquals(50, MiningSafety.clampBatteryFloor(99));
     }
 
     @Test
     public void safetyBoundariesAreInclusive() {
-        assertNull(MiningSafety.violation(41.9, 44.9, 25.1, true, 2, 42, 25, true));
-        assertNotNull(MiningSafety.violation(42.0, 30.0, 80.0, true, 0, 42, 25, false));
-        assertNotNull(MiningSafety.violation(30.0, 45.0, 80.0, true, 0, 42, 25, false));
-        assertNotNull(MiningSafety.violation(30.0, 30.0, 25.0, true, 0, 42, 25, false));
-        assertNotNull(MiningSafety.violation(30.0, 30.0, 80.0, false, 0, 42, 25, true));
-        assertNotNull(MiningSafety.violation(30.0, 30.0, 80.0, true, 3, 42, 25, false));
+        assertNull(MiningSafety.violation(41.9, 25.1, true, 2, 42, 25, true));
+        assertNotNull(MiningSafety.violation(85.0, 80.0, true, 0, 85, 25, false));
+        assertNull(MiningSafety.violation(84.9, 80.0, true, 0, 85, 25, false));
+        assertNotNull(MiningSafety.violation(42.0, 80.0, true, 0, 42, 25, false));
+        assertNotNull(MiningSafety.violation(30.0, 25.0, true, 0, 42, 25, false));
+        assertNotNull(MiningSafety.violation(30.0, 80.0, false, 0, 42, 25, true));
+        assertNotNull(MiningSafety.violation(30.0, 80.0, true, 3, 42, 25, false));
     }
 
     @Test

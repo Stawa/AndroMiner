@@ -3,17 +3,18 @@
   --app-inset-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
   --app-inset-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
   --app-inset-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
-  --color-app-bg: 249 250 248;
+  --color-app-bg: 245 247 242;
   --color-app-card: 255 255 255;
-  --color-app-elevated: 237 241 238;
-  --color-app-line: 213 222 217;
-  --color-app-on: 24 33 39;
-  --color-app-muted: 78 95 105;
-  --color-app-green: 16 103 86;
-  --color-app-green-dim: 221 240 234;
+  --color-app-elevated: 235 239 232;
+  --color-app-line: 223 229 218;
+  --color-app-on: 23 28 23;
+  --color-app-muted: 104 114 104;
+  --color-app-green: 118 184 42;
+  --color-app-green-ink: 74 120 18;
+  --color-app-green-dim: 228 240 214;
   --color-app-yellow: 137 91 17;
-  --danger: #b3313f;
-  --action-ink: #fff;
+  --danger: #d94747;
+  --action-ink: #101211;
   @apply font-sans;
   color-scheme: light;
   background: rgb(var(--color-app-bg));
@@ -22,17 +23,18 @@
   -webkit-font-smoothing: antialiased;
 }
 :root.dark {
-  --color-app-bg: 17 23 25;
-  --color-app-card: 26 34 36;
-  --color-app-elevated: 34 44 45;
-  --color-app-line: 48 63 64;
-  --color-app-on: 234 240 243;
-  --color-app-muted: 166 184 194;
-  --color-app-green: 122 214 191;
-  --color-app-green-dim: 29 62 54;
+  --color-app-bg: 16 18 17;
+  --color-app-card: 25 29 26;
+  --color-app-elevated: 34 40 35;
+  --color-app-line: 48 56 49;
+  --color-app-on: 242 245 240;
+  --color-app-muted: 155 164 156;
+  --color-app-green: 184 243 107;
+  --color-app-green-ink: 184 243 107;
+  --color-app-green-dim: 41 52 30;
   --color-app-yellow: 231 192 119;
-  --danger: #ff9ca4;
-  --action-ink: #102e27;
+  --danger: #ff6969;
+  --action-ink: #101211;
   color-scheme: dark;
 }
 * {

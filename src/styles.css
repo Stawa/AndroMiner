@@ -2,6 +2,10 @@
 @import './styles/base.css' layer(base);
 @import './styles/components.css' layer(components);
 @import './styles/layout.css' layer(components);
+@import './styles/config.css' layer(components);
+@import './styles/redesign.css' layer(components);
+@import './styles/session.css' layer(components);
+@import './styles/about.css' layer(components);
 @import './styles/utilities.css';
 @import './styles/motion.css';
 @config '../tailwind.config.ts';

@@ -2,6 +2,8 @@
 import { computed, ref } from 'vue';
 import { Browser } from '@capacitor/browser';
 import MaterialIcon from './MaterialIcon.vue';
+import ToggleRow from './ToggleRow.vue';
+import type { ShareField } from '../utils/telemetryClient';
 import countryCodes from '../../server/data/countries.json';
 import { useTelemetry } from '../composables/useTelemetry';
 import { formatDate, regionName, t } from '../i18n';
@@ -48,6 +50,17 @@ const confirmEnable = async (): Promise<void> => {
   await telemetry.enable();
   feedback.value = t('privacy.onFeedback');
 };
+
+const shareRows = computed<Array<{ field: ShareField; label: string; hint: string }>>(() => [
+  { field: 'androidVersion', label: t('privacy.fieldAndroid'), hint: t('privacy.itemAndroid') },
+  {
+    field: 'appVersion',
+    label: t('privacy.fieldAppVersion'),
+    hint: t('privacy.fieldAppVersionHint')
+  },
+  { field: 'variant', label: t('privacy.fieldVariant'), hint: t('privacy.fieldVariantHint') },
+  { field: 'country', label: t('privacy.fieldCountry'), hint: '' }
+]);
 
 const onCountry = (event: Event): void => {
   telemetry.setCountry((event.target as HTMLSelectElement).value || null);
@@ -125,6 +138,7 @@ const open = async (url: string): Promise<void> => {
         <li>{{ $t('privacy.itemVersion') }}</li>
         <li>{{ $t('privacy.itemAndroid') }}</li>
       </ul>
+      <p class="section-copy">{{ $t('privacy.fieldsOptional') }}</p>
       <p class="section-copy">
         {{ $t('privacy.neverSent') }}
       </p>
@@ -137,8 +151,20 @@ const open = async (url: string): Promise<void> => {
       </div>
     </div>
 
-    <template v-if="telemetry.supported && enabled">
-      <div class="config-field usage-field">
+    <template v-if="telemetry.supported">
+      <div class="usage-fields" role="group" :aria-label="$t('privacy.shareFields')">
+        <h4 class="usage-fields-title">{{ $t('privacy.shareFields') }}</h4>
+        <ToggleRow
+          v-for="row in shareRows"
+          :key="row.field"
+          :model-value="telemetry.state.value.share[row.field]"
+          :label="row.label"
+          :supporting-text="row.hint"
+          @update:model-value="telemetry.setShare(row.field, $event)"
+        />
+        <p class="section-copy">{{ $t('privacy.fieldsNote') }}</p>
+      </div>
+      <div v-if="telemetry.state.value.share.country" class="config-field usage-field">
         <label for="usage-country">{{ $t('privacy.country') }}</label>
         <select id="usage-country" :value="telemetry.state.value.country ?? ''" @change="onCountry">
           <option value="">{{ $t('privacy.noCountry') }}</option>
@@ -150,6 +176,8 @@ const open = async (url: string): Promise<void> => {
           {{ $t('privacy.countryHint') }}
         </p>
       </div>
+    </template>
+    <template v-if="telemetry.supported && enabled">
       <p class="section-copy usage-status" role="status">
         {{ $t('privacy.lastCheckin', { when: lastCheckin }) }}
       </p>
@@ -226,6 +254,17 @@ const open = async (url: string): Promise<void> => {
   color: rgb(var(--color-app-muted));
   font-size: 0.8125rem;
   line-height: 1.65;
+}
+.usage-fields {
+  display: grid;
+  gap: 4px;
+}
+.usage-fields-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(var(--color-app-muted));
 }
 .usage-field {
   display: grid;
