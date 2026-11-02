@@ -2,6 +2,8 @@ export const TELEMETRY_STORAGE_KEY = 'androminer-telemetry';
 export const DEFAULT_CHECKIN_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const RETRY_BACKOFF_MS = 60 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 10_000;
+/** How often a mining app tells the service it is still mining. */
+export const HEARTBEAT_INTERVAL_MS = 60_000;
 
 export type ApkVariant = 'download' | 'tls' | 'notls';
 
@@ -312,6 +314,24 @@ export const createTelemetryClient = (options: TelemetryClientOptions) => {
       }
       state.countedUntil = fresh[fresh.length - 1]!.ended;
       save();
+    },
+
+    /**
+     * Tells the service this installation is mining right now. It carries only the installation ID:
+     * the service measures the time between heartbeats itself, so no total is ever reported.
+     * Sent only while mining activity is shared. Never throws.
+     */
+    async heartbeat(): Promise<void> {
+      try {
+        if (!available || !state.enabled || !state.installationId || !state.share.activity) return;
+        await request('/v1/heartbeat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ v: 1, installationId: state.installationId })
+        });
+      } catch {
+        /* Best effort: a missed heartbeat only means that minute is not credited. */
+      }
     },
 
     /** The public ranking, or null when the service cannot be reached. */

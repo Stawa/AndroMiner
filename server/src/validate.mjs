@@ -23,6 +23,21 @@ const versionPattern = /^\d{1,3}\.\d{1,3}(?:\.\d{1,3})?(?:-[0-9A-Za-z.]{1,16})?$
 export const isInstallationId = (value) => typeof value === 'string' && idPattern.test(value);
 export const isCountryCode = (value) => typeof value === 'string' && countryCodes.has(value);
 
+/** A heartbeat carries only the installation ID; anything else is rejected. */
+export const validateHeartbeat = (body) => {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return { ok: false, error: 'Body must be a JSON object.' };
+  }
+  if (Object.keys(body).some((key) => key !== 'v' && key !== 'installationId')) {
+    return { ok: false, error: 'Request contains an unexpected field.' };
+  }
+  if (body.v !== 1) return { ok: false, error: 'Unsupported schema version.' };
+  if (!isInstallationId(body.installationId)) {
+    return { ok: false, error: 'installationId must be 32 lowercase hex characters.' };
+  }
+  return { ok: true, value: { installationId: body.installationId } };
+};
+
 /** Returns `{ ok: true, value }` or `{ ok: false, error }`. Unknown fields are rejected. */
 export const validateCheckin = (body) => {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {

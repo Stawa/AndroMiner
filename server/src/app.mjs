@@ -3,7 +3,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { createDownloadsSource } from './github.mjs';
 import { createRateLimiter } from './ratelimit.mjs';
 import { computeStats } from './stats.mjs';
-import { isInstallationId, validateCheckin } from './validate.mjs';
+import { isInstallationId, validateCheckin, validateHeartbeat } from './validate.mjs';
 
 const MAX_BODY_BYTES = 1024;
 const LEADERBOARD_SIZE = 50;
@@ -102,7 +102,15 @@ export const createApp = ({ config, store, now = Date.now, fetchImpl }) => {
       const rows = await store.readLeaderboard(LEADERBOARD_SIZE, nowSeconds());
       const entries = rows.map((row, index) => ({ rank: index + 1, ...row }));
       const payload = { generatedAt: new Date(now()).toISOString(), entries };
-      return send(response, 200, payload, { 'Cache-Control': 'public, max-age=300' });
+      return send(response, 200, payload, { 'Cache-Control': 'public, max-age=60' });
+    }
+
+    if (request.method === 'POST' && pathname === '/v1/heartbeat') {
+      limit(writeLimiter, request, 'heartbeat');
+      const result = validateHeartbeat(await readJson(request));
+      if (!result.ok) return send(response, 400, { ok: false, error: result.error });
+      const outcome = await store.heartbeat(result.value.installationId, nowSeconds());
+      return send(response, 200, { ok: true, counted: outcome.counted });
     }
 
     if (request.method === 'POST' && pathname === '/v1/checkin') {

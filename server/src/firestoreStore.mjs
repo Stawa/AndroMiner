@@ -1,5 +1,6 @@
 import { FieldValue } from '@google-cloud/firestore';
 import { dayOf, monthOf } from './dates.mjs';
+import { creditHeartbeat } from './heartbeat.mjs';
 import { publicIdOf } from './identity.mjs';
 import { HISTORY_DAYS, tallyInstalls } from './stats.mjs';
 
@@ -7,6 +8,8 @@ const DAY = 86_400;
 const BATCH_SIZE = 400;
 // Daily history only changes through the day's own counters, so it is re-read rarely.
 const HISTORY_CACHE_SECONDS = 6 * 3600;
+// The leaderboard follows live heartbeats, so it is recomputed at most once a minute.
+const LEADERBOARD_CACHE_SECONDS = 60;
 
 /**
  * Storage on Firestore, for hosts without a persistent disk (Vercel). Same contract as the SQLite
@@ -66,7 +69,10 @@ export const createFirestoreStore = ({ firestore, statsCacheSeconds = 3600 }) =>
           appVersion: checkin.appVersion,
           androidMajor: checkin.androidMajor,
           variant: checkin.variant,
-          miningSeconds: checkin.miningSeconds,
+          // The reported miningSeconds only says whether activity is shared (null means it is not).
+          // Ranked time comes from heartbeats alone, so a client cannot write it here.
+          verifiedSeconds: checkin.miningSeconds === null ? null : (existing?.verifiedSeconds ?? 0),
+          lastBeat: existing?.lastBeat ?? null,
           acceptedShares: checkin.acceptedShares,
           firstSeen: existing?.firstSeen ?? nowSeconds,
           lastSeen: nowSeconds
@@ -93,6 +99,27 @@ export const createFirestoreStore = ({ firestore, statsCacheSeconds = 3600 }) =>
           );
         }
         return { counted: true, isNew: !existing };
+      });
+    },
+
+    /**
+     * Credits mining time for one heartbeat. Only installations that already checked in and share
+     * their activity count, so a heartbeat can never create a record or revive an opt-out.
+     */
+    async heartbeat(id, nowSeconds) {
+      const ref = installs.doc(id);
+      return firestore.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        const data = snap.exists ? snap.data() : null;
+        if (!data || data.verifiedSeconds == null) return { counted: false };
+        const credit = creditHeartbeat(data.lastBeat ?? null, nowSeconds);
+        if (credit === null) return { counted: false };
+        tx.set(
+          ref,
+          { verifiedSeconds: data.verifiedSeconds + credit, lastBeat: nowSeconds },
+          { merge: true }
+        );
+        return { counted: true };
       });
     },
 
@@ -145,18 +172,18 @@ export const createFirestoreStore = ({ firestore, statsCacheSeconds = 3600 }) =>
     },
 
     async readLeaderboard(limit, nowSeconds) {
-      return cached('leaderboard', statsCacheSeconds, nowSeconds, async () => {
+      return cached('leaderboard', LEADERBOARD_CACHE_SECONDS, nowSeconds, async () => {
         const snap = await installs
-          .orderBy('miningSeconds', 'desc')
+          .orderBy('verifiedSeconds', 'desc')
           .limit(limit)
-          .select('country', 'miningSeconds', 'acceptedShares')
+          .select('country', 'verifiedSeconds', 'acceptedShares')
           .get();
         return snap.docs
-          .filter((doc) => doc.get('miningSeconds') !== null)
+          .filter((doc) => (doc.get('verifiedSeconds') ?? 0) > 0)
           .map((doc) => ({
             id: publicIdOf(doc.id),
             country: doc.get('country') ?? null,
-            miningSeconds: doc.get('miningSeconds'),
+            miningSeconds: doc.get('verifiedSeconds'),
             acceptedShares: doc.get('acceptedShares') ?? null
           }));
       });

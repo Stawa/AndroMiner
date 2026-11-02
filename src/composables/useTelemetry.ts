@@ -7,6 +7,7 @@ import {
   createTelemetryClient,
   defaultState,
   derivePublicId,
+  HEARTBEAT_INTERVAL_MS,
   type CheckinResult,
   type FinishedSession,
   type ShareField,
@@ -37,6 +38,9 @@ const client = createTelemetryClient({
   fetchImpl: (input, init) => fetch(input, init),
   getEnvironment
 });
+
+const supported = client.available && nativePlatform;
+let heartbeatTimer: number | undefined;
 
 const state = ref<TelemetryState>(defaultState());
 const busy = ref(false);
@@ -87,7 +91,7 @@ export const useTelemetry = () => ({
   lastResult: readonly(lastResult),
   publicId: readonly(publicId),
   /** False in builds without a configured endpoint and in the web build. */
-  supported: client.available && nativePlatform,
+  supported,
   buildHasEndpoint: client.available,
 
   /** Loads saved state and schedules the first check-in after startup has settled. */
@@ -137,6 +141,18 @@ export const useTelemetry = () => ({
     if (!started) return;
     client.recordSessions(sessions);
     sync();
+  },
+
+  /**
+   * Starts or stops the heartbeat that keeps the leaderboard's mining time live. Safe to call
+   * before start(): beats are skipped until the saved state (and so the ID) has loaded.
+   */
+  setMining(active: boolean): void {
+    window.clearInterval(heartbeatTimer);
+    heartbeatTimer = undefined;
+    if (!active || !supported) return;
+    void client.heartbeat();
+    heartbeatTimer = window.setInterval(() => void client.heartbeat(), HEARTBEAT_INTERVAL_MS);
   },
 
   fetchLeaderboard: () => client.fetchLeaderboard(),

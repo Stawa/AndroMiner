@@ -206,16 +206,56 @@ test('maintenance prune is closed without a secret and requires it when set', as
   assert.equal(s.firestore.size('daily_active'), 1);
 });
 
-test('the leaderboard lists only installations that share activity, best first', async (t) => {
+const MINUTE = 60_000;
+const beat = async (s, n) =>
+  (
+    await s.call('/v1/heartbeat', {
+      method: 'POST',
+      body: JSON.stringify({ v: 1, installationId: hex(n) })
+    })
+  ).json();
+
+test('the leaderboard ranks measured time of installations that share activity, best first', async (t) => {
   const s = await start();
   t.after(s.stop);
-  await s.post(checkin(1, { miningSeconds: 3600, acceptedShares: 10 }));
-  await s.post(checkin(2, { miningSeconds: 7200, acceptedShares: 4, country: null }));
+  await s.post(checkin(1, { miningSeconds: 0, acceptedShares: 10 }));
+  await s.post(checkin(2, { miningSeconds: 0, acceptedShares: 4, country: null }));
   await s.post(checkin(3));
+  await s.post(checkin(4, { miningSeconds: 9_000_000, acceptedShares: 1 }));
+  for (const n of [1, 2, 3]) await beat(s, n);
+  s.clock.t += MINUTE;
+  for (const n of [1, 2, 3]) await beat(s, n);
+  s.clock.t += MINUTE;
+  await beat(s, 2);
   const board = await (await s.call('/v1/leaderboard')).json();
   assert.deepEqual(board.entries, [
-    { rank: 1, id: publicIdOf(hex(2)), country: null, miningSeconds: 7200, acceptedShares: 4 },
-    { rank: 2, id: publicIdOf(hex(1)), country: 'ID', miningSeconds: 3600, acceptedShares: 10 }
+    { rank: 1, id: publicIdOf(hex(2)), country: null, miningSeconds: 120, acceptedShares: 4 },
+    { rank: 2, id: publicIdOf(hex(1)), country: 'ID', miningSeconds: 60, acceptedShares: 10 }
   ]);
   assert.equal(JSON.stringify(board).includes(hex(1)), false);
+});
+
+test('heartbeats are measured by the server and cannot create or revive a record', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  assert.equal((await beat(s, 9)).counted, false);
+  assert.equal(s.firestore.size('installs'), 0);
+
+  await s.post(checkin(1, { miningSeconds: 0 }));
+  assert.equal((await beat(s, 1)).counted, true);
+  s.clock.t += 10_000;
+  assert.equal((await beat(s, 1)).counted, false, 'too soon');
+  s.clock.t += 50_000;
+  await beat(s, 1);
+  s.clock.t += 10 * MINUTE;
+  await beat(s, 1);
+  s.clock.t += MINUTE;
+  await beat(s, 1);
+  assert.equal((await (await s.call('/v1/leaderboard')).json()).entries[0].miningSeconds, 120);
+
+  s.clock.t += DAY;
+  await s.post(checkin(1, { miningSeconds: null, acceptedShares: null }));
+  s.clock.t += MINUTE;
+  assert.equal((await beat(s, 1)).counted, false, 'activity is no longer shared');
+  assert.deepEqual((await (await s.call('/v1/leaderboard')).json()).entries, []);
 });

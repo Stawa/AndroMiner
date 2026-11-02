@@ -30,7 +30,7 @@ Example body:
 | `miningSeconds`  | An integer from 0 to 10 years in seconds, or `null`.         |
 | `acceptedShares` | An integer from 0 to 10,000,000,000, or `null`.              |
 
-`miningSeconds` and `acceptedShares` are optional. Omitting them is the same as sending `null`, and an installation with `miningSeconds: null` is not on the leaderboard.
+`miningSeconds` and `acceptedShares` are optional. Omitting them is the same as sending `null`. The value of `miningSeconds` is not stored or ranked; only whether it is `null` matters. An installation with `miningSeconds: null` shares no activity and is not on the leaderboard, and sending `null` clears its measured time, so turning activity back on starts again from zero. Ranked time comes only from `POST /v1/heartbeat`.
 
 Unknown fields are rejected. The body can be at most 1 KiB, and `Content-Type: application/json` is required.
 
@@ -43,6 +43,18 @@ Responses:
 | `413`  | The body is too large.                                                                                 |
 | `415`  | Wrong content type.                                                                                    |
 | `429`  | Rate limited. The `Retry-After` header says when to retry.                                             |
+
+## `POST /v1/heartbeat`
+
+Sent about once a minute while the app is mining. Body: `{"v":1,"installationId":"…"}`. No other field is accepted.
+
+The service credits the seconds since the installation's previous heartbeat, measured on its own clock:
+
+- A heartbeat less than 30 seconds after the previous one is ignored.
+- A gap of up to 5 minutes is credited in full.
+- After a longer gap the heartbeat only restarts the clock and credits nothing.
+
+Heartbeats only count for installations that already checked in and share their activity. They never create a record. Responses: `200` with `{"ok":true,"counted":true|false}`, `400` for an invalid body, `429` when rate limited.
 
 ## `DELETE /v1/installations/{installationId}`
 
@@ -60,7 +72,7 @@ Public. Responses can be cached for 5 minutes. The response contains:
 
 ## `GET /v1/leaderboard`
 
-Public. Responses can be cached for 5 minutes. Returns `{generatedAt, entries[]}` with at most 50 entries, longest mining time first. Each entry is `{rank, id, country, miningSeconds, acceptedShares}`. `id` is a public code (`XXXX-XXXX`, Crockford base32) made from a SHA-256 hash of the installation ID, so the installation ID itself is never returned. `country` and `acceptedShares` can be `null`.
+Public. Responses can be cached for 1 minute. Returns `{generatedAt, entries[]}` with at most 50 entries, longest measured mining time first. Each entry is `{rank, id, country, miningSeconds, acceptedShares}`. `id` is a public code (`XXXX-XXXX`, Crockford base32) made from a SHA-256 hash of the installation ID, so the installation ID itself is never returned. `country` and `acceptedShares` can be `null`.
 
 ## `GET /healthz`
 

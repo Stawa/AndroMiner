@@ -366,6 +366,38 @@ test('switching mining activity off keeps it local and out of the check-in', asy
   assert.equal(body.acceptedShares, null);
 });
 
+test('a heartbeat carries only the installation ID, never a mining total', async () => {
+  const { client, calls } = setup();
+  client.recordSessions([
+    { endedAt: '2026-10-01T10:00:00Z', durationSeconds: 3600, acceptedShares: 5 }
+  ]);
+  await client.heartbeat();
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, 'https://stats.example.org/v1/heartbeat');
+  assert.equal(calls[0].init.method, 'POST');
+  assert.deepEqual(JSON.parse(calls[0].init.body), {
+    v: 1,
+    installationId: client.getState().installationId
+  });
+});
+
+test('heartbeats stop when reporting or mining activity is switched off, and never throw', async () => {
+  const { client, calls } = setup();
+  client.setShare('activity', false);
+  await client.heartbeat();
+  client.setShare('activity', true);
+  client.setEnabled(false);
+  await client.heartbeat();
+  assert.equal(calls.length, 0);
+
+  const offline = setup({
+    fetchImpl: async () => {
+      throw new Error('offline');
+    }
+  });
+  await assert.doesNotReject(() => offline.client.heartbeat());
+});
+
 test('the public ID is a stable one-way code that matches the server', async () => {
   const id = '0123456789abcdef0123456789abcdef';
   assert.equal(await derivePublicId(id), 'H5DC-568W');

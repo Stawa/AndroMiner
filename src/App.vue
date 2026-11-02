@@ -67,6 +67,11 @@ const updater = useGitHubReleaseUpdater();
 useTheme();
 const telemetry = useTelemetry();
 watch(() => miner.sessionHistory.value, telemetry.recordSessions);
+watch(
+  () => ['mining', 'reconnecting'].includes(miner.state.value),
+  (mining) => telemetry.setMining(mining),
+  { immediate: true }
+);
 const sessionActive = computed(() => !['idle', 'error'].includes(miner.state.value));
 const sessionFullscreen = ref(false);
 const sessionView = ref<InstanceType<typeof MiningSessionView> | null>(null);

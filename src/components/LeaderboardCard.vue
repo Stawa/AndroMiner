@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { Clipboard } from '@capacitor/clipboard';
 import MaterialIcon from './MaterialIcon.vue';
 import { useTelemetry } from '../composables/useTelemetry';
@@ -8,6 +8,8 @@ import type { LeaderboardEntry } from '../utils/telemetryClient';
 import { countryFlag } from '../utils/countryFlag';
 
 const PREVIEW_ROWS = 10;
+// The service recomputes the ranking at most once a minute, so asking more often gains nothing.
+const REFRESH_INTERVAL_MS = 60_000;
 
 const telemetry = useTelemetry();
 const entries = ref<LeaderboardEntry[] | null>(null);
@@ -46,9 +48,15 @@ const copyId = async (): Promise<void> => {
 
 const countryLabel = (code: string | null): string => (code ? regionName(code) : '');
 
+let refreshTimer: number | undefined;
+
 onMounted(() => {
-  if (telemetry.supported) void refresh();
+  if (!telemetry.supported) return;
+  void refresh();
+  refreshTimer = window.setInterval(() => void refresh(), REFRESH_INTERVAL_MS);
 });
+
+onUnmounted(() => window.clearInterval(refreshTimer));
 </script>
 
 <template>

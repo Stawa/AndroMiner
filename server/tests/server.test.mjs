@@ -54,7 +54,14 @@ const start = async ({ env = {}, fetchImpl, clock = { t: Date.UTC(2026, 9, 31, 1
       headers: { 'Content-Type': 'application/json', ...init.headers }
     });
   const post = (body) => call('/v1/checkin', { method: 'POST', body: JSON.stringify(body) });
-  return { app, clock, call, post, stop: () => server.close() };
+  const beat = async (n) =>
+    (
+      await call('/v1/heartbeat', {
+        method: 'POST',
+        body: JSON.stringify({ v: 1, installationId: hex(n) })
+      })
+    ).json();
+  return { app, clock, call, post, beat, stop: () => server.close() };
 };
 
 test('accepts a valid check-in and counts it once per interval', async (t) => {
@@ -349,33 +356,39 @@ test('activity totals are validated like every other field', async (t) => {
   assert.equal((await s.post(baseCheckin(21))).status, 200, 'older clients omit the fields');
 });
 
-test('the leaderboard ranks shared activity under public IDs and never exposes the secret', async (t) => {
+const MINUTE = 60_000;
+
+test('the leaderboard ranks measured mining time under public IDs and never exposes the secret', async (t) => {
   const s = await start();
   t.after(s.stop);
-  await s.post(baseCheckin(1, { miningSeconds: 3600, acceptedShares: 10 }));
-  await s.post(baseCheckin(2, { miningSeconds: 7200, acceptedShares: 4, country: null }));
+  await s.post(baseCheckin(1, { miningSeconds: 0, acceptedShares: 10 }));
+  await s.post(baseCheckin(2, { miningSeconds: 0, acceptedShares: 4, country: null }));
   await s.post(baseCheckin(3));
-  await s.post(baseCheckin(4, { miningSeconds: 60, acceptedShares: null }));
+  await s.post(baseCheckin(4, { miningSeconds: 0, acceptedShares: null }));
+  for (const n of [1, 2, 4]) await s.beat(n);
+  s.clock.t += MINUTE;
+  for (const n of [1, 2, 4]) await s.beat(n);
+  s.clock.t += MINUTE;
+  for (const n of [1, 2]) await s.beat(n);
+  s.clock.t += MINUTE;
+  await s.beat(2);
+
   const board = await (await s.call('/v1/leaderboard')).json();
   assert.deepEqual(board.entries, [
-    { rank: 1, id: publicIdOf(hex(2)), country: null, miningSeconds: 7200, acceptedShares: 4 },
-    { rank: 2, id: publicIdOf(hex(1)), country: 'ID', miningSeconds: 3600, acceptedShares: 10 },
+    { rank: 1, id: publicIdOf(hex(2)), country: null, miningSeconds: 180, acceptedShares: 4 },
+    { rank: 2, id: publicIdOf(hex(1)), country: 'ID', miningSeconds: 120, acceptedShares: 10 },
     { rank: 3, id: publicIdOf(hex(4)), country: 'ID', miningSeconds: 60, acceptedShares: null }
   ]);
   const text = JSON.stringify(board);
   for (const n of [1, 2, 3, 4]) assert.equal(text.includes(hex(n)), false);
 
   s.clock.t += DAY;
-  await s.post(baseCheckin(4, { miningSeconds: 9000, acceptedShares: 1 }));
   await s.post(baseCheckin(1, { miningSeconds: null, acceptedShares: null }));
   const next = await (await s.call('/v1/leaderboard')).json();
   assert.deepEqual(
-    next.entries.map((entry) => [entry.rank, entry.id]),
-    [
-      [1, publicIdOf(hex(4))],
-      [2, publicIdOf(hex(2))]
-    ],
-    'new totals re-rank, and turning activity off removes the entry'
+    next.entries.map((entry) => entry.id),
+    [publicIdOf(hex(2)), publicIdOf(hex(4))],
+    'turning activity off removes the entry'
   );
 
   await s.call(`/v1/installations/${hex(4)}`, { method: 'DELETE' });
@@ -386,14 +399,68 @@ test('the leaderboard ranks shared activity under public IDs and never exposes t
   );
 });
 
+test('mining time is measured by the server and cannot be written by the client', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  // A reported total is no longer trusted: it only says that activity is shared.
+  await s.post(baseCheckin(1, { miningSeconds: 9_000_000, acceptedShares: 1 }));
+  assert.deepEqual((await (await s.call('/v1/leaderboard')).json()).entries, []);
+
+  assert.deepEqual(await s.beat(1), { ok: true, counted: true }, 'the first beat starts the clock');
+  s.clock.t += 10_000;
+  assert.equal((await s.beat(1)).counted, false, 'a beat that comes too soon is not counted');
+  s.clock.t += 50_000;
+  await s.beat(1);
+  s.clock.t += 10 * MINUTE;
+  await s.beat(1);
+  s.clock.t += MINUTE;
+  await s.beat(1);
+  const board = await (await s.call('/v1/leaderboard')).json();
+  assert.equal(
+    board.entries[0].miningSeconds,
+    120,
+    'a silence longer than five minutes is not credited, the beat after it is'
+  );
+});
+
+test('a heartbeat cannot create a record or bring back an opted-out one', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  assert.equal((await s.beat(7)).counted, false, 'unknown installations are ignored');
+  assert.equal(s.app.store.db.prepare('SELECT COUNT(*) AS n FROM installs').get().n, 0);
+
+  await s.post(baseCheckin(8, { miningSeconds: null, acceptedShares: null }));
+  await s.beat(8);
+  s.clock.t += MINUTE;
+  assert.equal((await s.beat(8)).counted, false, 'activity is not shared');
+  assert.deepEqual((await (await s.call('/v1/leaderboard')).json()).entries, []);
+});
+
+test('heartbeats accept only the installation ID', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const send = (body) =>
+    s.call('/v1/heartbeat', { method: 'POST', body: JSON.stringify(body) }).then((r) => r.status);
+  assert.equal(await send({ v: 1, installationId: hex(1) }), 200);
+  assert.equal(await send({ v: 1, installationId: hex(1), miningSeconds: 99999 }), 400);
+  assert.equal(await send({ v: 2, installationId: hex(1) }), 400);
+  assert.equal(await send({ v: 1, installationId: 'nope' }), 400);
+  assert.equal(await send([]), 400);
+});
+
 test('the leaderboard shows at most 50 installations', async (t) => {
   const s = await start({
     env: { MAX_NEW_INSTALLS_PER_HOUR: '1000', RATE_LIMIT_PER_MINUTE: '1000' }
   });
   t.after(s.stop);
-  for (let n = 1; n <= 55; n += 1) await s.post(baseCheckin(n, { miningSeconds: n * 60 }));
+  for (let n = 1; n <= 55; n += 1) await s.post(baseCheckin(n, { miningSeconds: 0 }));
+  for (let n = 1; n <= 55; n += 1) await s.beat(n);
+  s.clock.t += MINUTE;
+  for (let n = 1; n <= 55; n += 1) await s.beat(n);
+  s.clock.t += MINUTE;
+  await s.beat(55);
   const board = await (await s.call('/v1/leaderboard')).json();
   assert.equal(board.entries.length, 50);
-  assert.equal(board.entries[0].miningSeconds, 55 * 60);
+  assert.equal(board.entries[0].miningSeconds, 120);
   assert.equal(board.entries[49].rank, 50);
 });

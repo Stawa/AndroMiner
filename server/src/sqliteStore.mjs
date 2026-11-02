@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { dayOf, monthOf } from './dates.mjs';
+import { creditHeartbeat } from './heartbeat.mjs';
 import { publicIdOf } from './identity.mjs';
 import { HISTORY_DAYS, tallyInstalls } from './stats.mjs';
 
@@ -65,10 +66,13 @@ const migrateNullableInstallColumns = (db) => {
   }
 };
 
-/** Databases created before the leaderboard gain its two nullable columns in place. */
+/**
+ * Databases created before the leaderboard gain its nullable columns in place. `mining_seconds` is
+ * the retired self-reported total; `verified_seconds` and `last_beat_ts` come from heartbeats.
+ */
 const migrateActivityColumns = (db) => {
   const columns = db.prepare('PRAGMA table_info(installs)').all();
-  for (const name of ['mining_seconds', 'accepted_shares']) {
+  for (const name of ['mining_seconds', 'accepted_shares', 'verified_seconds', 'last_beat_ts']) {
     if (!columns.some((column) => column.name === name)) {
       db.exec(`ALTER TABLE installs ADD COLUMN ${name} INTEGER`);
     }
@@ -119,13 +123,18 @@ export const createSqliteStore = (path) => {
         const newDay = !existing || dayOf(existing.last_seen_ts) !== today;
         const newMonth = !existing || monthOf(existing.last_seen_ts) !== month;
 
+        // The reported miningSeconds only says whether activity is shared (null means it is not).
+        // Ranked time comes from heartbeats alone, so a client cannot write it here.
+        const sharesActivity = checkin.miningSeconds !== null;
         db.prepare(
           `INSERT INTO installs (id, country, app_version, android_major, variant, first_seen_ts, last_seen_ts,
-                                 mining_seconds, accepted_shares)
+                                 verified_seconds, accepted_shares)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET country = excluded.country, app_version = excluded.app_version,
              android_major = excluded.android_major, variant = excluded.variant,
-             last_seen_ts = excluded.last_seen_ts, mining_seconds = excluded.mining_seconds,
+             last_seen_ts = excluded.last_seen_ts,
+             verified_seconds = CASE WHEN excluded.verified_seconds IS NULL THEN NULL
+                                     ELSE COALESCE(installs.verified_seconds, 0) END,
              accepted_shares = excluded.accepted_shares`
         ).run(
           checkin.installationId,
@@ -135,7 +144,7 @@ export const createSqliteStore = (path) => {
           checkin.variant,
           nowSeconds,
           nowSeconds,
-          checkin.miningSeconds,
+          sharesActivity ? 0 : null,
           checkin.acceptedShares
         );
         if (newDay) {
@@ -162,6 +171,25 @@ export const createSqliteStore = (path) => {
         db.exec('ROLLBACK');
         throw error;
       }
+    },
+
+    /**
+     * Credits mining time for one heartbeat. Only installations that already checked in and share
+     * their activity count, so a heartbeat can never create a record or revive an opt-out.
+     */
+    async heartbeat(id, nowSeconds) {
+      const row = db
+        .prepare(
+          'SELECT verified_seconds AS seconds, last_beat_ts AS lastBeat FROM installs WHERE id = ?'
+        )
+        .get(id);
+      if (!row || row.seconds === null) return { counted: false };
+      const credit = creditHeartbeat(row.lastBeat, nowSeconds);
+      if (credit === null) return { counted: false };
+      db.prepare(
+        'UPDATE installs SET verified_seconds = verified_seconds + ?, last_beat_ts = ? WHERE id = ?'
+      ).run(credit, nowSeconds, id);
+      return { counted: true };
     },
 
     /** Removes the installation record. Published aggregate counters are not attributable to it. */
@@ -193,13 +221,13 @@ export const createSqliteStore = (path) => {
       };
     },
 
-    /** The installations that share their activity, longest mining time first. */
+    /** The installations that share their activity, longest measured mining time first. */
     async readLeaderboard(limit) {
       return db
         .prepare(
-          `SELECT id, country, mining_seconds AS miningSeconds, accepted_shares AS acceptedShares
-           FROM installs WHERE mining_seconds IS NOT NULL
-           ORDER BY mining_seconds DESC, first_seen_ts ASC, id ASC LIMIT ?`
+          `SELECT id, country, verified_seconds AS miningSeconds, accepted_shares AS acceptedShares
+           FROM installs WHERE verified_seconds > 0
+           ORDER BY verified_seconds DESC, first_seen_ts ASC, id ASC LIMIT ?`
         )
         .all(limit)
         .map(({ id, ...entry }) => ({ id: publicIdOf(id), ...entry }));
