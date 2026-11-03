@@ -72,3 +72,27 @@ jobs:
             options+=(-PbundleMiner=true)
           fi
           android/gradlew -p android testDebugUnitTest lintDebug assembleDebug "${options[@]}" --stacktrace
+  miner-armeabi-v7a:
+    needs: frontend
+    runs-on: ubuntu-24.04
+    env:
+      NDK_VERSION: 27.2.12479018
+      ABI: armeabi-v7a
+      WITH_TLS: 'ON'
+      SKIP_INSTALL: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - name: Prepare toolchains
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake make ninja-build perl pkg-config qemu-user gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;$NDK_VERSION"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+      - name: Build armeabi-v7a miner (API 24)
+        run: bash miner-builder/build-xmrig-android.sh
+      - name: Emulated RandomX hash check (qemu-user, not the Android binary)
+        run: bash miner-builder/validate-armv7-qemu.sh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: androminer-armeabi-v7a-miner
+          path: miner-builder/work/build/xmrig-armeabi-v7a/libxmrig.so

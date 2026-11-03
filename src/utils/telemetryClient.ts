@@ -2,7 +2,6 @@ export const TELEMETRY_STORAGE_KEY = 'androminer-telemetry';
 export const DEFAULT_CHECKIN_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const RETRY_BACKOFF_MS = 60 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 10_000;
-/** How often a mining app tells the service it is still mining. */
 export const HEARTBEAT_INTERVAL_MS = 60_000;
 
 export type ApkVariant = 'download' | 'tls' | 'notls';
@@ -168,10 +167,7 @@ export const generateInstallationId = (
 
 const BASE32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
-/**
- * The short code shown on the leaderboard, a one-way hash of the secret installation ID (which
- * authorizes deleting the record and so is never displayed). Mirrors `server/src/identity.mjs`.
- */
+/** Leaderboard code: a one-way hash of the secret installation ID. Mirrors `server/src/identity.mjs`. */
 export const derivePublicId = async (installationId: string): Promise<string> => {
   const digest = new Uint8Array(
     await crypto.subtle.digest(
@@ -253,7 +249,7 @@ export const createTelemetryClient = (options: TelemetryClientOptions) => {
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
     });
 
-  /** Sends queued deletion requests. Runs even while reporting is off because the user asked for it. */
+  /** Sends queued deletion requests, even while reporting is off. */
   const flushDeletions = (): Promise<void> => {
     if (!available || state.pendingDeletion.length === 0) return Promise.resolve();
     flushing ??= (async () => {
@@ -298,6 +294,9 @@ export const createTelemetryClient = (options: TelemetryClientOptions) => {
 
     setShare(field: ShareField, shared: boolean): void {
       state.share = { ...state.share, [field]: shared };
+      // The service applies a changed choice only from a check-in, so the next one is due now.
+      state.lastCheckinAt = null;
+      state.lastAttemptAt = null;
       save();
     },
 
@@ -316,11 +315,7 @@ export const createTelemetryClient = (options: TelemetryClientOptions) => {
       save();
     },
 
-    /**
-     * Tells the service this installation is mining right now. It carries only the installation ID:
-     * the service measures the time between heartbeats itself, so no total is ever reported.
-     * Sent only while mining activity is shared. Never throws.
-     */
+    /** Tells the service this installation is mining. Carries only the ID, since the service times the gaps. Sent only while activity is shared. Never throws. */
     async heartbeat(): Promise<void> {
       try {
         if (!available || !state.enabled || !state.installationId || !state.share.activity) return;
@@ -347,7 +342,6 @@ export const createTelemetryClient = (options: TelemetryClientOptions) => {
       }
     },
 
-    /** Issues a new random ID and asks the service to forget the old one. */
     async resetInstallationId(): Promise<void> {
       queueDeletion(state.installationId);
       state.installationId = state.enabled ? generateInstallationId(options.randomBytes) : '';

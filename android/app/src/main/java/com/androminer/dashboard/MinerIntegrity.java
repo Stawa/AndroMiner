@@ -11,7 +11,14 @@ final class MinerIntegrity {
     static final String REVISION = "795a6861630a26064aa68a334a713dda4e7de608";
     static final long MAX_BYTES = 64L * 1024 * 1024;
 
-    static String expectedHash(String variant) {
+    /** armeabi-v7a has no approved download yet: bundle it in the APK instead. */
+    static boolean hasApprovedDownload(String abi) {
+        return MinerAbi.ARM64.equals(abi);
+    }
+
+    static String expectedHash(String abi, String variant) {
+        if (!hasApprovedDownload(abi))
+            throw new IllegalArgumentException("No approved miner download for " + abi + ".");
         if ("tls".equals(variant))
             return "a7020df77da43412d1da15df718c1295a69014edfc4533a502f0f2ca7872733e";
         if ("notls".equals(variant))

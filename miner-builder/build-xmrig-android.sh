@@ -9,7 +9,14 @@ BUILD_DIR="$WORK_DIR/build"
 PREFIX_DIR="$WORK_DIR/prefix"
 
 ABI="${ABI:-arm64-v8a}"
-ANDROID_PLATFORM="${ANDROID_PLATFORM:-android-29}"
+# arm64-v8a keeps API 29 (the pinned download revision was built with it). armeabi-v7a targets the
+# app's minSdk (android/variables.gradle) because 32-bit devices skew toward old Android releases;
+# an API 29 binary can reference bionic symbols that do not exist there.
+case "$ABI" in
+  armeabi-v7a) DEFAULT_PLATFORM="android-24" ;;
+  *) DEFAULT_PLATFORM="android-29" ;;
+esac
+ANDROID_PLATFORM="${ANDROID_PLATFORM:-$DEFAULT_PLATFORM}"
 XMRIG_REF="${XMRIG_REF:-v6.26.0}"
 LIBUV_REF="${LIBUV_REF:-v1.48.0}"
 OPENSSL_REF="${OPENSSL_REF:-openssl-4.0.0}"
@@ -25,6 +32,11 @@ THIN_LTO="${THIN_LTO:-0}"
 QUIET="${QUIET:-ON}"
 JOBS="${JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)}"
 SKIP_INSTALL="${SKIP_INSTALL:-0}"
+# RELEASE_BUILD=1 drops debug info, build ids and unused sections, remaps source paths and strips
+# the output. Default on for armeabi-v7a; off for arm64-v8a so its output is unchanged.
+if [[ -z "${RELEASE_BUILD:-}" ]]; then
+  [[ "$ABI" == armeabi-v7a ]] && RELEASE_BUILD=1 || RELEASE_BUILD=0
+fi
 
 if [[ -t 1 ]]; then
   COLOR_CYAN=$'\033[36m'
@@ -353,15 +365,24 @@ log_detail "hwloc" "Disabled"
 if [[ -n "$CPU_TUNE" ]]; then
   log_detail "CPU tune" "$CPU_TUNE"
 else
-  log_detail "CPU tune" "Generic ARM64"
+  case "$ABI" in
+    armeabi-v7a) log_detail "CPU tune" "Generic ARMv7-A + NEON (upstream -march=armv7-a -mfpu=neon)" ;;
+    *) log_detail "CPU tune" "Generic ARM64" ;;
+  esac
 fi
 if [[ "$THIN_LTO" == "1" ]]; then
   log_detail "Thin LTO" "Enabled"
 else
   log_detail "Thin LTO" "Disabled"
 fi
+log_detail "Release build" "$RELEASE_BUILD"
 rm -rf "$BUILD_DIR/xmrig-$ABI"
 XMRIG_EXTRA_FLAGS=()
+XMRIG_LINK_FLAGS=()
+if [[ "$RELEASE_BUILD" == "1" ]]; then
+  XMRIG_EXTRA_FLAGS+=(-g0 "-ffile-prefix-map=$WORK_DIR=/work")
+  XMRIG_LINK_FLAGS+=(-Wl,--gc-sections -Wl,--build-id=none)
+fi
 if [[ -n "$CPU_TUNE" ]]; then
   XMRIG_EXTRA_FLAGS+=("-mtune=$CPU_TUNE")
 fi
@@ -395,7 +416,10 @@ if (( ${#XMRIG_EXTRA_FLAGS[@]} > 0 )); then
   )
 fi
 if [[ "$THIN_LTO" == "1" ]]; then
-  XMRIG_CMAKE_ARGS+=("-DCMAKE_EXE_LINKER_FLAGS=-flto=thin -Wl,--gc-sections")
+  XMRIG_LINK_FLAGS+=(-flto=thin -Wl,--gc-sections)
+fi
+if (( ${#XMRIG_LINK_FLAGS[@]} > 0 )); then
+  XMRIG_CMAKE_ARGS+=("-DCMAKE_EXE_LINKER_FLAGS=${XMRIG_LINK_FLAGS[*]}")
 fi
 XMRIG_CMAKE_ARGS+=("${OPENSSL_CMAKE_ARGS[@]}")
 run_logged "Configuring XMRig" "$LOG_DIR/xmrig-configure-$ABI-$WITH_TLS.log" cmake "${XMRIG_CMAKE_ARGS[@]}"
@@ -411,6 +435,16 @@ fi
 
 run_logged "Verifying Android miner" "$LOG_DIR/xmrig-elf.log" \
   bash "$BUILDER_DIR/verify-android-binary.sh" "$BUILT_XMRIG" "$NDK_DIR" "$ABI" "$WITH_TLS"
+
+if [[ "$RELEASE_BUILD" == "1" ]]; then
+  LLVM_BIN="$(ls -d "$NDK_DIR"/toolchains/llvm/prebuilt/*/bin | head -n 1)"
+  STRIPPED_XMRIG="$BUILD_DIR/xmrig-$ABI/libxmrig.so"
+  cp "$BUILT_XMRIG" "$STRIPPED_XMRIG"
+  "$LLVM_BIN/llvm-strip" --strip-unneeded "$STRIPPED_XMRIG"
+  run_logged "Verifying stripped Android miner" "$LOG_DIR/xmrig-elf-stripped.log" \
+    bash "$BUILDER_DIR/verify-android-binary.sh" "$STRIPPED_XMRIG" "$NDK_DIR" "$ABI" "$WITH_TLS" --stripped
+  BUILT_XMRIG="$STRIPPED_XMRIG"
+fi
 
 log_success "Built Android miner"
 log_detail "Output" "$BUILT_XMRIG"

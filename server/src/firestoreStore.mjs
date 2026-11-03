@@ -12,10 +12,9 @@ const HISTORY_CACHE_SECONDS = 6 * 3600;
 const LEADERBOARD_CACHE_SECONDS = 60;
 
 /**
- * Storage on Firestore, for hosts without a persistent disk (Vercel). Same contract as the SQLite
- * store. Firestore has no GROUP BY, so figures are tallied in memory from the recently active
- * installations and cached in `meta/*` documents; this keeps reads within the free daily quota.
- * Only server credentials may touch these collections (see firestore.rules).
+ * Firestore storage for hosts without a persistent disk (Vercel); same contract as the SQLite store.
+ * Firestore has no GROUP BY, so figures are tallied in memory and cached in `meta/*` to stay within
+ * the free read quota. Only server credentials may touch these collections (see firestore.rules).
  */
 export const createFirestoreStore = ({ firestore, statsCacheSeconds = 3600 }) => {
   const installs = firestore.collection('installs');
@@ -60,6 +59,23 @@ export const createFirestoreStore = ({ firestore, statsCacheSeconds = 3600 }) =>
         const snap = await tx.get(ref);
         const existing = snap.exists ? snap.data() : null;
         if (existing && nowSeconds - existing.lastSeen < minIntervalSeconds) {
+          // Never counted again, but a change to what the user shares applies immediately: turning
+          // activity on must start crediting heartbeats, and turning anything off must erase it.
+          const sharesActivity = checkin.miningSeconds !== null;
+          const wasSharing = existing.verifiedSeconds != null;
+          tx.set(
+            ref,
+            {
+              country: checkin.country,
+              appVersion: checkin.appVersion,
+              androidMajor: checkin.androidMajor,
+              variant: checkin.variant,
+              verifiedSeconds: sharesActivity ? (existing.verifiedSeconds ?? 0) : null,
+              acceptedShares:
+                sharesActivity && wasSharing ? existing.acceptedShares : checkin.acceptedShares
+            },
+            { merge: true }
+          );
           return { counted: false };
         }
         const today = dayOf(nowSeconds);
@@ -102,10 +118,7 @@ export const createFirestoreStore = ({ firestore, statsCacheSeconds = 3600 }) =>
       });
     },
 
-    /**
-     * Credits mining time for one heartbeat. Only installations that already checked in and share
-     * their activity count, so a heartbeat can never create a record or revive an opt-out.
-     */
+    /** Credits one heartbeat. Never creates a record or revives an opt-out. */
     async heartbeat(id, nowSeconds) {
       const ref = installs.doc(id);
       return firestore.runTransaction(async (tx) => {

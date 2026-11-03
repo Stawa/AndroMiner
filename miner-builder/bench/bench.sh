@@ -3,6 +3,10 @@
 #
 # usage: bench.sh LABEL LOCAL_BINARY THREADS [WINDOW_S=120] [WARM_S=40] [-- extra xmrig args]
 #
+# Works for arm64-v8a and armeabi-v7a binaries (the device ABI must match the binary). The 32-bit app
+# runs RandomX in light mode, so benchmark armeabi-v7a with `-- --randomx-mode=light`; init_ms is then
+# 0 because there is no dataset to build. Each row records device ABI, SoC and binary hash.
+#
 # Requirements: adb on PATH (or ADB=...), one device in `adb devices`, device unplugged
 # (so the battery counter measures discharge). Appends one CSV row to results/results.csv.
 #
@@ -56,9 +60,12 @@ INIT_MS=""
 for _ in $(seq 1 120); do
   INIT_MS="$("$ADB" shell "sed -n 's/.*dataset ready (\([0-9]*\) ms).*/\1/p' $REMOTE/$NAME.log" | tr -d '\r')"
   [[ -n "$INIT_MS" ]] && break
+  # Light mode never builds a dataset; the CPU backend's READY line marks the threads as running.
+  if [[ "${EXTRA[*]:-}" == *--randomx-mode=light* ]] &&
+     "$ADB" shell "grep -q 'READY threads' $REMOTE/$NAME.log" 2>/dev/null; then INIT_MS=0; break; fi
   sleep 3
 done
-[[ -n "$INIT_MS" ]] || { echo "dataset never became ready" >&2; "$ADB" shell "killall $NAME" || true; exit 1; }
+[[ -n "$INIT_MS" ]] || { echo "miner never became ready" >&2; "$ADB" shell "killall $NAME" || true; exit 1; }
 
 PID="$("$ADB" shell "pidof $NAME" | tr -d '\r' | awk '{print $1}')"
 sleep "$WARM"
@@ -98,5 +105,8 @@ DQ=$(( C1 - C2 ))
 read -r JOULES WATTS HPJ <<<"$(awk -v dq="$DQ" -v v1="$V1" -v v2="$V2" -v w="$ELAPSED" -v h="$H_MEAN" '
   BEGIN {v=(v1+v2)/2/1000; e=dq*3.6e-3*v; p=e/w; printf "%.0f %.2f %.2f", e, p, (p>0 ? h/p : 0)}')"
 
-[[ -f "$OUT/results.csv" ]] || echo "label,threads,window_s,init_ms,hashrate_avg,hashrate_sd,hashrate_median,cv_pct,quality,rss_mb,cpu_cores,charge_uah,joules_coarse,watts_coarse,h_per_w_coarse,temp_start,temp_end,batt_level_start,batt_level_end,per_core_util_pct,freqs_mid_khz" >"$OUT/results.csv"
-echo "$LABEL,$THREADS,$ELAPSED,$INIT_MS,$H_MEAN,$H_SD,$H_MED,$H_CV,$H_QUALITY,$(( RSS_KB / 1024 )),$CORES,$DQ,$JOULES,$WATTS,$HPJ,$T1,$T2,$L0,$L2,$UTIL,$FREQS" | tee -a "$OUT/results.csv"
+DEV_ABI="$("$ADB" shell getprop ro.product.cpu.abi | tr -d '\r')"
+DEV_SOC="$("$ADB" shell 'getprop ro.soc.model; getprop ro.board.platform' | tr -d '\r' | paste -sd/ | tr ',' ' ')"
+BIN_SHA="$(sha256sum "$BIN" | cut -c1-12)"
+[[ -f "$OUT/results.csv" ]] || echo "label,threads,window_s,init_ms,hashrate_avg,hashrate_sd,hashrate_median,cv_pct,quality,rss_mb,cpu_cores,charge_uah,joules_coarse,watts_coarse,h_per_w_coarse,temp_start,temp_end,batt_level_start,batt_level_end,per_core_util_pct,freqs_mid_khz,device_abi,soc,binary_sha12" >"$OUT/results.csv"
+echo "$LABEL,$THREADS,$ELAPSED,$INIT_MS,$H_MEAN,$H_SD,$H_MED,$H_CV,$H_QUALITY,$(( RSS_KB / 1024 )),$CORES,$DQ,$JOULES,$WATTS,$HPJ,$T1,$T2,$L0,$L2,$UTIL,$FREQS,$DEV_ABI,$DEV_SOC,$BIN_SHA" | tee -a "$OUT/results.csv"

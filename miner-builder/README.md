@@ -1,7 +1,9 @@
 # Android miner builder
 
 Builds the CPU-only XMRig executable used by AndroMiner. The default target is
-`arm64-v8a`, Android API 29, with TLS enabled.
+`arm64-v8a`, Android API 29, with TLS enabled. `ABI=armeabi-v7a` builds the 32-bit ARM
+miner (API 24, NEON required, stripped release flags); see
+[docs/native-arm-miners.md](../docs/native-arm-miners.md) for what is and is not verified.
 
 The app can download prebuilt miners from the
 [`miner-builder` branch](https://github.com/Stawa/AndroMiner/tree/miner-builder).
@@ -39,13 +41,15 @@ Linux or WSL, using a Linux SDK/NDK:
 bash miner-builder/build-xmrig-android.sh
 ```
 
-| Option                                         | PowerShell         | Bash environment  |
-| ---------------------------------------------- | ------------------ | ----------------- |
-| Disable TLS                                    | `-NoTls`           | `WITH_TLS=OFF`    |
-| Build without copying into the Android project | `-SkipInstall`     | `SKIP_INSTALL=1`  |
-| Show compiler output                           | `-ShowBuildOutput` | `QUIET=OFF`       |
-| Limit parallel build jobs                      | `-Jobs 4`          | `JOBS=4`          |
-| Select an XMRig tag or branch                  | `-XmrigRef <ref>`  | `XMRIG_REF=<ref>` |
+| Option                                         | PowerShell               | Bash environment  |
+| ---------------------------------------------- | ------------------------ | ----------------- |
+| Disable TLS                                    | `-NoTls`                 | `WITH_TLS=OFF`    |
+| Build without copying into the Android project | `-SkipInstall`           | `SKIP_INSTALL=1`  |
+| Show compiler output                           | `-ShowBuildOutput`       | `QUIET=OFF`       |
+| Limit parallel build jobs                      | `-Jobs 4`                | `JOBS=4`          |
+| Select an XMRig tag or branch                  | `-XmrigRef <ref>`        | `XMRIG_REF=<ref>` |
+| Target ABI (`arm64-v8a` or `armeabi-v7a`)      | `-Abi` (no v7a defaults) | `ABI=<abi>`       |
+| Strip and drop debug info/build ids            | Bash builder only        | `RELEASE_BUILD=1` |
 
 The Bash builder pins XMRig to `v6.26.0` (the PowerShell builder defaults to `master`);
 libuv defaults to `v1.48.0`, and OpenSSL to
@@ -63,6 +67,9 @@ By default, the builder copies the executable to:
 ```text
 android/app/src/main/jniLibs/arm64-v8a/libxmrig.so
 ```
+
+For `ABI=armeabi-v7a` the target is `jniLibs/armeabi-v7a/libxmrig.so`. A bundled APK
+contains whichever ABI directories exist; Android installs the one matching the device.
 
 AndroMiner runs this file as a separate process. The `.so` name lets Android
 package it as a native library. TLS and no-TLS builds write to the same destination,

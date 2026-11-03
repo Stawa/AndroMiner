@@ -145,14 +145,11 @@ final class NativeMiningRuntime {
     private static final String[] BINARY_CANDIDATES = {
         "miners/libxmrig.so", "miners/xmrig", "miners/xmrig-aarch64", "libxmrig.so"
     };
-    private static final String TLS_MINER_DOWNLOAD_URL =
+    private static final String MINER_DOWNLOAD_URL_FORMAT =
             "https://raw.githubusercontent.com/Stawa/AndroMiner/"
                     + MinerIntegrity.REVISION
-                    + "/lib/arm64-v8a/tls/libxmrig.so";
-    private static final String NOTLS_MINER_DOWNLOAD_URL =
-            "https://raw.githubusercontent.com/Stawa/AndroMiner/"
-                    + MinerIntegrity.REVISION
-                    + "/lib/arm64-v8a/notls/libxmrig.so";
+                    + "/lib/%s/%s/libxmrig.so";
+    private static final String DEVICE_ABI = MinerAbi.select(Build.SUPPORTED_ABIS);
     private static final String API_HOST = "127.0.0.1";
     private static final int DOWNLOAD_CONNECT_TIMEOUT_MS = 15000;
     private static final int DOWNLOAD_READ_TIMEOUT_MS = 45000;
@@ -344,6 +341,14 @@ final class NativeMiningRuntime {
     public void download(PluginCall call) {
         String variant = normalizeMinerVariant(call.getString("variant", "tls"));
 
+        if (!MinerIntegrity.hasApprovedDownload(DEVICE_ABI)) {
+            call.reject(
+                    "No approved miner download exists for this device ("
+                            + (DEVICE_ABI == null ? Build.SUPPORTED_ABIS[0] : DEVICE_ABI)
+                            + "). Use an APK that bundles the miner.");
+            return;
+        }
+
         if (isRunning()) {
             call.reject("Stop the active miner before downloading a replacement binary.");
             return;
@@ -436,6 +441,11 @@ final class NativeMiningRuntime {
             verifyInstalledBinary(binary);
         } catch (IOException failure) {
             call.reject(failure.getMessage());
+            return;
+        }
+        if (MinerAbi.ARM32.equals(DEVICE_ABI) && !MinerAbi.cpuInfoHasNeon(readCpuInfo())) {
+            call.reject(
+                    "This 32-bit ARM CPU does not report NEON, which the armeabi-v7a miner requires.");
             return;
         }
         JSObject config = call.getObject("config", new JSObject());
@@ -849,6 +859,10 @@ final class NativeMiningRuntime {
         command.add("--cpu-priority=" + mapCpuPriority(priority));
         command.add("--donate-level=" + donateLevel);
         command.add("--donate-over-proxy=" + donateOverProxy);
+        if (MinerAbi.ARM32.equals(DEVICE_ABI)) {
+            /* 32-bit: the 2 GB RandomX dataset does not fit reliably in the address space. */
+            command.add("--randomx-mode=light");
+        }
         command.add("--no-color");
         command.add("--print-time=2");
         command.add("--api-id=androminer-android");
@@ -1272,7 +1286,7 @@ final class NativeMiningRuntime {
         miner.put("variantLabel", formatInstalledMinerVariant(variant));
         miner.put("source", source);
         miner.put("sourceLabel", formatMinerSource(source));
-        miner.put("abi", "arm64-v8a");
+        miner.put("abi", DEVICE_ABI == null ? "unsupported" : DEVICE_ABI);
         miner.put("fileName", installed ? binary.getName() : "libxmrig.so");
         miner.put("path", installed ? binary.getAbsolutePath() : "");
         miner.put("sizeBytes", installed ? binary.length() : null);
@@ -2057,6 +2071,17 @@ final class NativeMiningRuntime {
         return versionOutput.toLowerCase(Locale.US).contains("openssl") ? "tls" : "notls";
     }
 
+    private String readCpuInfo() {
+        StringBuilder text = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(new FileReader("/proc/cpuinfo"))) {
+            String line;
+            while ((line = reader.readLine()) != null) text.append(line).append('\n');
+        } catch (IOException unreadable) {
+            return "";
+        }
+        return text.toString();
+    }
+
     private String readMinerVersionOutput(File binary) {
         return readMinerCommandOutput(binary, "--version", 2);
     }
@@ -2197,7 +2222,7 @@ final class NativeMiningRuntime {
     }
 
     private String getMinerDownloadUrl(String variant) {
-        return "notls".equals(variant) ? NOTLS_MINER_DOWNLOAD_URL : TLS_MINER_DOWNLOAD_URL;
+        return String.format(MINER_DOWNLOAD_URL_FORMAT, DEVICE_ABI, variant);
     }
 
     private void verifyInstalledBinary(File binary) throws IOException {
@@ -2206,7 +2231,7 @@ final class NativeMiningRuntime {
             if (!"tls".equals(variant) && !"notls".equals(variant))
                 throw new IOException(
                         "Installed miner has no verified variant. Download the approved miner again.");
-            MinerIntegrity.verify(binary, MinerIntegrity.expectedHash(variant));
+            MinerIntegrity.verify(binary, MinerIntegrity.expectedHash(DEVICE_ABI, variant));
         }
         verifiedPath = binary.getAbsolutePath();
         verifiedLength = binary.length();
@@ -2273,7 +2298,7 @@ final class NativeMiningRuntime {
 
             if (totalBytes > 0 && downloadedBytes != totalBytes)
                 throw new IOException("Miner download was interrupted.");
-            MinerIntegrity.verify(temp, MinerIntegrity.expectedHash(variant));
+            MinerIntegrity.verify(temp, MinerIntegrity.expectedHash(DEVICE_ABI, variant));
             // POSIX rename replaces the old file atomically, without a delete-before-install gap.
             try {
                 android.system.Os.rename(temp.getAbsolutePath(), target.getAbsolutePath());

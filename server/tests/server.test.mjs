@@ -436,6 +436,39 @@ test('a heartbeat cannot create a record or bring back an opted-out one', async 
   assert.deepEqual((await (await s.call('/v1/leaderboard')).json()).entries, []);
 });
 
+test('turning activity sharing on within the interval makes heartbeats count', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const row = () =>
+    s.app.store.db
+      .prepare(
+        'SELECT verified_seconds AS v, accepted_shares AS a, country AS c FROM installs WHERE id = ?'
+      )
+      .get(hex(9));
+  await s.post(baseCheckin(9, { miningSeconds: null, acceptedShares: null }));
+  assert.equal(row().v, null);
+
+  s.clock.t += MINUTE;
+  const reply = await (
+    await s.post(baseCheckin(9, { miningSeconds: 5, acceptedShares: 2 }))
+  ).json();
+  assert.equal(reply.counted, false, 'still not a new active-day/month count');
+  assert.deepEqual({ ...row() }, { v: 0, a: 2, c: 'ID' });
+
+  await s.beat(9);
+  s.clock.t += MINUTE;
+  assert.equal((await s.beat(9)).counted, true);
+  assert.equal(row().v, 60);
+
+  s.clock.t += MINUTE;
+  await s.post(baseCheckin(9, { country: null, miningSeconds: null, acceptedShares: null }));
+  assert.deepEqual(
+    { ...row() },
+    { v: null, a: null, c: null },
+    'turning sharing off applies at once'
+  );
+});
+
 test('heartbeats accept only the installation ID', async (t) => {
   const s = await start();
   t.after(s.stop);

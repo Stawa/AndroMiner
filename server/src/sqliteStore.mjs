@@ -66,10 +66,7 @@ const migrateNullableInstallColumns = (db) => {
   }
 };
 
-/**
- * Databases created before the leaderboard gain its nullable columns in place. `mining_seconds` is
- * the retired self-reported total; `verified_seconds` and `last_beat_ts` come from heartbeats.
- */
+/** Adds the leaderboard columns to older databases. `mining_seconds` is retired; the other two come from heartbeats. */
 const migrateActivityColumns = (db) => {
   const columns = db.prepare('PRAGMA table_info(installs)').all();
   for (const name of ['mining_seconds', 'accepted_shares', 'verified_seconds', 'last_beat_ts']) {
@@ -94,11 +91,7 @@ export const createSqliteStore = (path) => {
   return {
     db,
 
-    /**
-     * Records one check-in. `counted` is false when the installation already checked in within the
-     * minimum interval, so repeated requests never inflate any figure. `busy` is true when a new
-     * installation would exceed the hourly cap.
-     */
+    /** `counted` is false for a repeat inside the minimum interval. `busy` means the hourly cap on new installations is reached. */
     async checkin(checkin, nowSeconds, { minIntervalSeconds, maxNewPerHour }) {
       db.exec('BEGIN IMMEDIATE');
       try {
@@ -106,6 +99,24 @@ export const createSqliteStore = (path) => {
           .prepare('SELECT last_seen_ts FROM installs WHERE id = ?')
           .get(checkin.installationId);
         if (existing && nowSeconds - existing.last_seen_ts < minIntervalSeconds) {
+          // Never counted again, but a change to what the user shares applies immediately: turning
+          // activity on must start crediting heartbeats, and turning anything off must erase it.
+          const sharesActivity = checkin.miningSeconds !== null;
+          db.prepare(
+            `UPDATE installs SET country = ?, app_version = ?, android_major = ?, variant = ?,
+               verified_seconds = CASE WHEN ? THEN COALESCE(verified_seconds, 0) ELSE NULL END,
+               accepted_shares = CASE WHEN ? AND verified_seconds IS NOT NULL THEN accepted_shares ELSE ? END
+             WHERE id = ?`
+          ).run(
+            checkin.country,
+            checkin.appVersion,
+            checkin.androidMajor,
+            checkin.variant,
+            sharesActivity ? 1 : 0,
+            sharesActivity ? 1 : 0,
+            checkin.acceptedShares,
+            checkin.installationId
+          );
           db.exec('COMMIT');
           return { counted: false };
         }
@@ -173,10 +184,7 @@ export const createSqliteStore = (path) => {
       }
     },
 
-    /**
-     * Credits mining time for one heartbeat. Only installations that already checked in and share
-     * their activity count, so a heartbeat can never create a record or revive an opt-out.
-     */
+    /** Credits one heartbeat. Never creates a record or revives an opt-out. */
     async heartbeat(id, nowSeconds) {
       const row = db
         .prepare(

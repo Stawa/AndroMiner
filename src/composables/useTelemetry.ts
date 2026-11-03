@@ -81,9 +81,9 @@ const run = async (task: () => Promise<void>): Promise<void> => {
 };
 
 /**
- * Anonymous usage statistics, on by default and switchable off at any time. Everything here is fire-and-forget and swallows its own errors, so
- * it can never delay startup or interact with mining. The statistics state lives under its own
- * storage key and is deliberately excluded from configuration export.
+ * Anonymous usage statistics: on by default, switchable off. Everything is fire-and-forget and
+ * swallows its own errors, so it never delays startup or touches mining. State is stored under its
+ * own key and excluded from configuration export.
  */
 export const useTelemetry = () => ({
   state: readonly(state),
@@ -134,6 +134,10 @@ export const useTelemetry = () => ({
   setShare(field: ShareField, shared: boolean): void {
     client.setShare(field, shared);
     sync();
+    void client.checkinIfDue().then((result) => {
+      lastResult.value = result;
+      sync();
+    });
   },
 
   recordSessions(sessions: FinishedSession[]): void {
@@ -143,10 +147,7 @@ export const useTelemetry = () => ({
     sync();
   },
 
-  /**
-   * Starts or stops the heartbeat that keeps the leaderboard's mining time live. Safe to call
-   * before start(): beats are skipped until the saved state (and so the ID) has loaded.
-   */
+  /** Starts or stops the mining heartbeat. Safe before start(): beats wait until the ID has loaded. */
   setMining(active: boolean): void {
     window.clearInterval(heartbeatTimer);
     heartbeatTimer = undefined;
