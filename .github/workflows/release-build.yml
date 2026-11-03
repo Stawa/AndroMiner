@@ -211,6 +211,26 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$apk"
           cp "$apk" "release-assets/androminer-notls-${{ github.event.release.tag_name }}.apk"
 
+      - name: Build ARMv7 TLS miner
+        if: github.event_name == 'release'
+        env:
+          ABI: armeabi-v7a
+          ANDROID_PLATFORM: android-24
+          WITH_TLS: 'ON'
+          QUIET: 'ON'
+        run: bash miner-builder/build-xmrig-android.sh
+
+      - name: Build ARMv7 bundled APK
+        if: github.event_name == 'release'
+        run: |
+          (cd android && ./gradlew clean assembleRelease -PbundleMiner=true -PminerVariant=tls -PminerAbi=armeabi-v7a -PversionNameOverride="$ANDROID_VERSION_NAME" -PversionCodeOverride="$ANDROID_VERSION_CODE" --stacktrace)
+          apk="$(find android/app/build/outputs/apk/release -type f -name "*.apk" ! -name "*unsigned*.apk" | head -n 1)"
+          test -n "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$apk"
+          unzip -l "$apk" | grep -q 'lib/armeabi-v7a/libxmrig.so'
+          ! unzip -l "$apk" | grep -q 'lib/arm64-v8a/'
+          cp "$apk" "release-assets/androminer-armv7a-${{ github.event.release.tag_name }}.apk"
+
       - name: Collect release outputs
         if: github.event_name == 'release'
         run: |
@@ -218,6 +238,7 @@ jobs:
           test -f "release-assets/androminer-download-${{ github.event.release.tag_name }}.apk"
           test -f "release-assets/androminer-tls-${{ github.event.release.tag_name }}.apk"
           test -f "release-assets/androminer-notls-${{ github.event.release.tag_name }}.apk"
+          test -f "release-assets/androminer-armv7a-${{ github.event.release.tag_name }}.apk"
           test -f "release-assets/androminer-web-${{ github.event.release.tag_name }}.zip"
 
       - name: Write downloadable checksums
