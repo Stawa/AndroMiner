@@ -1,10 +1,21 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import DotMeter from '../components/DotMeter.vue';
+import ProtectionPanel from '../components/ProtectionPanel.vue';
 import { formatNumber, t } from '../i18n';
-import type { DeviceTelemetry, MiningConfig } from '../types/mining';
+import type {
+  DeviceTelemetry,
+  MiningConfig,
+  ProtectionEvent,
+  ProtectionSnapshot
+} from '../types/mining';
 
-const props = defineProps<{ device: DeviceTelemetry; config: MiningConfig }>();
+const props = defineProps<{
+  device: DeviceTelemetry;
+  config: MiningConfig;
+  protection: ProtectionSnapshot | null;
+  protectionEvents: ProtectionEvent[];
+}>();
 
 const missing = (): string => t('device.notReported');
 const present = (value: string | number | null | undefined, suffix = ''): string =>
@@ -78,6 +89,13 @@ const system = computed(() => [
         {{ $t('device.sensor') }} · {{ device.thermalSensorName }}
       </p>
     </section>
+
+    <ProtectionPanel
+      :device="device"
+      :protection="protection"
+      :events="protectionEvents"
+      :temperature-limit-c="config.thermalThreshold"
+    />
 
     <section class="dv-group" :aria-label="$t('device.power')">
       <h2 class="eyebrow">{{ $t('metric.battery') }}</h2>

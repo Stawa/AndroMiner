@@ -1,4 +1,8 @@
-import type { MiningSessionHistoryItem } from '../types/mining';
+import type {
+  MiningSessionHistoryItem,
+  ProtectionEvent,
+  ProtectionSnapshot
+} from '../types/mining';
 
 export interface NativeSessionRecord {
   id: string;
@@ -17,6 +21,9 @@ export interface NativeSessionRecord {
   hashingSeconds: number;
   endReason?: string;
   reasonCode?: string;
+  protection?: ProtectionSnapshot;
+  protectionEvents?: ProtectionEvent[];
+  protectionSeconds?: { caution: number; throttled: number };
 }
 
 export function mergeNativeHistory(
@@ -88,7 +95,26 @@ export function exportHistory(rows: MiningSessionHistoryItem[], includePool = fa
       rejectedShares: row.rejectedShares,
       averageHashrate: row.averageHashrate,
       sampleCount: row.sampleCount ?? null,
-      sampleWindowSeconds: row.sampleWindowSeconds ?? null
+      sampleWindowSeconds: row.sampleWindowSeconds ?? null,
+      protection: {
+        cautionSeconds: row.protectionSeconds?.caution ?? 0,
+        throttledSeconds: row.protectionSeconds?.throttled ?? 0,
+        events: (row.protectionEvents ?? []).map((event) => ({
+          type: event.type,
+          at: new Date(event.at).toISOString(),
+          trigger: event.trigger,
+          sensor: event.sensor,
+          value: event.value,
+          unit: event.unit,
+          threshold: event.threshold,
+          previousState: event.previousState,
+          newState: event.newState,
+          previousIntensity: event.previousIntensity,
+          newIntensity: event.newIntensity,
+          action: event.action,
+          recovery: event.recovery
+        }))
+      }
     }))
   };
 }

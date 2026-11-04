@@ -30,6 +30,11 @@ interface NativeDeviceStatus {
   temperatureSource?: DeviceTelemetry['thermalSource'];
   temperatureSensor?: string;
   thermalStatus: DeviceTelemetry['thermalStatus'];
+  sampledAt?: number;
+  batteryTemperatureC?: number | null;
+  androidThermalStatus?: DeviceTelemetry['androidThermalStatus'];
+  cpuTemperatureC?: number | null;
+  cpuTemperatureSensor?: string | null;
 }
 
 interface DeviceStatusPlugin {
@@ -102,7 +107,12 @@ export const useDeviceTelemetry = () => {
     temperatureC: null,
     thermalStatus: 'unknown',
     thermalSource: 'unavailable',
-    thermalSensorName: null
+    thermalSensorName: null,
+    batteryTemperatureC: null,
+    androidThermalStatus: 'unavailable',
+    cpuTemperatureC: null,
+    cpuTemperatureSensor: null,
+    sampledAt: null
   });
 
   const refresh = async (): Promise<void> => {
@@ -170,6 +180,18 @@ export const useDeviceTelemetry = () => {
       device.thermalStatus = nativeStatus?.thermalStatus || 'unavailable';
       device.thermalSource = nativeStatus?.temperatureSource || 'unavailable';
       device.thermalSensorName = nativeStatus?.temperatureSensor || null;
+      device.batteryTemperatureC =
+        typeof nativeStatus?.batteryTemperatureC === 'number'
+          ? Number(nativeStatus.batteryTemperatureC.toFixed(1))
+          : null;
+      device.androidThermalStatus = nativeStatus?.androidThermalStatus || 'unavailable';
+      device.cpuTemperatureC =
+        typeof nativeStatus?.cpuTemperatureC === 'number'
+          ? Number(nativeStatus.cpuTemperatureC.toFixed(1))
+          : null;
+      device.cpuTemperatureSensor = nativeStatus?.cpuTemperatureSensor || null;
+      device.sampledAt =
+        typeof nativeStatus?.sampledAt === 'number' ? nativeStatus.sampledAt : null;
     } catch {
       device.batteryLevel = null;
       device.cpuThreads = getHardwareConcurrency();
@@ -187,6 +209,11 @@ export const useDeviceTelemetry = () => {
       device.thermalStatus = 'unavailable';
       device.thermalSource = 'unavailable';
       device.thermalSensorName = null;
+      device.batteryTemperatureC = null;
+      device.androidThermalStatus = 'unavailable';
+      device.cpuTemperatureC = null;
+      device.cpuTemperatureSensor = null;
+      device.sampledAt = null;
     } finally {
       refreshing = false;
     }

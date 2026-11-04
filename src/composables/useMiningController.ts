@@ -8,6 +8,9 @@ import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
 import { cryptocurrencies, getCryptocurrencyById } from '../data/miningCatalog';
 import type {
+  CrashRestart,
+  ProtectionEvent,
+  ProtectionSnapshot,
   HistoryPoint,
   MiningApiTelemetry,
   MiningConfig,
@@ -53,6 +56,7 @@ interface NativeMinerStatus {
   stats?: NativeMinerStats;
   logs?: string[];
   apiTelemetry?: MiningApiTelemetry;
+  crashRestart?: CrashRestart;
 }
 
 interface NativeMinerDownloadProgress {
@@ -71,9 +75,15 @@ interface NativeMinerPlugin {
   ) => Promise<PluginListenerHandle>;
   pause: () => Promise<NativeMinerStatus>;
   stop: () => Promise<NativeMinerStatus>;
+  restartAfterCrash: () => Promise<NativeMinerStatus>;
+  cancelRestartAfterCrash: () => Promise<NativeMinerStatus>;
   status: () => Promise<NativeMinerStatus>;
   deleteHistory: (options: { id?: string }) => Promise<NativeMinerStatus>;
-  updateSafety: (options: { batteryFloor: number; chargingOnly: boolean }) => Promise<void>;
+  updateSafety: (options: {
+    batteryFloor: number;
+    chargingOnly: boolean;
+    autoRestartOnCrash: boolean;
+  }) => Promise<void>;
 }
 
 export type MinerBinaryVariant = 'tls' | 'notls';
@@ -276,6 +286,12 @@ export const useMiningController = () => {
   const config = reactive<MiningConfig>(cloneConfig(initialConfig));
   const stats = reactive<MiningStats>({ ...initialStats });
   const apiTelemetry = ref<MiningApiTelemetry>(defaultApiTelemetry());
+  /** Live native protection reading; null unless a session is running. */
+  const protection = ref<ProtectionSnapshot | null>(null);
+  /** Protection events of the current or most recent native session. */
+  const protectionEvents = ref<ProtectionEvent[]>([]);
+  /** Set while the native layer is waiting to restart a crashed miner. */
+  const crashRestart = ref<CrashRestart | null>(null);
   const hashrateHistory = ref<HistoryPoint[]>(createEmptyHistory());
   const temperatureHistory = ref<HistoryPoint[]>(createEmptyHistory());
   const sessionHistory = ref<MiningSessionHistoryItem[]>(readSessionHistory());
@@ -378,6 +394,9 @@ export const useMiningController = () => {
       (status.available ? t('msg.backendReady') : t('msg.downloadRequired'));
 
     connected.value = status.running && status.connected === true;
+    crashRestart.value = status.crashRestart ?? null;
+    protection.value = status.running ? (status.session?.protection ?? null) : null;
+    protectionEvents.value = status.session?.protectionEvents ?? [];
     minerLogs.value = Array.isArray(status.logs) ? status.logs : minerLogs.value;
     apiTelemetry.value = status.apiTelemetry || {
       ...apiTelemetry.value,
@@ -752,6 +771,25 @@ export const useMiningController = () => {
     persistSessionHistory();
   };
 
+  const restartAfterCrash = async (): Promise<void> => {
+    if (!Capacitor.isNativePlatform()) return;
+    try {
+      setBackendStatus(await NativeMiner.restartAfterCrash());
+    } catch (error) {
+      setBackendError(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const cancelRestartAfterCrash = async (): Promise<void> => {
+    if (!Capacitor.isNativePlatform()) return;
+    crashRestart.value = null;
+    try {
+      setBackendStatus(await NativeMiner.cancelRestartAfterCrash());
+    } catch {
+      /* The next status poll reports the real state. */
+    }
+  };
+
   const stopMining = async (): Promise<void> => {
     if (actionBusy) {
       if (state.value === 'starting') {
@@ -931,7 +969,8 @@ export const useMiningController = () => {
     if (!Capacitor.isNativePlatform()) return;
     await NativeMiner.updateSafety({
       batteryFloor: settings.batterySafety.stopBelowPercent,
-      chargingOnly: settings.batterySafety.mineOnlyCharging
+      chargingOnly: settings.batterySafety.mineOnlyCharging,
+      autoRestartOnCrash: settings.autoRestartOnCrash
     });
   };
 
@@ -998,6 +1037,11 @@ export const useMiningController = () => {
     downloadProgress,
     minerLogs,
     apiTelemetry,
+    protection,
+    protectionEvents,
+    crashRestart,
+    restartAfterCrash,
+    cancelRestartAfterCrash,
     config,
     stats,
     hashrateHistory,

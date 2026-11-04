@@ -144,6 +144,8 @@ export interface MiningSessionHistoryItem {
   requestedThreads?: number;
   effectiveThreads?: number | null;
   minerVersion?: string | null;
+  protectionEvents?: ProtectionEvent[];
+  protectionSeconds?: { caution: number; throttled: number };
 }
 
 export interface MiningTelemetry {
@@ -198,4 +200,92 @@ export interface DeviceTelemetry {
   thermalStatus: 'unknown' | 'cool' | 'normal' | 'warm' | 'hot' | 'unavailable';
   thermalSource: 'native' | 'battery' | 'estimated' | 'unavailable';
   thermalSensorName: string | null;
+  /** BatteryManager reading; separate from the best-guess `temperatureC` above. */
+  batteryTemperatureC: number | null;
+  androidThermalStatus: AndroidThermalStatus;
+  /** Only set when a thermal zone explicitly named for the CPU is readable. */
+  cpuTemperatureC: number | null;
+  cpuTemperatureSensor: string | null;
+  sampledAt: number | null;
+}
+
+export type AndroidThermalStatus =
+  | 'none'
+  | 'light'
+  | 'moderate'
+  | 'severe'
+  | 'critical'
+  | 'emergency'
+  | 'shutdown'
+  | 'unsupported'
+  | 'unavailable';
+
+/** Native crash-recovery state: a restart is pending, failed, or given up after repeated crashes. */
+export interface CrashRestart {
+  pending: boolean;
+  exitCode: number | null;
+  attempt: number;
+  maxAttempts: number;
+  /** Epoch ms when the miner restarts by itself unless the user cancels. */
+  deadlineAt?: number;
+  exhausted?: boolean;
+  failed?: boolean;
+  message?: string;
+}
+
+export type ProtectionState = 'normal' | 'caution' | 'throttled' | 'critical';
+
+export type ProtectionTrigger =
+  | 'battery_temperature'
+  | 'thermal_status'
+  | 'battery_level'
+  | 'cpu_temperature'
+  | 'sensor_stale'
+  | 'sensor_unavailable'
+  | 'power_disconnected'
+  | 'screen_off'
+  | 'none';
+
+export interface ProtectionEvent {
+  type:
+    | 'intensity_reduced'
+    | 'intensity_restored'
+    | 'mining_stopped'
+    | 'monitoring_unavailable'
+    | 'monitoring_restored';
+  at: number;
+  trigger: ProtectionTrigger;
+  sensor: string | null;
+  value: number | null;
+  unit: string | null;
+  threshold: number | null;
+  previousState: ProtectionState;
+  newState: ProtectionState;
+  previousIntensity: number;
+  newIntensity: number;
+  action: 'reduce' | 'restore' | 'stop' | 'hold';
+  recovery: 'pending' | 'recovering' | 'recovered' | 'manual_restart_required';
+}
+
+export interface ProtectionSnapshot {
+  at: number;
+  state: ProtectionState;
+  trigger: ProtectionTrigger;
+  configuredIntensity: number;
+  targetIntensity: number;
+  measuredIntensity: number;
+  recoveryRemainingMs: number;
+  batteryTemperatureC: number | null;
+  batteryPercent: number | null;
+  charging: boolean;
+  androidThermalLevel: number | null;
+  androidThermalSupported: boolean;
+  cpuTemperatureC: number | null;
+  ageMs: Record<
+    'batteryTemperature' | 'batteryPercent' | 'androidThermalStatus' | 'cpuTemperature',
+    number
+  >;
+  staleAfterMs: number;
+  temperatureLimitC: number;
+  batteryFloorPercent: number;
 }

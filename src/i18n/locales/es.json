@@ -205,6 +205,15 @@
     "stop": "Detener",
     "stopping": "Deteniendo"
   },
+  "crash": {
+    "title": "El minero se detuvo de forma inesperada",
+    "pending": "Se reiniciará en {seconds} s si no cancelas. Reinicio {attempt} de {max}.",
+    "restartNow": "Reiniciar ahora",
+    "cancel": "No reiniciar",
+    "dismiss": "Descartar",
+    "exhausted": "El minero falló {max} veces en poco tiempo, así que no se reiniciará automáticamente. Revisa el registro y vuelve a iniciarlo cuando quieras.",
+    "failed": "Falló el reinicio automático: {message}"
+  },
   "dashboard": {
     "addWallet": "Añadir una cartera",
     "allRuns": "Todas las sesiones",
@@ -253,6 +262,76 @@
     "checkRequired": "Obligatorio",
     "checkConnected": "Conectado",
     "limitValue": "límite {value}"
+  },
+  "protection": {
+    "title": "Protección del dispositivo",
+    "state": {
+      "normal": "Normal",
+      "caution": "Precaución",
+      "throttled": "Limitado",
+      "critical": "Detenido",
+      "idle": "Sin minar"
+    },
+    "summary": {
+      "normal": "Minando a la intensidad configurada.",
+      "caution": "Intensidad reducida al {percent}% para mantener el teléfono más fresco.",
+      "throttled": "Intensidad reducida al {percent}% porque el teléfono está caliente o la batería está baja.",
+      "critical": "La minería se detuvo para proteger el teléfono.",
+      "idle": "La protección actúa mientras minas. Estas lecturas son en vivo."
+    },
+    "configured": "Intensidad configurada",
+    "current": "Intensidad actual",
+    "measured": "Intensidad medida",
+    "recovery": "Se restaurará un paso en {seconds} s si las lecturas siguen seguras.",
+    "readings": "Lecturas",
+    "batteryTemp": "Temperatura de la batería",
+    "androidThermal": "Estado térmico de Android",
+    "cpuTemp": "Temperatura de la CPU",
+    "battery": "Batería",
+    "sensor": "Sensor",
+    "cpuUnavailable": "Este teléfono no lo expone",
+    "headroom": "Margen hasta tu límite",
+    "headroomValue": "{value} °C por debajo de {limit} °C",
+    "headroomOff": "El límite de temperatura está desactivado",
+    "age": "Actualizado hace {seconds} s",
+    "stale": "Sin actualización desde hace {seconds} s",
+    "never": "Nunca se ha informado",
+    "thermal": {
+      "none": "Ninguno",
+      "light": "Leve",
+      "moderate": "Moderado",
+      "severe": "Grave",
+      "critical": "Crítico",
+      "emergency": "Emergencia",
+      "shutdown": "Apagado",
+      "unsupported": "No compatible (requiere Android 10)",
+      "unavailable": "No disponible"
+    },
+    "events": "Eventos de protección",
+    "noEvents": "No hubo eventos de protección en esta sesión.",
+    "durations": "Precaución durante {caution}, limitado durante {throttled}.",
+    "event": {
+      "reduced": {
+        "battery_temperature": "Intensidad reducida del {from}% al {to}% porque la temperatura de la batería llegó a {value} (umbral {threshold}).",
+        "thermal_status": "Intensidad reducida del {from}% al {to}% porque Android subió su estado térmico al nivel {value}.",
+        "battery_level": "Intensidad reducida del {from}% al {to}% porque la batería bajó a {value} (umbral {threshold}).",
+        "cpu_temperature": "Intensidad reducida del {from}% al {to}% porque la temperatura de la CPU llegó a {value} (umbral {threshold})."
+      },
+      "restoredPartial": "Intensidad restaurada del {from}% al {to}% mientras se recupera: {reading}.",
+      "restoredFull": "La minería volvió a la intensidad completa tras recuperarse: {reading}.",
+      "stopped": {
+        "battery_temperature": "La minería se detuvo porque la temperatura de la batería llegó a {value}, el límite que configuraste ({threshold}).",
+        "thermal_status": "La minería se detuvo porque Android informó una limitación térmica grave.",
+        "battery_level": "La minería se detuvo porque la batería llegó a {value}, tu nivel de parada ({threshold}).",
+        "cpu_temperature": "La minería se detuvo porque la temperatura de la CPU llegó a {value} (límite {threshold}).",
+        "power_disconnected": "La minería se detuvo porque se desconectó la alimentación (modo solo con carga).",
+        "screen_off": "La minería se detuvo porque se apagó la pantalla.",
+        "sensor": "La minería se detuvo porque un sensor necesario dejó de informar."
+      },
+      "monitoringLost": "Supervisión de protección no disponible: {reading} dejó de informar. Intensidad mantenida en {to}%.",
+      "monitoringRestored": "La supervisión de protección se ha restablecido: el sensor vuelve a informar.",
+      "detail": "Lectura {value} · límite {threshold} · intensidad {from}% → {to}%"
+    }
   },
   "device": {
     "androidCpu": "Android CPU",
@@ -842,7 +921,10 @@
     "throttle": "Limitar en segundo plano",
     "unsupported": "Automatización no disponible",
     "unsupportedCopy": "Estas preferencias guardadas no tienen implementación en tiempo de ejecución. No se pueden activar en esta compilación.",
-    "yourData": "Tus datos"
+    "yourData": "Tus datos",
+    "reliability": "Fiabilidad",
+    "crashRestart": "Reiniciar tras un fallo",
+    "crashRestartHint": "Si el minero se detiene de forma inesperada, pregunta primero y se reinicia solo a los 30 segundos si no respondes"
   },
   "start": {
     "allowed": "Permitido con notificación",

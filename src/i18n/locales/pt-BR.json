@@ -205,6 +205,15 @@
     "stop": "Parar",
     "stopping": "Parando"
   },
+  "crash": {
+    "title": "O minerador parou inesperadamente",
+    "pending": "Reiniciando em {seconds} s, a menos que você cancele. Reinício {attempt} de {max}.",
+    "restartNow": "Reiniciar agora",
+    "cancel": "Não reiniciar",
+    "dismiss": "Dispensar",
+    "exhausted": "O minerador travou {max} vezes em pouco tempo, então não será reiniciado automaticamente. Confira o registro e inicie de novo quando quiser.",
+    "failed": "Falha no reinício automático: {message}"
+  },
   "dashboard": {
     "addWallet": "Adicionar uma carteira",
     "allRuns": "Todas as sessões",
@@ -253,6 +262,76 @@
     "checkRequired": "Obrigatório",
     "checkConnected": "Conectado",
     "limitValue": "limite {value}"
+  },
+  "protection": {
+    "title": "Proteção do dispositivo",
+    "state": {
+      "normal": "Normal",
+      "caution": "Atenção",
+      "throttled": "Limitado",
+      "critical": "Parado",
+      "idle": "Sem minerar"
+    },
+    "summary": {
+      "normal": "Minerando na intensidade configurada.",
+      "caution": "Intensidade reduzida para {percent}% para manter o celular mais frio.",
+      "throttled": "Intensidade reduzida para {percent}% porque o celular está quente ou a bateria está baixa.",
+      "critical": "A mineração foi parada para proteger o celular.",
+      "idle": "A proteção atua enquanto você minera. Estas leituras são em tempo real."
+    },
+    "configured": "Intensidade configurada",
+    "current": "Intensidade atual",
+    "measured": "Intensidade medida",
+    "recovery": "Restaurando um passo em {seconds} s se as leituras continuarem seguras.",
+    "readings": "Leituras",
+    "batteryTemp": "Temperatura da bateria",
+    "androidThermal": "Status térmico do Android",
+    "cpuTemp": "Temperatura da CPU",
+    "battery": "Bateria",
+    "sensor": "Sensor",
+    "cpuUnavailable": "Não exposto por este celular",
+    "headroom": "Margem até o seu limite",
+    "headroomValue": "{value} °C abaixo de {limit} °C",
+    "headroomOff": "O limite de temperatura está desativado",
+    "age": "Atualizado há {seconds} s",
+    "stale": "Sem atualização há {seconds} s",
+    "never": "Nunca informado",
+    "thermal": {
+      "none": "Nenhum",
+      "light": "Leve",
+      "moderate": "Moderado",
+      "severe": "Grave",
+      "critical": "Crítico",
+      "emergency": "Emergência",
+      "shutdown": "Desligamento",
+      "unsupported": "Não compatível (requer Android 10)",
+      "unavailable": "Indisponível"
+    },
+    "events": "Eventos de proteção",
+    "noEvents": "Nenhum evento de proteção nesta sessão.",
+    "durations": "Atenção por {caution}, limitado por {throttled}.",
+    "event": {
+      "reduced": {
+        "battery_temperature": "Intensidade reduzida de {from}% para {to}% porque a temperatura da bateria chegou a {value} (etapa em {threshold}).",
+        "thermal_status": "Intensidade reduzida de {from}% para {to}% porque o Android elevou o status térmico para o nível {value}.",
+        "battery_level": "Intensidade reduzida de {from}% para {to}% porque a bateria caiu para {value} (etapa em {threshold}).",
+        "cpu_temperature": "Intensidade reduzida de {from}% para {to}% porque a temperatura da CPU chegou a {value} (etapa em {threshold})."
+      },
+      "restoredPartial": "Intensidade restaurada de {from}% para {to}% enquanto se recupera: {reading}.",
+      "restoredFull": "A mineração voltou à intensidade total após se recuperar: {reading}.",
+      "stopped": {
+        "battery_temperature": "A mineração parou porque a temperatura da bateria chegou a {value}, o limite que você definiu ({threshold}).",
+        "thermal_status": "A mineração parou porque o Android informou limitação térmica severa.",
+        "battery_level": "A mineração parou porque a bateria chegou a {value}, seu nível de parada ({threshold}).",
+        "cpu_temperature": "A mineração parou porque a temperatura da CPU chegou a {value} (limite {threshold}).",
+        "power_disconnected": "A mineração parou porque a energia foi desconectada (modo somente carregando).",
+        "screen_off": "A mineração parou porque a tela foi desligada.",
+        "sensor": "A mineração parou porque um sensor necessário deixou de informar."
+      },
+      "monitoringLost": "Monitoramento de proteção indisponível: {reading} deixou de informar. Intensidade mantida em {to}%.",
+      "monitoringRestored": "O monitoramento de proteção voltou: o sensor está informando de novo.",
+      "detail": "Leitura {value} · limite {threshold} · intensidade {from}% → {to}%"
+    }
   },
   "device": {
     "androidCpu": "CPU Android",
@@ -842,7 +921,10 @@
     "throttle": "Limitar em segundo plano",
     "unsupported": "Automação indisponível",
     "unsupportedCopy": "Estas preferências salvas não têm implementação em tempo de execução. Elas não podem ser ativadas nesta versão.",
-    "yourData": "Seus dados"
+    "yourData": "Seus dados",
+    "reliability": "Confiabilidade",
+    "crashRestart": "Reiniciar após uma falha",
+    "crashRestartHint": "Se o minerador parar inesperadamente, pergunta primeiro e reinicia sozinho após 30 segundos se você não responder"
   },
   "start": {
     "allowed": "Permitido com notificação",

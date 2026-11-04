@@ -12,6 +12,7 @@ import { useDialogFocus } from '../composables/useDialogFocus';
 import { useSettingsStore } from '../stores/settings';
 import { formatDate, formatDuration, formatNumber, t } from '../i18n';
 import type {
+  ProtectionSnapshot,
   DeviceTelemetry,
   HistoryPoint,
   MiningApiTelemetry,
@@ -32,6 +33,7 @@ interface MiningSessionViewProps {
   logs: string[];
   apiTelemetry: MiningApiTelemetry;
   hashrateHistory: HistoryPoint[];
+  protection: ProtectionSnapshot | null;
 }
 
 interface ImmersiveModePlugin {
@@ -339,6 +341,26 @@ const diagnosticGroups = computed(() => [
       },
       { label: t('diag.batteryFlow'), value: powerDrawLabel.value }
     ]
+  },
+  {
+    title: t('protection.title'),
+    items: props.protection
+      ? [
+          { label: t('protection.title'), value: t(`protection.state.${props.protection.state}`) },
+          {
+            label: t('protection.configured'),
+            value: `${Math.round(props.protection.configuredIntensity)}%`
+          },
+          {
+            label: t('protection.current'),
+            value: `${Math.round(props.protection.targetIntensity)}%`
+          },
+          {
+            label: t('protection.measured'),
+            value: `${Math.round(props.protection.measuredIntensity)}%`
+          }
+        ]
+      : [{ label: t('protection.title'), value: t('common.unavailable') }]
   }
 ]);
 

@@ -205,6 +205,15 @@
     "stop": "Berhenti",
     "stopping": "Menghentikan"
   },
+  "crash": {
+    "title": "Penambang berhenti tiba-tiba",
+    "pending": "Dimulai ulang dalam {seconds} dtk kecuali Anda batalkan. Percobaan {attempt} dari {max}.",
+    "restartNow": "Mulai ulang sekarang",
+    "cancel": "Jangan mulai ulang",
+    "dismiss": "Tutup",
+    "exhausted": "Penambang mogok {max} kali dalam waktu singkat, jadi tidak akan dimulai ulang otomatis. Periksa log, lalu mulai lagi saat siap.",
+    "failed": "Mulai ulang otomatis gagal: {message}"
+  },
   "dashboard": {
     "addWallet": "Tambahkan dompet",
     "allRuns": "Semua sesi",
@@ -253,6 +262,76 @@
     "checkRequired": "Wajib",
     "checkConnected": "Terhubung",
     "limitValue": "batas {value}"
+  },
+  "protection": {
+    "title": "Perlindungan perangkat",
+    "state": {
+      "normal": "Normal",
+      "caution": "Waspada",
+      "throttled": "Dibatasi",
+      "critical": "Dihentikan",
+      "idle": "Tidak menambang"
+    },
+    "summary": {
+      "normal": "Menambang dengan intensitas yang diatur.",
+      "caution": "Intensitas diturunkan ke {percent}% agar ponsel lebih dingin.",
+      "throttled": "Intensitas dipangkas ke {percent}% karena ponsel panas atau baterai rendah.",
+      "critical": "Penambangan dihentikan untuk melindungi ponsel.",
+      "idle": "Perlindungan aktif saat menambang. Pembacaan ini langsung."
+    },
+    "configured": "Intensitas yang diatur",
+    "current": "Intensitas saat ini",
+    "measured": "Intensitas terukur",
+    "recovery": "Memulihkan satu langkah dalam {seconds} dtk jika pembacaan tetap aman.",
+    "readings": "Pembacaan",
+    "batteryTemp": "Suhu baterai",
+    "androidThermal": "Status termal Android",
+    "cpuTemp": "Suhu CPU",
+    "battery": "Baterai",
+    "sensor": "Sensor",
+    "cpuUnavailable": "Tidak disediakan oleh ponsel ini",
+    "headroom": "Selisih ke batas Anda",
+    "headroomValue": "{value} °C di bawah {limit} °C",
+    "headroomOff": "Batas suhu nonaktif",
+    "age": "Diperbarui {seconds} dtk lalu",
+    "stale": "Tidak ada pembaruan selama {seconds} dtk",
+    "never": "Belum pernah melapor",
+    "thermal": {
+      "none": "Tidak ada",
+      "light": "Ringan",
+      "moderate": "Sedang",
+      "severe": "Berat",
+      "critical": "Kritis",
+      "emergency": "Darurat",
+      "shutdown": "Mati",
+      "unsupported": "Tidak didukung (perlu Android 10)",
+      "unavailable": "Tidak tersedia"
+    },
+    "events": "Peristiwa perlindungan",
+    "noEvents": "Tidak ada peristiwa perlindungan pada sesi ini.",
+    "durations": "Waspada selama {caution}, dibatasi selama {throttled}.",
+    "event": {
+      "reduced": {
+        "battery_temperature": "Intensitas diturunkan dari {from}% ke {to}% karena suhu baterai mencapai {value} (langkah di {threshold}).",
+        "thermal_status": "Intensitas diturunkan dari {from}% ke {to}% karena Android menaikkan status termal ke level {value}.",
+        "battery_level": "Intensitas diturunkan dari {from}% ke {to}% karena baterai turun ke {value} (langkah di {threshold}).",
+        "cpu_temperature": "Intensitas diturunkan dari {from}% ke {to}% karena suhu CPU mencapai {value} (langkah di {threshold})."
+      },
+      "restoredPartial": "Intensitas dipulihkan dari {from}% ke {to}% seiring {reading} pulih.",
+      "restoredFull": "Penambangan kembali ke intensitas penuh setelah {reading} pulih.",
+      "stopped": {
+        "battery_temperature": "Penambangan dihentikan karena suhu baterai mencapai {value}, batas yang Anda atur ({threshold}).",
+        "thermal_status": "Penambangan dihentikan karena Android melaporkan pembatasan termal berat.",
+        "battery_level": "Penambangan dihentikan karena baterai mencapai {value}, level henti Anda ({threshold}).",
+        "cpu_temperature": "Penambangan dihentikan karena suhu CPU mencapai {value} (batas {threshold}).",
+        "power_disconnected": "Penambangan dihentikan karena daya diputus (mode hanya saat mengisi daya).",
+        "screen_off": "Penambangan dihentikan karena layar mati.",
+        "sensor": "Penambangan dihentikan karena sensor yang diperlukan berhenti melapor."
+      },
+      "monitoringLost": "Pemantauan perlindungan tidak tersedia: {reading} berhenti melapor. Intensitas dipertahankan di {to}%.",
+      "monitoringRestored": "Pemantauan perlindungan kembali: sensor melapor lagi.",
+      "detail": "Pembacaan {value} · batas {threshold} · intensitas {from}% → {to}%"
+    }
   },
   "device": {
     "androidCpu": "CPU Android",
@@ -842,7 +921,10 @@
     "throttle": "Batasi di latar belakang",
     "unsupported": "Otomatisasi tidak tersedia",
     "unsupportedCopy": "Preferensi tersimpan ini belum memiliki implementasi saat berjalan dan tidak dapat diaktifkan pada versi ini.",
-    "yourData": "Data Anda"
+    "yourData": "Data Anda",
+    "reliability": "Keandalan",
+    "crashRestart": "Mulai ulang setelah mogok",
+    "crashRestartHint": "Jika penambang berhenti tiba-tiba, tanya dulu dan mulai ulang sendiri setelah 30 detik jika tidak dijawab"
   },
   "start": {
     "allowed": "Diizinkan dengan notifikasi",

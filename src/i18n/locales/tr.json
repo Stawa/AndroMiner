@@ -205,6 +205,15 @@
     "stop": "Durdur",
     "stopping": "Durduruluyor"
   },
+  "crash": {
+    "title": "Madenci beklenmedik şekilde durdu",
+    "pending": "İptal etmezseniz {seconds} sn içinde yeniden başlayacak. Yeniden başlatma {attempt}/{max}.",
+    "restartNow": "Şimdi yeniden başlat",
+    "cancel": "Yeniden başlatma",
+    "dismiss": "Kapat",
+    "exhausted": "Madenci kısa sürede {max} kez çöktü, bu yüzden otomatik olarak yeniden başlamayacak. Günlüğü kontrol edin, hazır olunca tekrar başlatın.",
+    "failed": "Otomatik yeniden başlatma başarısız: {message}"
+  },
   "dashboard": {
     "addWallet": "Cüzdan ekle",
     "allRuns": "Tüm çalıştırmalar",
@@ -253,6 +262,76 @@
     "checkRequired": "Gerekli",
     "checkConnected": "Bağlı",
     "limitValue": "sınır {value}"
+  },
+  "protection": {
+    "title": "Cihaz koruması",
+    "state": {
+      "normal": "Normal",
+      "caution": "Dikkat",
+      "throttled": "Kısıtlandı",
+      "critical": "Durduruldu",
+      "idle": "Madencilik yok"
+    },
+    "summary": {
+      "normal": "Ayarlanan yoğunlukta madencilik yapılıyor.",
+      "caution": "Telefonu serin tutmak için yoğunluk %{percent} seviyesine düşürüldü.",
+      "throttled": "Telefon sıcak veya pil düşük olduğu için yoğunluk %{percent} seviyesine indirildi.",
+      "critical": "Telefonu korumak için madencilik durduruldu.",
+      "idle": "Koruma madencilik sırasında çalışır. Bu değerler canlıdır."
+    },
+    "configured": "Ayarlanan yoğunluk",
+    "current": "Mevcut yoğunluk",
+    "measured": "Ölçülen yoğunluk",
+    "recovery": "Değerler güvenli kalırsa {seconds} sn içinde bir adım geri alınacak.",
+    "readings": "Ölçümler",
+    "batteryTemp": "Pil sıcaklığı",
+    "androidThermal": "Android termal durumu",
+    "cpuTemp": "CPU sıcaklığı",
+    "battery": "Pil",
+    "sensor": "Sensör",
+    "cpuUnavailable": "Bu telefon tarafından sunulmuyor",
+    "headroom": "Sınırınıza kalan pay",
+    "headroomValue": "{limit} °C sınırının {value} °C altında",
+    "headroomOff": "Sıcaklık sınırı kapalı",
+    "age": "{seconds} sn önce güncellendi",
+    "stale": "{seconds} sn'dir güncelleme yok",
+    "never": "Hiç bildirilmedi",
+    "thermal": {
+      "none": "Yok",
+      "light": "Hafif",
+      "moderate": "Orta",
+      "severe": "Ciddi",
+      "critical": "Kritik",
+      "emergency": "Acil durum",
+      "shutdown": "Kapanma",
+      "unsupported": "Desteklenmiyor (Android 10 gerekir)",
+      "unavailable": "Kullanılamıyor"
+    },
+    "events": "Koruma olayları",
+    "noEvents": "Bu oturumda koruma olayı yok.",
+    "durations": "{caution} dikkat, {throttled} kısıtlı.",
+    "event": {
+      "reduced": {
+        "battery_temperature": "Pil sıcaklığı {value} değerine ulaştığı için yoğunluk %{from} seviyesinden %{to} seviyesine düşürüldü (adım: {threshold}).",
+        "thermal_status": "Android termal durumu {value}. seviyeye çıkardığı için yoğunluk %{from} seviyesinden %{to} seviyesine düşürüldü.",
+        "battery_level": "Pil {value} seviyesine düştüğü için yoğunluk %{from} seviyesinden %{to} seviyesine düşürüldü (adım: {threshold}).",
+        "cpu_temperature": "CPU sıcaklığı {value} değerine ulaştığı için yoğunluk %{from} seviyesinden %{to} seviyesine düşürüldü (adım: {threshold})."
+      },
+      "restoredPartial": "{reading} toparlandıkça yoğunluk %{from} seviyesinden %{to} seviyesine geri getirildi.",
+      "restoredFull": "{reading} toparlandıktan sonra madencilik tam yoğunluğa döndü.",
+      "stopped": {
+        "battery_temperature": "Pil sıcaklığı belirlediğiniz sınır olan {threshold} değerine, yani {value} seviyesine ulaştığı için madencilik durduruldu.",
+        "thermal_status": "Android ciddi termal kısıtlama bildirdiği için madencilik durduruldu.",
+        "battery_level": "Pil, durdurma seviyeniz olan {threshold} değerine, yani {value} seviyesine ulaştığı için madencilik durduruldu.",
+        "cpu_temperature": "CPU sıcaklığı {value} değerine ulaştığı için madencilik durduruldu (sınır {threshold}).",
+        "power_disconnected": "Güç bağlantısı kesildiği için madencilik durduruldu (yalnızca şarjda mod).",
+        "screen_off": "Ekran kapandığı için madencilik durduruldu.",
+        "sensor": "Gerekli bir sensör bildirim yapmayı bıraktığı için madencilik durduruldu."
+      },
+      "monitoringLost": "Koruma izleme kullanılamıyor: {reading} bildirim yapmayı bıraktı. Yoğunluk %{to} seviyesinde tutuluyor.",
+      "monitoringRestored": "Koruma izleme geri geldi: sensör yeniden bildirim yapıyor.",
+      "detail": "Ölçüm {value} · sınır {threshold} · yoğunluk %{from} → %{to}"
+    }
   },
   "device": {
     "androidCpu": "Android CPU",
@@ -842,7 +921,10 @@
     "throttle": "Arka planda kısıtla",
     "unsupported": "Kullanılamayan otomasyon",
     "unsupportedCopy": "Bu kayıtlı tercihlerin çalışma zamanı uygulaması yok. Bu derlemede etkinleştirilemezler.",
-    "yourData": "Verileriniz"
+    "yourData": "Verileriniz",
+    "reliability": "Güvenilirlik",
+    "crashRestart": "Çökmeden sonra yeniden başlat",
+    "crashRestartHint": "Madenci beklenmedik şekilde durursa önce sorar, yanıt vermezseniz 30 saniye sonra kendiliğinden yeniden başlatır"
   },
   "start": {
     "allowed": "Bildirimle izin verilir",

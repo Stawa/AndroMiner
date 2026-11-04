@@ -205,6 +205,15 @@
     "stop": "停止",
     "stopping": "正在停止"
   },
+  "crash": {
+    "title": "挖矿程序意外停止",
+    "pending": "若不取消，将在 {seconds} 秒后重新启动。第 {attempt} 次，共 {max} 次。",
+    "restartNow": "立即重启",
+    "cancel": "不重启",
+    "dismiss": "关闭",
+    "exhausted": "挖矿程序在短时间内崩溃了 {max} 次，因此不会自动重启。请查看日志，准备好后再手动启动。",
+    "failed": "自动重启失败：{message}"
+  },
   "dashboard": {
     "addWallet": "添加钱包",
     "allRuns": "全部运行",
@@ -253,6 +262,76 @@
     "checkRequired": "必填",
     "checkConnected": "已连接",
     "limitValue": "上限 {value}"
+  },
+  "protection": {
+    "title": "设备保护",
+    "state": {
+      "normal": "正常",
+      "caution": "注意",
+      "throttled": "已限速",
+      "critical": "已停止",
+      "idle": "未在挖矿"
+    },
+    "summary": {
+      "normal": "正按设定强度挖矿。",
+      "caution": "为让手机保持凉爽，强度已降至 {percent}%。",
+      "throttled": "手机发热或电量偏低，强度已降至 {percent}%。",
+      "critical": "为保护手机，已停止挖矿。",
+      "idle": "挖矿期间保护持续运行。这些读数为实时数据。"
+    },
+    "configured": "设定强度",
+    "current": "当前强度",
+    "measured": "实测强度",
+    "recovery": "若读数保持安全，将在 {seconds} 秒后恢复一档。",
+    "readings": "读数",
+    "batteryTemp": "电池温度",
+    "androidThermal": "Android 热状态",
+    "cpuTemp": "CPU 温度",
+    "battery": "电池",
+    "sensor": "传感器",
+    "cpuUnavailable": "此手机未提供",
+    "headroom": "距你的上限还有",
+    "headroomValue": "比 {limit} °C 低 {value} °C",
+    "headroomOff": "温度上限已关闭",
+    "age": "{seconds} 秒前更新",
+    "stale": "已 {seconds} 秒无更新",
+    "never": "从未上报",
+    "thermal": {
+      "none": "无",
+      "light": "轻度",
+      "moderate": "中度",
+      "severe": "严重",
+      "critical": "危急",
+      "emergency": "紧急",
+      "shutdown": "关机",
+      "unsupported": "不支持（需要 Android 10）",
+      "unavailable": "不可用"
+    },
+    "events": "保护事件",
+    "noEvents": "本次会话没有保护事件。",
+    "durations": "注意状态 {caution}，限速 {throttled}。",
+    "event": {
+      "reduced": {
+        "battery_temperature": "电池温度达到 {value}（档位 {threshold}），强度已从 {from}% 降至 {to}%。",
+        "thermal_status": "Android 将热状态升至 {value} 级，强度已从 {from}% 降至 {to}%。",
+        "battery_level": "电量降至 {value}（档位 {threshold}），强度已从 {from}% 降至 {to}%。",
+        "cpu_temperature": "CPU 温度达到 {value}（档位 {threshold}），强度已从 {from}% 降至 {to}%。"
+      },
+      "restoredPartial": "{reading}正在恢复，强度已从 {from}% 恢复到 {to}%。",
+      "restoredFull": "{reading}已恢复，挖矿回到完整强度。",
+      "stopped": {
+        "battery_temperature": "电池温度达到 {value}，已触及你设定的上限（{threshold}），挖矿已停止。",
+        "thermal_status": "Android 报告严重热降频，挖矿已停止。",
+        "battery_level": "电量降至 {value}，已触及你设定的停止电量（{threshold}），挖矿已停止。",
+        "cpu_temperature": "CPU 温度达到 {value}（上限 {threshold}），挖矿已停止。",
+        "power_disconnected": "电源已断开（仅充电时挖矿模式），挖矿已停止。",
+        "screen_off": "屏幕已关闭，挖矿已停止。",
+        "sensor": "必需的传感器停止上报，挖矿已停止。"
+      },
+      "monitoringLost": "保护监测不可用：{reading}已停止上报。强度保持在 {to}%。",
+      "monitoringRestored": "保护监测已恢复：传感器重新上报。",
+      "detail": "读数 {value} · 上限 {threshold} · 强度 {from}% → {to}%"
+    }
   },
   "device": {
     "androidCpu": "Android CPU",
@@ -842,7 +921,10 @@
     "throttle": "后台时降速",
     "unsupported": "暂不可用的自动化功能",
     "unsupportedCopy": "这些已保存的偏好设置尚未实现，当前版本无法启用。",
-    "yourData": "你的数据"
+    "yourData": "你的数据",
+    "reliability": "可靠性",
+    "crashRestart": "崩溃后重启",
+    "crashRestartHint": "挖矿程序意外停止时，先询问；若 30 秒内没有回应，则自动重启"
   },
   "start": {
     "allowed": "允许（显示通知）",

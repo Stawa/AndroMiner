@@ -166,6 +166,17 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocumentPoin
       </section>
       <section class="surface">
         <div class="section-heading">
+          <h3>{{ $t('settings.reliability') }}</h3>
+          <MaterialIcon name="restart_alt" :size="20" />
+        </div>
+        <ToggleRow
+          v-model="settings.autoRestartOnCrash"
+          :label="$t('settings.crashRestart')"
+          :supporting-text="$t('settings.crashRestartHint')"
+        />
+      </section>
+      <section class="surface">
+        <div class="section-heading">
           <h3>{{ $t('settings.yourData') }}</h3>
           <MaterialIcon name="folder_open" :size="20" />
         </div>

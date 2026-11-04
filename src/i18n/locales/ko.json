@@ -205,6 +205,15 @@
     "stop": "중지",
     "stopping": "중지 중"
   },
+  "crash": {
+    "title": "채굴기가 예기치 않게 중지되었습니다",
+    "pending": "취소하지 않으면 {seconds}초 후 다시 시작합니다. 재시작 {attempt}/{max}.",
+    "restartNow": "지금 다시 시작",
+    "cancel": "다시 시작 안 함",
+    "dismiss": "닫기",
+    "exhausted": "채굴기가 짧은 시간에 {max}번 충돌해 자동으로 다시 시작하지 않습니다. 로그를 확인한 뒤 준비되면 다시 시작하세요.",
+    "failed": "자동 재시작 실패: {message}"
+  },
   "dashboard": {
     "addWallet": "지갑 추가",
     "allRuns": "모든 실행",
@@ -253,6 +262,76 @@
     "checkRequired": "필수",
     "checkConnected": "연결됨",
     "limitValue": "한도 {value}"
+  },
+  "protection": {
+    "title": "기기 보호",
+    "state": {
+      "normal": "정상",
+      "caution": "주의",
+      "throttled": "제한됨",
+      "critical": "중지됨",
+      "idle": "채굴 안 함"
+    },
+    "summary": {
+      "normal": "설정한 강도로 채굴 중입니다.",
+      "caution": "휴대폰을 시원하게 유지하려고 강도를 {percent}%로 낮췄습니다.",
+      "throttled": "휴대폰이 뜨겁거나 배터리가 부족해 강도를 {percent}%로 줄였습니다.",
+      "critical": "휴대폰을 보호하기 위해 채굴을 중지했습니다.",
+      "idle": "채굴하는 동안 보호가 작동합니다. 이 값은 실시간입니다."
+    },
+    "configured": "설정 강도",
+    "current": "현재 강도",
+    "measured": "측정된 강도",
+    "recovery": "측정값이 안전하면 {seconds}초 뒤 한 단계 복원합니다.",
+    "readings": "측정값",
+    "batteryTemp": "배터리 온도",
+    "androidThermal": "Android 열 상태",
+    "cpuTemp": "CPU 온도",
+    "battery": "배터리",
+    "sensor": "센서",
+    "cpuUnavailable": "이 휴대폰에서 제공하지 않음",
+    "headroom": "설정한 한계까지 여유",
+    "headroomValue": "{limit} °C보다 {value} °C 낮음",
+    "headroomOff": "온도 제한이 꺼져 있음",
+    "age": "{seconds}초 전 업데이트",
+    "stale": "{seconds}초째 업데이트 없음",
+    "never": "보고된 적 없음",
+    "thermal": {
+      "none": "없음",
+      "light": "가벼움",
+      "moderate": "보통",
+      "severe": "심각",
+      "critical": "위험",
+      "emergency": "긴급",
+      "shutdown": "종료",
+      "unsupported": "지원 안 됨(Android 10 필요)",
+      "unavailable": "사용할 수 없음"
+    },
+    "events": "보호 이벤트",
+    "noEvents": "이번 세션에는 보호 이벤트가 없습니다.",
+    "durations": "주의 {caution}, 제한 {throttled}.",
+    "event": {
+      "reduced": {
+        "battery_temperature": "배터리 온도가 {value}에 도달해(단계 {threshold}) 강도를 {from}%에서 {to}%로 낮췄습니다.",
+        "thermal_status": "Android가 열 상태를 {value}단계로 올려 강도를 {from}%에서 {to}%로 낮췄습니다.",
+        "battery_level": "배터리가 {value}까지 떨어져(단계 {threshold}) 강도를 {from}%에서 {to}%로 낮췄습니다.",
+        "cpu_temperature": "CPU 온도가 {value}에 도달해(단계 {threshold}) 강도를 {from}%에서 {to}%로 낮췄습니다."
+      },
+      "restoredPartial": "{reading}이(가) 회복되어 강도를 {from}%에서 {to}%로 복원했습니다.",
+      "restoredFull": "{reading}이(가) 회복되어 채굴이 전체 강도로 돌아왔습니다.",
+      "stopped": {
+        "battery_temperature": "배터리 온도가 설정한 한계({threshold})인 {value}에 도달해 채굴을 중지했습니다.",
+        "thermal_status": "Android가 심각한 열 제한을 알려 채굴을 중지했습니다.",
+        "battery_level": "배터리가 설정한 중지 수준({threshold})인 {value}에 도달해 채굴을 중지했습니다.",
+        "cpu_temperature": "CPU 온도가 {value}에 도달해(한계 {threshold}) 채굴을 중지했습니다.",
+        "power_disconnected": "전원 연결이 끊겨(충전 중에만 채굴 모드) 채굴을 중지했습니다.",
+        "screen_off": "화면이 꺼져 채굴을 중지했습니다.",
+        "sensor": "필요한 센서가 보고를 멈춰 채굴을 중지했습니다."
+      },
+      "monitoringLost": "보호 모니터링을 사용할 수 없음: {reading}이(가) 보고를 멈췄습니다. 강도를 {to}%로 유지합니다.",
+      "monitoringRestored": "보호 모니터링이 복구되었습니다. 센서가 다시 보고합니다.",
+      "detail": "측정값 {value} · 한계 {threshold} · 강도 {from}% → {to}%"
+    }
   },
   "device": {
     "androidCpu": "Android CPU",
@@ -842,7 +921,10 @@
     "throttle": "백그라운드에서 제한",
     "unsupported": "사용할 수 없는 자동화",
     "unsupportedCopy": "이 저장된 환경설정은 런타임 구현이 없습니다. 이 빌드에서는 사용 설정할 수 없습니다.",
-    "yourData": "내 데이터"
+    "yourData": "내 데이터",
+    "reliability": "안정성",
+    "crashRestart": "충돌 후 다시 시작",
+    "crashRestartHint": "채굴기가 예기치 않게 멈추면 먼저 물어보고, 답이 없으면 30초 뒤 자동으로 다시 시작합니다"
   },
   "start": {
     "allowed": "알림과 함께 허용됨",

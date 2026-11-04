@@ -72,6 +72,49 @@
   font-weight: 400;
   color: rgb(var(--color-app-muted));
 }
+/* Device protection. */
+.dv-protection .dv-hero-top {
+  align-items: baseline;
+}
+.dv-summary {
+  font-size: 0.875rem;
+  color: rgb(var(--color-app-on));
+}
+.dv-protection h3.eyebrow {
+  margin-top: 8px;
+}
+.dv-age {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 400;
+  color: rgb(var(--color-app-muted));
+}
+.pe-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pe-list li {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid rgb(var(--color-app-line));
+  font-size: 0.8125rem;
+}
+.pe-list time {
+  color: rgb(var(--color-app-muted));
+  font-variant-numeric: tabular-nums;
+}
+.pe-list p {
+  overflow-wrap: anywhere;
+}
+.pe-detail {
+  margin-top: 2px;
+  font-size: 0.75rem;
+  color: rgb(var(--color-app-muted));
+}
 @media (min-width: 48rem) {
   .device-page {
     grid-template-columns: repeat(2, minmax(0, 1fr));

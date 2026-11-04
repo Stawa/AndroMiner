@@ -21,6 +21,7 @@ import MaterialIcon from './components/MaterialIcon.vue';
 import MinerDownloadWarningSheet from './components/MinerDownloadWarningSheet.vue';
 import PhoneMiningRiskView from './components/PhoneMiningRiskView.vue';
 import StartMiningWarningSheet from './components/StartMiningWarningSheet.vue';
+import CrashRestartPrompt from './components/CrashRestartPrompt.vue';
 import { useDeviceTelemetry } from './composables/useDeviceTelemetry';
 import { useGitHubReleaseUpdater } from './composables/useGitHubReleaseUpdater';
 import { useMiningController, type MinerBinaryVariant } from './composables/useMiningController';
@@ -505,7 +506,11 @@ watch(
 );
 
 watch(
-  () => [settings.batterySafety.stopBelowPercent, settings.batterySafety.mineOnlyCharging],
+  () => [
+    settings.batterySafety.stopBelowPercent,
+    settings.batterySafety.mineOnlyCharging,
+    settings.autoRestartOnCrash
+  ],
   () => {
     void miner.syncSafetySettings().catch(() => {
       dataFeedback.value = t('app.protectionSyncFailed');
@@ -597,10 +602,18 @@ onBeforeUnmount(() => {
         :logs="miner.minerLogs.value"
         :api-telemetry="miner.apiTelemetry.value"
         :hashrate-history="miner.hashrateHistory.value"
+        :protection="miner.protection.value"
         @pause="miner.pauseMining"
         @stop="miner.stopMining"
         @profile="miner.updateProfile"
         @resume="requestResumeMining"
+      />
+
+      <CrashRestartPrompt
+        v-if="miner.crashRestart.value"
+        :crash="miner.crashRestart.value"
+        @restart="miner.restartAfterCrash"
+        @cancel="miner.cancelRestartAfterCrash"
       />
 
       <div v-if="dataFeedback" class="app-page phone-page data-feedback" role="status">
@@ -654,7 +667,13 @@ onBeforeUnmount(() => {
             @delete-session="miner.deleteSessionHistoryItem"
             @clear-sessions="miner.clearSessionHistory"
           />
-          <DeviceView v-else-if="activeTab === 'device'" :device="device" :config="miner.config" />
+          <DeviceView
+            v-else-if="activeTab === 'device'"
+            :device="device"
+            :config="miner.config"
+            :protection="miner.protection.value"
+            :protection-events="miner.protectionEvents.value"
+          />
           <SettingsView
             v-else-if="activeTab === 'settings'"
             @export-config="exportConfig"

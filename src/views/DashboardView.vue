@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProtectionEventList from '../components/ProtectionEventList.vue';
 import { useDialogFocus } from '../composables/useDialogFocus';
 import { computed, ref } from 'vue';
 import MaterialIcon from '../components/MaterialIcon.vue';
@@ -423,6 +424,18 @@ useDialogFocus(
             <dd>{{ selected.acceptedShares }} / {{ selected.rejectedShares }}</dd>
           </div>
         </dl>
+        <section v-if="selected.protectionEvents?.length" class="dv-group">
+          <h4 class="eyebrow">{{ $t('protection.events') }}</h4>
+          <p v-if="selected.protectionSeconds" class="section-copy">
+            {{
+              $t('protection.durations', {
+                caution: formatDuration(selected.protectionSeconds.caution),
+                throttled: formatDuration(selected.protectionSeconds.throttled)
+              })
+            }}
+          </p>
+          <ProtectionEventList :events="selected.protectionEvents" />
+        </section>
         <button class="outline-button danger-text" @click="remove">
           {{ $t('dashboard.deleteSession') }}
         </button>

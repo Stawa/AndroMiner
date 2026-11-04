@@ -205,6 +205,15 @@
     "stop": "Stop",
     "stopping": "Stopping"
   },
+  "crash": {
+    "title": "Miner stopped unexpectedly",
+    "pending": "Restarting in {seconds} s unless you cancel. Restart {attempt} of {max}.",
+    "restartNow": "Restart now",
+    "cancel": "Don't restart",
+    "dismiss": "Dismiss",
+    "exhausted": "The miner crashed {max} times in a short time, so it will not restart automatically. Check the log, then start it again when ready.",
+    "failed": "Automatic restart failed: {message}"
+  },
   "dashboard": {
     "addWallet": "Add a wallet",
     "allRuns": "All runs",
@@ -253,6 +262,76 @@
     "checkRequired": "Required",
     "checkConnected": "Connected",
     "limitValue": "limit {value}"
+  },
+  "protection": {
+    "title": "Device protection",
+    "state": {
+      "normal": "Normal",
+      "caution": "Caution",
+      "throttled": "Throttled",
+      "critical": "Stopped",
+      "idle": "Not mining"
+    },
+    "summary": {
+      "normal": "Mining at the configured intensity.",
+      "caution": "Intensity reduced to {percent}% to keep the phone cooler.",
+      "throttled": "Intensity cut to {percent}% because the phone is hot or the battery is low.",
+      "critical": "Mining was stopped to protect the phone.",
+      "idle": "Protection runs while mining. These readings are live."
+    },
+    "configured": "Configured intensity",
+    "current": "Current intensity",
+    "measured": "Measured intensity",
+    "recovery": "Restoring one step in {seconds} s if readings stay safe.",
+    "readings": "Readings",
+    "batteryTemp": "Battery temperature",
+    "androidThermal": "Android thermal status",
+    "cpuTemp": "CPU temperature",
+    "battery": "Battery",
+    "sensor": "Sensor",
+    "cpuUnavailable": "Not exposed by this phone",
+    "headroom": "Headroom to your limit",
+    "headroomValue": "{value} °C below {limit} °C",
+    "headroomOff": "Temperature limit is off",
+    "age": "Updated {seconds} s ago",
+    "stale": "No update for {seconds} s",
+    "never": "Never reported",
+    "thermal": {
+      "none": "None",
+      "light": "Light",
+      "moderate": "Moderate",
+      "severe": "Severe",
+      "critical": "Critical",
+      "emergency": "Emergency",
+      "shutdown": "Shutdown",
+      "unsupported": "Not supported (needs Android 10)",
+      "unavailable": "Unavailable"
+    },
+    "events": "Protection events",
+    "noEvents": "No protection events this session.",
+    "durations": "Caution for {caution}, throttled for {throttled}.",
+    "event": {
+      "reduced": {
+        "battery_temperature": "Intensity reduced from {from}% to {to}% because battery temperature reached {value} (step at {threshold}).",
+        "thermal_status": "Intensity reduced from {from}% to {to}% because Android raised its thermal status to level {value}.",
+        "battery_level": "Intensity reduced from {from}% to {to}% because the battery fell to {value} (step at {threshold}).",
+        "cpu_temperature": "Intensity reduced from {from}% to {to}% because CPU temperature reached {value} (step at {threshold})."
+      },
+      "restoredPartial": "Intensity restored from {from}% to {to}% as the {reading} recovers.",
+      "restoredFull": "Mining returned to full intensity after the {reading} recovered.",
+      "stopped": {
+        "battery_temperature": "Mining stopped because battery temperature reached {value}, the limit you set ({threshold}).",
+        "thermal_status": "Mining stopped because Android reported severe thermal throttling.",
+        "battery_level": "Mining stopped because the battery reached {value}, your stop level ({threshold}).",
+        "cpu_temperature": "Mining stopped because CPU temperature reached {value} (limit {threshold}).",
+        "power_disconnected": "Mining stopped because power was disconnected (charging-only mode).",
+        "screen_off": "Mining stopped because the screen turned off.",
+        "sensor": "Mining stopped because a required sensor stopped reporting."
+      },
+      "monitoringLost": "Protection monitoring unavailable: the {reading} stopped reporting. Intensity held at {to}%.",
+      "monitoringRestored": "Protection monitoring is back: the sensor is reporting again.",
+      "detail": "Reading {value} · limit {threshold} · intensity {from}% → {to}%"
+    }
   },
   "device": {
     "androidCpu": "Android CPU",
@@ -842,7 +921,10 @@
     "throttle": "Throttle in background",
     "unsupported": "Unavailable automation",
     "unsupportedCopy": "These saved preferences have no runtime implementation. They cannot be enabled in this build.",
-    "yourData": "Your data"
+    "yourData": "Your data",
+    "reliability": "Reliability",
+    "crashRestart": "Restart after a crash",
+    "crashRestartHint": "If the miner stops unexpectedly, ask first and restart on its own after 30 seconds if you don't answer"
   },
   "start": {
     "allowed": "Allowed with notification",

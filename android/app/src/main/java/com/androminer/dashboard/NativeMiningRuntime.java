@@ -26,6 +26,7 @@ import java.net.ServerSocket;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -33,6 +34,9 @@ import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.json.JSONArray;
@@ -274,7 +278,21 @@ final class NativeMiningRuntime {
     private boolean minerCpuUsageAvailable;
     private long lastMinerCpuJiffies;
     private long lastCpuSampleAtMs;
-    private int minerPid = -1;
+    private volatile int minerPid = -1;
+    private ProtectionEngine protection;
+    private MinerThrottle throttle;
+    private volatile int measuredIntensity = 100;
+    private final ScheduledExecutorService restartTimer =
+            Executors.newSingleThreadScheduledExecutor(
+                    runnable -> {
+                        Thread thread = new Thread(runnable, "androminer-crash-restart");
+                        thread.setDaemon(true);
+                        return thread;
+                    });
+    private ScheduledFuture<?> restartTask;
+    private JSObject crashConfig;
+    private JSObject crashRestart;
+    private final ArrayDeque<Long> crashTimes = new ArrayDeque<>();
     private int acceptedShares;
     private int rejectedShares;
     private int activeThreads;
@@ -290,6 +308,7 @@ final class NativeMiningRuntime {
     private String apiTelemetryMessage = "XMRig API telemetry has not started.";
     private volatile int batteryFloor = 25;
     private volatile boolean chargingOnly;
+    private volatile boolean autoRestartOnCrash = true;
     private volatile boolean activityVisible = true;
     private long sessionGeneration;
 
@@ -298,6 +317,12 @@ final class NativeMiningRuntime {
                 () -> {
                     batteryFloor = MiningSafety.clampBatteryFloor(call.getInt("batteryFloor", 25));
                     chargingOnly = call.getBoolean("chargingOnly", false);
+                    autoRestartOnCrash = call.getBoolean("autoRestartOnCrash", true);
+                    if (!autoRestartOnCrash) cancelCrashRestart();
+                    synchronized (NativeMiningRuntime.this) {
+                        if (protection != null && activeConfig != null)
+                            protection.reconfigure(protectionConfig(activeConfig));
+                    }
                     if (isRunning() && activeConfig != null) {
                         String reason =
                                 DeviceStatusPlugin.safetyViolation(
@@ -311,6 +336,105 @@ final class NativeMiningRuntime {
                     }
                     call.resolve();
                 });
+    }
+
+    /**
+     * After an unexpected exit, offer a restart that happens by itself if nobody answers. The
+     * native layer owns the timer so it still fires while the WebView is suspended. A miner that
+     * keeps crashing is not restarted again after CrashRestartPolicy.MAX_RESTARTS crashes in CrashRestartPolicy.WINDOW_MS.
+     */
+    private synchronized void scheduleCrashRestart(int exitCode) {
+        cancelCrashRestart();
+        if (activeConfig == null || !autoRestartOnCrash) return;
+        int attempt = CrashRestartPolicy.recordCrash(crashTimes, SystemClock.elapsedRealtime());
+        JSObject state = new JSObject();
+        state.put("exitCode", exitCode == Integer.MIN_VALUE ? JSONObject.NULL : exitCode);
+        state.put("attempt", attempt);
+        state.put("maxAttempts", CrashRestartPolicy.MAX_RESTARTS);
+        if (!CrashRestartPolicy.mayRestart(attempt)) {
+            state.put("pending", false);
+            state.put("exhausted", true);
+            crashRestart = state;
+            appendLog("Miner crashed repeatedly; automatic restart is off for this run.");
+            return;
+        }
+        crashConfig = activeConfig;
+        state.put("pending", true);
+        state.put("deadlineAt", System.currentTimeMillis() + CrashRestartPolicy.DELAY_MS);
+        crashRestart = state;
+        appendLog("Miner crashed. Restarting in " + CrashRestartPolicy.DELAY_MS / 1000 + " s unless cancelled.");
+        restartTask =
+                restartTimer.schedule(
+                        () -> {
+                            if (!controlExecutor.isShutdown())
+                                controlExecutor.execute(this::runCrashRestart);
+                        },
+                        CrashRestartPolicy.DELAY_MS,
+                        TimeUnit.MILLISECONDS);
+    }
+
+    private synchronized void cancelCrashRestart() {
+        if (restartTask != null) restartTask.cancel(false);
+        restartTask = null;
+        crashConfig = null;
+        crashRestart = null;
+    }
+
+    /** Runs when the countdown ends or the user taps Restart now. Starts the same setup again. */
+    private synchronized void runCrashRestart() {
+        if (crashRestart == null || !crashRestart.optBoolean("pending") || crashConfig == null)
+            return;
+        JSObject config = crashConfig;
+        JSObject attempt = crashRestart;
+        if (restartTask != null) restartTask.cancel(false);
+        restartTask = null;
+        startOnWorker(
+                config,
+                true,
+                new StartResult() {
+                    public void resolve() {
+                        crashRestart = null;
+                        crashConfig = null;
+                        appendLog("Miner restarted after a crash.");
+                    }
+
+                    public void reject(String message) {
+                        attempt.put("pending", false);
+                        attempt.put("failed", true);
+                        attempt.put("message", message);
+                        crashRestart = attempt;
+                        lastMessage = "Automatic restart failed: " + message;
+                        appendLog(lastMessage);
+                    }
+                });
+    }
+
+    public void restartAfterCrash(PluginCall call) {
+        controlExecutor.execute(
+                () -> {
+                    try {
+                        runCrashRestart();
+                        call.resolve(createStatus());
+                    } catch (RuntimeException failure) {
+                        call.reject(failure.getMessage(), failure);
+                    }
+                });
+    }
+
+    public void cancelRestartAfterCrash(PluginCall call) {
+        controlExecutor.execute(
+                () -> {
+                    cancelCrashRestart();
+                    call.resolve(createStatus());
+                });
+    }
+
+    private ProtectionEngine.Config protectionConfig(JSObject config) {
+        return new ProtectionEngine.Config(
+                config.optInt("thermalThreshold", 42),
+                batteryFloor,
+                chargingOnly || config.optBoolean("autoPauseOnBattery", false),
+                config.optBoolean("autoPauseScreenOff", false));
     }
 
     private synchronized void stopForProtection(String reason, long generation) {
@@ -415,16 +539,36 @@ final class NativeMiningRuntime {
         controlExecutor.execute(
                 () -> {
                     try {
-                        startOnWorker(call);
+                        cancelCrashRestart();
+                        startOnWorker(
+                                call.getObject("config", new JSObject()),
+                                false,
+                                new StartResult() {
+                                    public void resolve() {
+                                        call.resolve();
+                                    }
+
+                                    public void reject(String message) {
+                                        call.reject(message);
+                                    }
+                                });
                     } catch (RuntimeException exception) {
                         call.reject(exception.getMessage(), exception);
                     }
                 });
     }
 
-    private synchronized void startOnWorker(PluginCall call) {
+    /** Receives the outcome of a start attempt, whether user- or crash-recovery-initiated. */
+    private interface StartResult {
+        void resolve();
+
+        void reject(String message);
+    }
+
+    private synchronized void startOnWorker(
+            JSObject config, boolean automatic, StartResult call) {
         if (isRunning()) {
-            call.resolve(createStatus());
+            call.resolve();
             return;
         }
 
@@ -448,7 +592,6 @@ final class NativeMiningRuntime {
                     "This 32-bit ARM CPU does not report NEON, which the armeabi-v7a miner requires.");
             return;
         }
-        JSObject config = call.getObject("config", new JSObject());
         String wallet = config.getString("walletAddress", "").trim();
         String host = config.getString("poolUrl", "").trim();
         int port = config.getInteger("poolPort", 0);
@@ -461,7 +604,7 @@ final class NativeMiningRuntime {
             call.reject("Enter a wallet or pool username, host, and valid port before mining.");
             return;
         }
-        if (!activityVisible) {
+        if (!activityVisible && !automatic) {
             call.reject("Open AndroMiner before starting a mining session.");
             return;
         }
@@ -558,6 +701,10 @@ final class NativeMiningRuntime {
             if (minerPid <= 0) {
                 minerPid = resolveProcessPid(minerProcess);
             }
+            protection = new ProtectionEngine(protectionConfig(config));
+            if (throttle != null) throttle.shutdown();
+            throttle = new MinerThrottle(() -> minerPid);
+            measuredIntensity = 100;
             stoppedUptimeSeconds = 0;
             hashrate = 0;
             difficulty = 0;
@@ -591,7 +738,7 @@ final class NativeMiningRuntime {
             checkpoint(true);
             Process startedProcess = minerProcess;
             outputExecutor.execute(() -> readMinerOutput(startedProcess));
-            call.resolve(createStatus());
+            call.resolve();
         } catch (Exception exception) {
             stopMinerProcess();
             MiningGuardService.end(getContext());
@@ -614,6 +761,7 @@ final class NativeMiningRuntime {
     }
 
     private synchronized void pauseOnWorker(PluginCall call) {
+        cancelCrashRestart();
         transition("stopping", "manual_pause");
         stopMinerProcess();
         finishRecord("manual_pause", "Paused by the user; resume requires a new start.", false);
@@ -642,6 +790,7 @@ final class NativeMiningRuntime {
     }
 
     private synchronized void stopOnWorker(PluginCall call) {
+        cancelCrashRestart();
         transition("stopping", "manual_stop");
         stopMinerProcess();
         finishRecord("manual_stop", "Stopped by the user.", false);
@@ -775,17 +924,8 @@ final class NativeMiningRuntime {
         if (generation != sessionGeneration || !isRunning()) return null;
         if (!MiningGuardService.notificationsEnabled(getContext()))
             return "Mining notifications were disabled.";
-        DeviceStatusPlugin.SafetyObservation observation =
-                DeviceStatusPlugin.safetyObservation(
-                        getContext(),
-                        config,
-                        batteryFloor,
-                        chargingOnly || config.optBoolean("autoPauseOnBattery", false));
-        sessionRecord.put("protection", observation.details);
-        if (!observation.details.isNull("temperatureC")
-                && !observation.details.isNull("batteryPercent"))
-            sessionRecord.put("lastValidProtection", observation.details);
-        if (observation.reason != null) return observation.reason;
+        String stopReason = applyProtection(config);
+        if (stopReason != null) return stopReason;
         long now = SystemClock.elapsedRealtime();
         sessionClock.sample(
                 now,
@@ -804,6 +944,104 @@ final class NativeMiningRuntime {
             return storageError;
         }
         return null;
+    }
+
+    private static final int MAX_PROTECTION_EVENTS = 30;
+
+    /**
+     * Reads the device, runs the policy, enforces the resulting intensity on the real process and
+     * records every change. Returns a stop reason when the policy reaches Critical. A failed read
+     * throws: the watchdog treats that as a monitoring failure and stops mining.
+     */
+    private synchronized String applyProtection(JSObject config) {
+        if (protection == null || sessionRecord == null) return null;
+        ProtectionEngine.Input input = DeviceStatusPlugin.readProtectionInput(getContext());
+        ProtectionEngine.Decision decision = protection.evaluate(input);
+        if (decision.state != ProtectionEngine.State.CRITICAL && throttle != null) {
+            throttle.setIntensity(decision.intensityPercent);
+            measuredIntensity = throttle.measuredPercent();
+        }
+        JSONArray log = sessionRecord.optJSONArray("protectionEvents");
+        JSArray events = new JSArray();
+        if (log != null)
+            for (int i = Math.max(0, log.length() - (MAX_PROTECTION_EVENTS - 1)); i < log.length(); i++)
+                events.put(log.opt(i));
+        for (ProtectionEngine.Event event : decision.events) {
+            events.put(protectionEventJson(event));
+            appendLog(
+                    "Protection "
+                            + event.type
+                            + ": "
+                            + event.previousState
+                            + " -> "
+                            + event.newState
+                            + " ("
+                            + event.trigger
+                            + ")");
+        }
+        sessionRecord.put("protectionEvents", events);
+        JSObject seconds = new JSObject();
+        seconds.put("caution", protection.secondsIn(ProtectionEngine.State.CAUTION));
+        seconds.put("throttled", protection.secondsIn(ProtectionEngine.State.THROTTLED));
+        sessionRecord.put("protectionSeconds", seconds);
+        JSObject snapshot = protectionSnapshot(input, decision);
+        sessionRecord.put("protection", snapshot);
+        if (!snapshot.isNull("batteryTemperatureC") && !snapshot.isNull("batteryPercent"))
+            sessionRecord.put("lastValidProtection", snapshot);
+        if (!decision.events.isEmpty()) checkpoint(true);
+        return decision.stopReason;
+    }
+
+    private static Object nullable(Object value) {
+        return value == null ? JSONObject.NULL : value;
+    }
+
+    private JSObject protectionEventJson(ProtectionEngine.Event event) {
+        JSObject json = new JSObject();
+        json.put("type", event.type);
+        json.put("at", System.currentTimeMillis());
+        json.put("trigger", event.trigger);
+        json.put("sensor", nullable(event.sensor));
+        json.put("value", nullable(event.value));
+        json.put("unit", nullable(event.unit));
+        json.put("threshold", nullable(event.threshold));
+        json.put("previousState", event.previousState.name().toLowerCase(Locale.US));
+        json.put("newState", event.newState.name().toLowerCase(Locale.US));
+        json.put("previousIntensity", event.previousIntensity);
+        json.put("newIntensity", event.newIntensity);
+        json.put("action", event.action);
+        json.put("recovery", event.recovery);
+        return json;
+    }
+
+    /** Current readings with their freshness. Contains no wallet, pool or credential data. */
+    private JSObject protectionSnapshot(
+            ProtectionEngine.Input input, ProtectionEngine.Decision decision) {
+        JSObject json = new JSObject();
+        long now = input.nowMs;
+        json.put("at", System.currentTimeMillis());
+        json.put("state", decision.state.name().toLowerCase(Locale.US));
+        json.put("trigger", decision.trigger);
+        json.put("configuredIntensity", 100);
+        json.put("targetIntensity", decision.intensityPercent);
+        json.put("measuredIntensity", measuredIntensity);
+        json.put("recoveryRemainingMs", protection.recoveryRemainingMs(now));
+        json.put("batteryTemperatureC", nullable(input.batteryTemperatureC));
+        json.put("batteryPercent", nullable(input.batteryPercent));
+        json.put("charging", input.charging);
+        json.put("androidThermalLevel", nullable(input.thermalStatus));
+        json.put("androidThermalSupported", input.thermalSupported);
+        json.put("cpuTemperatureC", nullable(input.cpuTemperatureC));
+        JSObject age = new JSObject();
+        age.put("batteryTemperature", protection.ageMs("batteryTemperature", now));
+        age.put("batteryPercent", protection.ageMs("batteryPercent", now));
+        age.put("androidThermalStatus", protection.ageMs("thermalStatus", now));
+        age.put("cpuTemperature", protection.ageMs("cpuTemperature", now));
+        json.put("ageMs", age);
+        json.put("staleAfterMs", ProtectionEngine.STALE_AFTER_MS);
+        json.put("temperatureLimitC", protection.config().temperatureLimitC);
+        json.put("batteryFloorPercent", protection.config().batteryFloorPercent);
+        return json;
     }
 
     private synchronized String sessionLabel() {
@@ -1463,6 +1701,9 @@ final class NativeMiningRuntime {
         result.put("exitCode", exitCode == Integer.MIN_VALUE ? null : exitCode);
         result.put("failureReason", failureReason);
         result.put("unexpectedExit", unexpectedExit);
+        synchronized (this) {
+            if (crashRestart != null) result.put("crashRestart", crashRestart);
+        }
 
         JSObject api = new JSObject();
         api.put("available", running && telemetryAvailable);
@@ -1764,6 +2005,7 @@ final class NativeMiningRuntime {
                                 "native_crash",
                                 "Native miner exited unexpectedly (code " + codeLabel + ").",
                                 true);
+                        scheduleCrashRestart(exitCode);
                     }
                 }
             }
@@ -1926,6 +2168,8 @@ final class NativeMiningRuntime {
 
         stoppedUptimeSeconds = Math.max(0, (SystemClock.elapsedRealtime() - startedAtMs) / 1000);
         stopRequested = true;
+        /* A paused process cannot act on SIGTERM; always resume it first. */
+        if (throttle != null) throttle.release();
         minerProcess.destroy();
         try {
             if (!waitForProcess(minerProcess, 3)) {
@@ -1945,6 +2189,8 @@ final class NativeMiningRuntime {
                 minerProcess = null;
             }
             if (minerProcess == null) {
+                if (throttle != null) throttle.shutdown();
+                throttle = null;
                 MiningGuardService.end(getContext());
                 minerPid = -1;
                 resetCpuUsageSampling();

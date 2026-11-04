@@ -205,6 +205,15 @@
     "stop": "Dừng",
     "stopping": "Đang dừng"
   },
+  "crash": {
+    "title": "Trình đào dừng đột ngột",
+    "pending": "Sẽ khởi động lại sau {seconds} giây nếu bạn không hủy. Lần khởi động lại {attempt}/{max}.",
+    "restartNow": "Khởi động lại ngay",
+    "cancel": "Không khởi động lại",
+    "dismiss": "Bỏ qua",
+    "exhausted": "Trình đào đã sập {max} lần trong thời gian ngắn nên sẽ không tự khởi động lại. Hãy xem nhật ký rồi bắt đầu lại khi sẵn sàng.",
+    "failed": "Tự khởi động lại thất bại: {message}"
+  },
   "dashboard": {
     "addWallet": "Thêm ví",
     "allRuns": "Tất cả các lần chạy",
@@ -253,6 +262,76 @@
     "checkRequired": "Bắt buộc",
     "checkConnected": "Đã cắm",
     "limitValue": "giới hạn {value}"
+  },
+  "protection": {
+    "title": "Bảo vệ thiết bị",
+    "state": {
+      "normal": "Bình thường",
+      "caution": "Thận trọng",
+      "throttled": "Bị giảm tốc",
+      "critical": "Đã dừng",
+      "idle": "Không đào"
+    },
+    "summary": {
+      "normal": "Đang đào ở cường độ đã cấu hình.",
+      "caution": "Đã giảm cường độ xuống {percent}% để giữ điện thoại mát hơn.",
+      "throttled": "Đã hạ cường độ xuống {percent}% vì điện thoại nóng hoặc pin yếu.",
+      "critical": "Đã dừng đào để bảo vệ điện thoại.",
+      "idle": "Bảo vệ hoạt động khi đang đào. Các số đo này cập nhật trực tiếp."
+    },
+    "configured": "Cường độ đã cấu hình",
+    "current": "Cường độ hiện tại",
+    "measured": "Cường độ đo được",
+    "recovery": "Sẽ khôi phục một bước sau {seconds} giây nếu số đo vẫn an toàn.",
+    "readings": "Số đo",
+    "batteryTemp": "Nhiệt độ pin",
+    "androidThermal": "Trạng thái nhiệt Android",
+    "cpuTemp": "Nhiệt độ CPU",
+    "battery": "Pin",
+    "sensor": "Cảm biến",
+    "cpuUnavailable": "Điện thoại này không cung cấp",
+    "headroom": "Khoảng cách tới giới hạn của bạn",
+    "headroomValue": "Thấp hơn {limit} °C là {value} °C",
+    "headroomOff": "Giới hạn nhiệt độ đang tắt",
+    "age": "Cập nhật {seconds} giây trước",
+    "stale": "Không có cập nhật trong {seconds} giây",
+    "never": "Chưa từng báo cáo",
+    "thermal": {
+      "none": "Không",
+      "light": "Nhẹ",
+      "moderate": "Vừa",
+      "severe": "Nặng",
+      "critical": "Nghiêm trọng",
+      "emergency": "Khẩn cấp",
+      "shutdown": "Tắt máy",
+      "unsupported": "Không hỗ trợ (cần Android 10)",
+      "unavailable": "Không khả dụng"
+    },
+    "events": "Sự kiện bảo vệ",
+    "noEvents": "Phiên này chưa có sự kiện bảo vệ nào.",
+    "durations": "Thận trọng trong {caution}, bị giảm tốc trong {throttled}.",
+    "event": {
+      "reduced": {
+        "battery_temperature": "Đã giảm cường độ từ {from}% xuống {to}% vì nhiệt độ pin đạt {value} (mốc {threshold}).",
+        "thermal_status": "Đã giảm cường độ từ {from}% xuống {to}% vì Android nâng trạng thái nhiệt lên mức {value}.",
+        "battery_level": "Đã giảm cường độ từ {from}% xuống {to}% vì pin tụt xuống {value} (mốc {threshold}).",
+        "cpu_temperature": "Đã giảm cường độ từ {from}% xuống {to}% vì nhiệt độ CPU đạt {value} (mốc {threshold})."
+      },
+      "restoredPartial": "Đã khôi phục cường độ từ {from}% lên {to}% khi {reading} hồi phục.",
+      "restoredFull": "Việc đào trở lại cường độ đầy đủ sau khi {reading} hồi phục.",
+      "stopped": {
+        "battery_temperature": "Đã dừng đào vì nhiệt độ pin đạt {value}, đúng giới hạn bạn đặt ({threshold}).",
+        "thermal_status": "Đã dừng đào vì Android báo giảm xung nhiệt nghiêm trọng.",
+        "battery_level": "Đã dừng đào vì pin còn {value}, mức dừng bạn đặt ({threshold}).",
+        "cpu_temperature": "Đã dừng đào vì nhiệt độ CPU đạt {value} (giới hạn {threshold}).",
+        "power_disconnected": "Đã dừng đào vì ngắt nguồn điện (chế độ chỉ khi sạc).",
+        "screen_off": "Đã dừng đào vì màn hình đã tắt.",
+        "sensor": "Đã dừng đào vì một cảm biến cần thiết ngừng báo cáo."
+      },
+      "monitoringLost": "Không thể giám sát bảo vệ: {reading} ngừng báo cáo. Giữ cường độ ở {to}%.",
+      "monitoringRestored": "Giám sát bảo vệ đã hoạt động lại: cảm biến báo cáo trở lại.",
+      "detail": "Số đo {value} · giới hạn {threshold} · cường độ {from}% → {to}%"
+    }
   },
   "device": {
     "androidCpu": "CPU Android",
@@ -842,7 +921,10 @@
     "throttle": "Giảm tốc ở chế độ nền",
     "unsupported": "Tự động hóa không khả dụng",
     "unsupportedCopy": "Những tùy chọn đã lưu này không có triển khai khi chạy. Không thể bật chúng trong bản dựng này.",
-    "yourData": "Dữ liệu của bạn"
+    "yourData": "Dữ liệu của bạn",
+    "reliability": "Độ tin cậy",
+    "crashRestart": "Khởi động lại sau khi sập",
+    "crashRestartHint": "Nếu trình đào dừng đột ngột, ứng dụng sẽ hỏi trước và tự khởi động lại sau 30 giây nếu bạn không trả lời"
   },
   "start": {
     "allowed": "Cho phép kèm thông báo",

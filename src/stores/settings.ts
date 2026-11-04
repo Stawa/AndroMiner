@@ -31,6 +31,8 @@ export interface SettingsState {
   notifications: NotificationSettings;
   autoStart: boolean;
   autoResume: boolean;
+  /** Offer a restart after an unexpected miner exit and do it automatically if unanswered. */
+  autoRestartOnCrash: boolean;
   thermalThreshold: number;
   batterySafety: BatterySafetySettings;
   performance: PerformanceSettings;
@@ -47,6 +49,7 @@ const defaultSettings = (): SettingsState => ({
   },
   autoStart: false,
   autoResume: true,
+  autoRestartOnCrash: true,
   thermalThreshold: 42,
   batterySafety: {
     stopBelowPercent: 25,

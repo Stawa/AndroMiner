@@ -57,7 +57,77 @@ public class DeviceStatusPlugin extends Plugin {
             result.put("temperatureSensor", temperature.sensorName);
         }
         result.put("thermalStatus", getThermalStatus(temperature));
+        putProtectionReadings(result, getContext(), batteryIntent);
         call.resolve(result);
+    }
+
+    /**
+     * Raw, separately labelled sources behind the Device Health view: battery temperature from
+     * BatteryManager, Android's own thermal status, and CPU temperature only when a thermal zone
+     * explicitly named for the CPU is readable.
+     */
+    private void putProtectionReadings(JSObject result, Context context, Intent batteryIntent) {
+        result.put("sampledAt", System.currentTimeMillis());
+        Double batteryTemperature = getBatteryTemperatureC(batteryIntent);
+        result.put(
+                "batteryTemperatureC",
+                batteryTemperature == null ? org.json.JSONObject.NULL : batteryTemperature);
+        Integer level = readAndroidThermalLevel(context);
+        result.put("androidThermalStatus", androidThermalName(level));
+        result.put("androidThermalLevel", level == null ? org.json.JSONObject.NULL : level);
+        TemperatureReading cpu = readReliableCpuTemperature();
+        result.put("cpuTemperatureC", cpu == null ? org.json.JSONObject.NULL : cpu.valueC);
+        result.put("cpuTemperatureSensor", cpu == null ? org.json.JSONObject.NULL : cpu.sensorName);
+    }
+
+    /** Null when Android exposes no thermal status (API below 29) or it could not be read. */
+    private static Integer readAndroidThermalLevel(Context context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null;
+        try {
+            PowerManager power = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+            return power == null ? null : power.getCurrentThermalStatus();
+        } catch (RuntimeException unavailable) {
+            return null;
+        }
+    }
+
+    private static String androidThermalName(Integer level) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return "unsupported";
+        if (level == null) return "unavailable";
+        String[] names = {
+            "none", "light", "moderate", "severe", "critical", "emergency", "shutdown"
+        };
+        return level >= 0 && level < names.length ? names[level] : "unavailable";
+    }
+
+    /** Highest reading among thermal zones whose type names the CPU; null when none is readable. */
+    private TemperatureReading readReliableCpuTemperature() {
+        TemperatureReading hottest = null;
+        for (TemperatureReading reading : getThermalZoneReadings()) {
+            if (!reading.sensorName.toLowerCase(Locale.ROOT).contains("cpu")) continue;
+            if (reading.valueC < 10 || reading.valueC > 110) continue;
+            if (hottest == null || reading.valueC > hottest.valueC) hottest = reading;
+        }
+        return hottest;
+    }
+
+    static ProtectionEngine.Input readProtectionInput(Context context) {
+        DeviceStatusPlugin reader = new DeviceStatusPlugin();
+        Intent battery =
+                context.registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+        ProtectionEngine.Input input = new ProtectionEngine.Input();
+        input.nowMs = android.os.SystemClock.elapsedRealtime();
+        input.batteryTemperatureC = reader.getBatteryTemperatureC(battery);
+        Double level = reader.getBatteryLevel(battery);
+        input.batteryPercent = level == null ? null : level * 100;
+        input.charging = reader.isCharging(battery);
+        input.thermalSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q;
+        input.thermalStatus = readAndroidThermalLevel(context);
+        TemperatureReading cpu = reader.readReliableCpuTemperature();
+        input.cpuTemperatureC = cpu == null ? null : cpu.valueC;
+        PowerManager power = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+        input.screenOn = power == null || power.isInteractive();
+        return input;
     }
 
     private Double getBatteryLevel(Intent batteryIntent) {
