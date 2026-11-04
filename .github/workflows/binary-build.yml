@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build-binaries:
-    name: Build and publish ARM64 miner binaries
+    name: Build and publish ARM miner binaries
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -71,10 +71,37 @@ jobs:
           mkdir -p miner-payload/lib/arm64-v8a/notls
           cp android/app/src/main/jniLibs/arm64-v8a/libxmrig.so miner-payload/lib/arm64-v8a/notls/libxmrig.so
 
+      - name: Build ARMv7 TLS miner
+        env:
+          ABI: armeabi-v7a
+          ANDROID_PLATFORM: android-24
+          WITH_TLS: 'ON'
+          QUIET: 'ON'
+        run: bash miner-builder/build-xmrig-android.sh
+
+      - name: Collect ARMv7 TLS miner
+        run: |
+          mkdir -p miner-payload/lib/armeabi-v7a/tls
+          cp android/app/src/main/jniLibs/armeabi-v7a/libxmrig.so miner-payload/lib/armeabi-v7a/tls/libxmrig.so
+
+      - name: Build ARMv7 no-TLS miner
+        env:
+          ABI: armeabi-v7a
+          ANDROID_PLATFORM: android-24
+          WITH_TLS: 'OFF'
+          QUIET: 'ON'
+        run: bash miner-builder/build-xmrig-android.sh
+
+      - name: Collect ARMv7 no-TLS miner
+        run: |
+          mkdir -p miner-payload/lib/armeabi-v7a/notls
+          cp android/app/src/main/jniLibs/armeabi-v7a/libxmrig.so miner-payload/lib/armeabi-v7a/notls/libxmrig.so
+
       - name: Prepare branch payload
         run: |
           cp miner-payload/lib/arm64-v8a/tls/libxmrig.so miner-payload/lib/arm64-v8a/libxmrig.so
-          (cd miner-payload && sha256sum lib/arm64-v8a/libxmrig.so lib/arm64-v8a/tls/libxmrig.so lib/arm64-v8a/notls/libxmrig.so > SHA256SUMS)
+          cp miner-payload/lib/armeabi-v7a/tls/libxmrig.so miner-payload/lib/armeabi-v7a/libxmrig.so
+          (cd miner-payload && sha256sum lib/*/libxmrig.so lib/*/tls/libxmrig.so lib/*/notls/libxmrig.so > SHA256SUMS)
           cat > miner-payload/README.md <<'EOF'
           # AndroMiner Miner Binaries
 
@@ -85,9 +112,11 @@ jobs:
           ```text
           lib/arm64-v8a/tls/libxmrig.so
           lib/arm64-v8a/notls/libxmrig.so
+          lib/armeabi-v7a/tls/libxmrig.so
+          lib/armeabi-v7a/notls/libxmrig.so
           ```
 
-          `lib/arm64-v8a/libxmrig.so` is kept as the TLS default for compatibility.
+          `lib/<abi>/libxmrig.so` is kept as the TLS default for compatibility.
 
           Source and build scripts live in the `miner-builder/` directory on the `main` branch.
           EOF
@@ -95,7 +124,7 @@ jobs:
       - name: Upload miner artifact
         uses: actions/upload-artifact@v7
         with:
-          name: androminer-arm64-miners
+          name: androminer-arm-miners
           path: miner-payload/**
           if-no-files-found: error
 
@@ -117,7 +146,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: androminer-arm64-miner-build-logs
+          name: androminer-arm-miner-build-logs
           path: |
             miner-builder/work/logs/
             miner-builder/work/build/**/CMakeCache.txt
