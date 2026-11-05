@@ -5,7 +5,7 @@
 <h1 align="center">AndroMiner</h1>
 
 <p align="center">
-  An open-source Android CPU miner powered by XMRig.<br />
+  An open-source Android CPU miner powered by XMRig, with experimental XMRigCC and XLArig engines.<br />
   Configure pools, monitor device readings, and manage mining sessions on your phone.
 </p>
 
@@ -66,6 +66,9 @@ existing runs. The wallet is a placeholder. Tap any image for full size.
 - Choose a CPU profile or adjust threads, priority, and core affinity.
 - Follow measured hashrate, accepted and rejected shares, and miner output.
 - Monitor available temperature and battery readings, with native protection rules.
+- Device protection steps through Normal, Caution, Throttled and Stop, explains each change and keeps the events with the run ([details](docs/device-protection.md)).
+- Choose a mining engine: XMRig (supported), or experimental XMRigCC and XLArig (Scala/Panthera). Bundled APKs include all three; the download APK can fetch them once their hashes are pinned. See [mining engines](docs/engines.md) for status, ABIs and what is not verified.
+- Ask to restart a crashed miner, and restart it automatically after 30 seconds if there is no answer (Settings → Reliability).
 - Save mining setups and session history locally; import or export configuration.
 - Set a native session deadline, recover interrupted runs, and retain protection stop reasons.
 - Test pool DNS/TCP/TLS reachability without sending a wallet or password.
@@ -132,7 +135,7 @@ npm run build
 Validation commands: `npm run lint`, `npm test`, `npm run i18n:check`, `npm run format:check`, and
 `npm run test:ui` (requires a running preview and installed Chromium/Edge).
 Android checks: `android/gradlew -p android :app:testDebugUnitTest :app:lintDebug spotlessCheck`.
-See [implementation and validation notes](docs/ROADMAP-IMPLEMENTATION.md) for device test setup.
+See [validating on a device](docs/engines.md#validating-on-a-device) for device test setup.
 
 ## Building Android APKs
 
@@ -208,10 +211,13 @@ Existing environment variables take precedence over values in the file.
   block mining or stop an active run. A battery sensor is not a CPU temperature sensor.
 - **Waiting**, **Stale**, and unavailable readings are not measured zero. The app
   does not calculate earnings or pool payouts.
-- Coins requiring another mining engine are listed but disabled.
-- Automatic start/restart, adaptive intensity, background throttling, automatic
-  efficiency-core preference, and individual event notifications are not implemented.
-  These preferences are disabled in Settings; the ongoing mining notification is implemented.
+- The coin list only includes coins that still show signs of life (a maintained project or a live market). Others, such as DERO, ArQmA and Talleo, were removed; see [mining engines](docs/engines.md).
+- XMRigCC and XLArig are Experimental: built and checked as binaries for arm64 and ARMv7, not yet run on a device.
+  Their downloads in the download APK stay off until reviewed hashes are pinned. See [mining engines](docs/engines.md).
+- Starting automatically, background throttling, automatic efficiency-core preference and
+  individual event notifications are not implemented. These preferences are disabled in
+  Settings; the ongoing mining notification, crash restart and device protection are implemented.
+  Intensity reduction pauses the miner in short cycles and has not been verified on every device.
 - Clearing app data removes saved setups and history. Configuration exports
   include wallet and pool settings, so review them before sharing.
 - Native history retains up to 100 runs and 50 state events per run. After an
@@ -241,8 +247,8 @@ Downloader APKs accept only the miner revision and SHA-256 hashes embedded in th
 APK. Downloads are checked before execution and atomically installed; failed checks
 keep the previous file. Legacy unverified files require downloading the approved
 version again. This makes engine updates depend on reviewed app updates. Details,
-network disclosures, and known validation limits are in the
-[implementation notes](docs/ROADMAP-IMPLEMENTATION.md).
+network disclosures, and known validation limits are in
+[release and downloads](docs/engines.md#release-and-downloads).
 
 ## Safety
 
@@ -266,4 +272,7 @@ you checked it on Android.
 ## License
 
 AndroMiner application code is licensed under [MIT](LICENSE).
-XMRig is licensed separately under [GPLv3](https://github.com/xmrig/xmrig/blob/master/LICENSE).
+The bundled mining engines are licensed separately under GPLv3: [XMRig](https://github.com/xmrig/xmrig/blob/master/LICENSE),
+[XMRigCC](https://github.com/Bendr0id/xmrigCC/blob/master/LICENSE) and
+[XLArig](https://github.com/scala-network/XLArig/blob/master/LICENSE). See
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for versions, sources and attribution.

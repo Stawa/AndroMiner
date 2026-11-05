@@ -170,7 +170,6 @@
     "saveAgain": "Save & Start Again",
     "saveChanges": "Save changes",
     "saved": "Saved",
-    "saveDownload": "Save & Download",
     "saveStart": "Save & Start Mining",
     "scheduling": "CPU scheduling",
     "sec": {
@@ -263,6 +262,46 @@
     "checkConnected": "Connected",
     "limitValue": "limit {value}"
   },
+  "engine": {
+    "title": "Mining engine",
+    "select": "Engine",
+    "status": {
+      "supported": "Supported",
+      "experimental": "Experimental",
+      "unsupported": "Unsupported on Android"
+    },
+    "version": "Version",
+    "algorithms": "Algorithms",
+    "protocols": "Pool protocols",
+    "architectures": "Architectures",
+    "intensity": "Intensity control",
+    "intensityUnverified": "Pauses the miner in short cycles; not yet verified on hardware",
+    "intensityVerified": "Verified on hardware",
+    "license": "License",
+    "install": {
+      "label": "Installation",
+      "bundled": "Bundled in this APK",
+      "downloaded": "Downloaded and verified",
+      "missing": "Not included in this APK",
+      "missingDownload": "Not downloaded",
+      "abi": "Not built for this CPU",
+      "unsupported": "Cannot run on Android"
+    },
+    "experimental": "Experimental: built for Android but not yet validated on a device. It may not work, and protection has not been verified for it.",
+    "unavailable": "Engine details are available in the Android app.",
+    "unknown": "Unknown",
+    "none": "None",
+    "download": "Download engines…",
+    "cannotDownload": "{engine} is not installed and this APK has no approved download for it. Use a bundled TLS or No-TLS APK to run it.",
+    "cannotMine": "Cannot mine {coin}",
+    "hintAuto": "Chosen automatically for {coin}. You can pick another engine that supports it.",
+    "hintCustom": "Custom choice. {engine} is the automatic engine for this coin.",
+    "blocked": {
+      "download": "{engine} isn't installed. Download it with the engine card above, then start.",
+      "abi": "{engine} isn't built for this CPU. Pick another engine.",
+      "unsupported": "{engine} can't run on Android. Pick another engine."
+    }
+  },
   "protection": {
     "title": "Device protection",
     "state": {
@@ -331,7 +370,8 @@
       "monitoringLost": "Protection monitoring unavailable: the {reading} stopped reporting. Intensity held at {to}%.",
       "monitoringRestored": "Protection monitoring is back: the sensor is reporting again.",
       "detail": "Reading {value} · limit {threshold} · intensity {from}% → {to}%"
-    }
+    },
+    "throttleNote": "Intensity is reduced by pausing the miner in short cycles. This has not been verified on every device, so treat protection as best effort."
   },
   "device": {
     "androidCpu": "Android CPU",
@@ -391,13 +431,16 @@
     "bytesDownloaded": "{size} downloaded",
     "close": "Close download warning",
     "confirm": "Download & continue",
-    "copy": "This APK needs an ARM64 XMRig executable. It downloads from the AndroMiner project's GitHub miner-builder branch and runs locally on your phone.",
+    "copy": "{engine} is not installed in this APK. It downloads from the AndroMiner project's GitHub miner-builder branch, is checked against a SHA-256 hash pinned in this app, and runs locally on your phone.",
     "downloading": "Downloading…",
     "notice": "Continue only if you trust this source. Security apps may flag mining software. Downloaded binaries need the compatible download APK.",
     "noTlsHint": "Plain TCP only",
     "progress": "Miner download progress",
     "title": "Download mining engine",
-    "tlsHint": "Encrypted pools supported"
+    "tlsHint": "Encrypted pools supported",
+    "engines": "mining engines",
+    "confirmOne": "Download {engine}",
+    "confirmAll": "Download all engines ({count})"
   },
   "guard": {
     "battery": "Battery fell below the configured limit ({threshold}%). Charge the phone before continuing.",
@@ -562,7 +605,6 @@
     "didNotStart": "The miner did not start. Check mining logs.",
     "downloadBeforeStart": "Download the Android miner binary before starting.",
     "downloadFailed": "Miner download failed.",
-    "downloadingMiner": "Downloading {variant} Android miner binary from GitHub...",
     "downloadRequired": "Native miner download is required before the first mining session.",
     "exitCode": " Exit code: {code}.",
     "historyNotSaved": "Session history could not be saved on this device.",
@@ -581,7 +623,8 @@
     "stopFailed": "Stop failed. Retry Stop.",
     "stopped": "Miner stopped.",
     "stopRequested": "Stop requested. Ending the starting process…",
-    "tooHot": "Device is above the temperature limit. Let it cool before starting."
+    "tooHot": "Device is above the temperature limit. Let it cool before starting.",
+    "downloadingEngine": "Downloading {engine} ({variant})…"
   },
   "nav": {
     "about": "About",
@@ -1022,6 +1065,8 @@
     "duration": "Use a session duration between 0 and 1440 minutes.",
     "pool": "Enter a pool host without spaces.",
     "port": "Use a port between 1 and 65535.",
-    "wallet": "Enter your wallet address or the username supplied by your pool."
+    "wallet": "Enter your wallet address or the username supplied by your pool.",
+    "engine": "This engine cannot mine the selected coin. Choose a compatible engine or coin.",
+    "coin": "This coin is no longer offered. Choose another coin."
   }
 }

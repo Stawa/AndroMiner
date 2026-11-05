@@ -170,7 +170,6 @@
     "saveAgain": "保存并重新开始",
     "saveChanges": "保存更改",
     "saved": "已保存",
-    "saveDownload": "保存并下载",
     "saveStart": "保存并开始挖矿",
     "scheduling": "CPU 调度",
     "sec": {
@@ -263,6 +262,46 @@
     "checkConnected": "已连接",
     "limitValue": "上限 {value}"
   },
+  "engine": {
+    "title": "挖矿引擎",
+    "select": "引擎",
+    "status": {
+      "supported": "已支持",
+      "experimental": "实验性",
+      "unsupported": "Android 上不受支持"
+    },
+    "version": "版本",
+    "algorithms": "算法",
+    "protocols": "矿池协议",
+    "architectures": "架构",
+    "intensity": "强度控制",
+    "intensityUnverified": "通过短周期暂停挖矿程序来降低强度；尚未在硬件上验证",
+    "intensityVerified": "已在硬件上验证",
+    "license": "许可证",
+    "install": {
+      "label": "安装",
+      "bundled": "已包含在此 APK 中",
+      "downloaded": "已下载并验证",
+      "missing": "未包含在此 APK 中",
+      "missingDownload": "未下载",
+      "abi": "未针对此 CPU 构建",
+      "unsupported": "无法在 Android 上运行"
+    },
+    "experimental": "实验性：已为 Android 构建，但尚未在设备上验证。可能无法工作，其保护功能也未经验证。",
+    "unavailable": "引擎详情可在 Android 应用中查看。",
+    "unknown": "未知",
+    "none": "无",
+    "download": "下载引擎…",
+    "cannotDownload": "未安装 {engine}，且此 APK 没有为它批准的下载。请使用已包含它的 TLS 或 No-TLS APK。",
+    "cannotMine": "无法挖 {coin}",
+    "hintAuto": "已为 {coin} 自动选择。你也可以选择其他支持它的引擎。",
+    "hintCustom": "自定义选择。此币种的自动引擎是 {engine}。",
+    "blocked": {
+      "download": "{engine} 未安装。请先通过上方引擎卡片下载，然后再开始。",
+      "abi": "{engine} 未针对此 CPU 构建。请选择其他引擎。",
+      "unsupported": "{engine} 无法在 Android 上运行。请选择其他引擎。"
+    }
+  },
   "protection": {
     "title": "设备保护",
     "state": {
@@ -331,7 +370,8 @@
       "monitoringLost": "保护监测不可用：{reading}已停止上报。强度保持在 {to}%。",
       "monitoringRestored": "保护监测已恢复：传感器重新上报。",
       "detail": "读数 {value} · 上限 {threshold} · 强度 {from}% → {to}%"
-    }
+    },
+    "throttleNote": "强度通过短周期暂停挖矿程序来降低。尚未在所有设备上验证，请将保护视为尽力而为。"
   },
   "device": {
     "androidCpu": "Android CPU",
@@ -391,13 +431,16 @@
     "bytesDownloaded": "已下载 {size}",
     "close": "关闭下载提示",
     "confirm": "下载并继续",
-    "copy": "此 APK 需要 ARM64 版 XMRig 可执行文件。它会从 AndroMiner 项目 GitHub 的 miner-builder 分支下载，并在你的手机本地运行。",
+    "copy": "此 APK 中未安装 {engine}。它从 AndroMiner 项目的 GitHub miner-builder 分支下载，用本应用内固定的 SHA-256 哈希校验，并在你的手机上本地运行。",
     "downloading": "正在下载…",
     "notice": "仅在你信任此来源时继续。安全软件可能会将挖矿软件标记为风险。下载的程序需要配合兼容的“下载版” APK 使用。",
     "noTlsHint": "仅支持普通 TCP",
     "progress": "挖矿程序下载进度",
     "title": "下载挖矿引擎",
-    "tlsHint": "支持加密矿池"
+    "tlsHint": "支持加密矿池",
+    "engines": "挖矿引擎",
+    "confirmOne": "下载 {engine}",
+    "confirmAll": "下载全部引擎（{count}）"
   },
   "guard": {
     "battery": "电量已低于设定下限（{threshold}%）。请先给手机充电再继续。",
@@ -562,7 +605,6 @@
     "didNotStart": "挖矿程序未能启动，请查看挖矿日志。",
     "downloadBeforeStart": "开始前请先下载 Android 挖矿程序。",
     "downloadFailed": "挖矿程序下载失败。",
-    "downloadingMiner": "正在从 GitHub 下载 {variant} 版 Android 挖矿程序…",
     "downloadRequired": "首次挖矿前需要先下载原生挖矿程序。",
     "exitCode": " 退出代码：{code}。",
     "historyNotSaved": "无法在此设备上保存会话历史。",
@@ -581,7 +623,8 @@
     "stopFailed": "停止失败，请重试“停止”。",
     "stopped": "挖矿程序已停止。",
     "stopRequested": "已请求停止，正在结束启动过程…",
-    "tooHot": "设备温度超过上限。请先降温再开始。"
+    "tooHot": "设备温度超过上限。请先降温再开始。",
+    "downloadingEngine": "正在下载 {engine}（{variant}）…"
   },
   "nav": {
     "about": "关于",
@@ -1022,6 +1065,8 @@
     "duration": "会话时长请设置在 0 到 1440 分钟之间。",
     "pool": "请输入不含空格的矿池主机。",
     "port": "端口请设置在 1 到 65535 之间。",
-    "wallet": "请输入你的钱包地址，或矿池提供的用户名。"
+    "wallet": "请输入你的钱包地址，或矿池提供的用户名。",
+    "engine": "此引擎无法挖所选币种。请选择兼容的引擎或币种。",
+    "coin": "此币种已不再提供。请选择其他币种。"
   }
 }

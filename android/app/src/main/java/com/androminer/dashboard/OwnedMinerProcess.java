@@ -13,8 +13,12 @@ final class OwnedMinerProcess {
         if (entries == null)
             throw new IOException(
                     "Cannot check for a previous miner process. Restart the app before mining.");
-        String bundled = context.getApplicationInfo().nativeLibraryDir + "/libxmrig.so";
-        String downloaded = new File(context.getFilesDir(), "miners/libxmrig.so").getAbsolutePath();
+        java.util.List<String> executables = new java.util.ArrayList<>();
+        for (String library : MinerEngine.libraryNames()) {
+            executables.add(context.getApplicationInfo().nativeLibraryDir + "/" + library);
+            executables.add(new File(context.getFilesDir(), "miners/" + library).getAbsolutePath());
+        }
+        String[] allowed = executables.toArray(new String[0]);
         for (File entry : entries) {
             if (!entry.getName().matches("[0-9]+")) continue;
             int pid;
@@ -23,7 +27,7 @@ final class OwnedMinerProcess {
             } catch (NumberFormatException ignored) {
                 continue;
             }
-            if (!matches(readCommand(entry), bundled, downloaded)) continue;
+            if (!matches(readCommand(entry), allowed)) continue;
             try {
                 android.os.Process.killProcess(pid);
             } catch (RuntimeException denied) {
@@ -32,17 +36,17 @@ final class OwnedMinerProcess {
                         denied);
             }
             long deadline = SystemClock.elapsedRealtime() + 1000;
-            while (matches(readCommand(entry), bundled, downloaded)
+            while (matches(readCommand(entry), allowed)
                     && SystemClock.elapsedRealtime() < deadline) SystemClock.sleep(25);
-            if (matches(readCommand(entry), bundled, downloaded))
+            if (matches(readCommand(entry), allowed))
                 throw new IOException(
                         "A previous miner is still running. Force stop AndroMiner in Android settings.");
         }
     }
 
-    static boolean matches(String command, String bundled, String downloaded) {
+    static boolean matches(String command, String... executables) {
         String[] args = command.split("\u0000");
-        if (args.length == 0 || (!args[0].equals(bundled) && !args[0].equals(downloaded)))
+        if (args.length == 0 || !java.util.Arrays.asList(executables).contains(args[0]))
             return false;
         for (String arg : args) if (arg.equals("--api-id=androminer-android")) return true;
         return false;

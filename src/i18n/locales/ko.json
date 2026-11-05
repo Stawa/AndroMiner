@@ -170,7 +170,6 @@
     "saveAgain": "저장하고 다시 시작",
     "saveChanges": "변경 사항 저장",
     "saved": "저장됨",
-    "saveDownload": "저장 및 다운로드",
     "saveStart": "저장하고 마이닝 시작",
     "scheduling": "CPU 스케줄링",
     "sec": {
@@ -263,6 +262,46 @@
     "checkConnected": "연결됨",
     "limitValue": "한도 {value}"
   },
+  "engine": {
+    "title": "채굴 엔진",
+    "select": "엔진",
+    "status": {
+      "supported": "지원됨",
+      "experimental": "실험적",
+      "unsupported": "Android에서 지원 안 됨"
+    },
+    "version": "버전",
+    "algorithms": "알고리즘",
+    "protocols": "풀 프로토콜",
+    "architectures": "아키텍처",
+    "intensity": "강도 제어",
+    "intensityUnverified": "채굴기를 짧은 주기로 일시 정지합니다. 기기에서는 아직 검증되지 않았습니다",
+    "intensityVerified": "기기에서 검증됨",
+    "license": "라이선스",
+    "install": {
+      "label": "설치",
+      "bundled": "이 APK에 포함됨",
+      "downloaded": "다운로드 및 검증됨",
+      "missing": "이 APK에 포함되지 않음",
+      "missingDownload": "다운로드되지 않음",
+      "abi": "이 CPU용으로 빌드되지 않음",
+      "unsupported": "Android에서 실행할 수 없음"
+    },
+    "experimental": "실험적: Android용으로 빌드했지만 아직 기기에서 검증되지 않았습니다. 작동하지 않을 수 있으며 보호 기능도 검증되지 않았습니다.",
+    "unavailable": "엔진 정보는 Android 앱에서 볼 수 있습니다.",
+    "unknown": "알 수 없음",
+    "none": "없음",
+    "download": "엔진 다운로드…",
+    "cannotDownload": "{engine}이(가) 설치되어 있지 않고 이 APK에는 승인된 다운로드가 없습니다. 해당 엔진이 포함된 TLS 또는 No-TLS APK를 사용하세요.",
+    "cannotMine": "{coin}을(를) 채굴할 수 없음",
+    "hintAuto": "{coin}에 맞게 자동 선택됨. 지원하는 다른 엔진을 선택할 수도 있습니다.",
+    "hintCustom": "직접 선택함. 이 코인의 자동 엔진은 {engine}입니다.",
+    "blocked": {
+      "download": "{engine}이(가) 설치되어 있지 않습니다. 위 엔진 카드에서 다운로드한 뒤 시작하세요.",
+      "abi": "{engine}은(는) 이 CPU용으로 빌드되지 않았습니다. 다른 엔진을 선택하세요.",
+      "unsupported": "{engine}은(는) Android에서 실행할 수 없습니다. 다른 엔진을 선택하세요."
+    }
+  },
   "protection": {
     "title": "기기 보호",
     "state": {
@@ -331,7 +370,8 @@
       "monitoringLost": "보호 모니터링을 사용할 수 없음: {reading}이(가) 보고를 멈췄습니다. 강도를 {to}%로 유지합니다.",
       "monitoringRestored": "보호 모니터링이 복구되었습니다. 센서가 다시 보고합니다.",
       "detail": "측정값 {value} · 한계 {threshold} · 강도 {from}% → {to}%"
-    }
+    },
+    "throttleNote": "채굴기를 짧은 주기로 일시 정지해 강도를 낮춥니다. 모든 기기에서 검증되지 않았으므로 보호는 최선의 노력으로 보세요."
   },
   "device": {
     "androidCpu": "Android CPU",
@@ -391,13 +431,16 @@
     "bytesDownloaded": "{size} 다운로드됨",
     "close": "다운로드 경고 닫기",
     "confirm": "다운로드하고 계속",
-    "copy": "이 APK에는 ARM64 XMRig 실행 파일이 필요합니다. AndroMiner 프로젝트의 GitHub miner-builder 브랜치에서 다운로드되며 휴대폰에서 로컬로 실행됩니다.",
+    "copy": "{engine}이(가) 이 APK에 설치되어 있지 않습니다. AndroMiner 프로젝트의 GitHub miner-builder 브랜치에서 내려받고, 이 앱에 고정된 SHA-256 해시로 검증한 뒤 휴대폰에서 로컬로 실행합니다.",
     "downloading": "다운로드 중…",
     "notice": "이 출처를 신뢰하는 경우에만 계속하세요. 보안 앱이 마이닝 소프트웨어를 탐지할 수 있습니다. 다운로드한 바이너리에는 호환되는 다운로드 APK가 필요합니다.",
     "noTlsHint": "일반 TCP만",
     "progress": "마이너 다운로드 진행률",
     "title": "마이닝 엔진 다운로드",
-    "tlsHint": "암호화된 풀 지원"
+    "tlsHint": "암호화된 풀 지원",
+    "engines": "채굴 엔진",
+    "confirmOne": "{engine} 다운로드",
+    "confirmAll": "모든 엔진 다운로드({count})"
   },
   "guard": {
     "battery": "배터리가 설정된 한도({threshold}%) 아래로 떨어졌습니다. 계속하기 전에 휴대폰을 충전하세요.",
@@ -562,7 +605,6 @@
     "didNotStart": "마이너가 시작되지 않았습니다. 마이닝 로그를 확인하세요.",
     "downloadBeforeStart": "시작하기 전에 Android 마이너 바이너리를 다운로드하세요.",
     "downloadFailed": "마이너 다운로드에 실패했습니다.",
-    "downloadingMiner": "GitHub에서 {variant} Android 마이너 바이너리를 다운로드하는 중...",
     "downloadRequired": "첫 마이닝 세션 전에 네이티브 마이너 다운로드가 필요합니다.",
     "exitCode": " 종료 코드: {code}.",
     "historyNotSaved": "이 기기에 세션 기록을 저장하지 못했습니다.",
@@ -581,7 +623,8 @@
     "stopFailed": "중지에 실패했습니다. 중지를 다시 시도하세요.",
     "stopped": "마이너가 중지되었습니다.",
     "stopRequested": "중지가 요청되었습니다. 시작 프로세스를 종료하는 중…",
-    "tooHot": "기기가 온도 한도를 초과했습니다. 시작하기 전에 식히세요."
+    "tooHot": "기기가 온도 한도를 초과했습니다. 시작하기 전에 식히세요.",
+    "downloadingEngine": "{engine} 다운로드 중({variant})…"
   },
   "nav": {
     "about": "정보",
@@ -1022,6 +1065,8 @@
     "duration": "0분에서 1440분 사이의 세션 시간을 사용하세요.",
     "pool": "공백 없이 풀 호스트를 입력하세요.",
     "port": "1에서 65535 사이의 포트를 사용하세요.",
-    "wallet": "지갑 주소 또는 풀에서 제공한 사용자 이름을 입력하세요."
+    "wallet": "지갑 주소 또는 풀에서 제공한 사용자 이름을 입력하세요.",
+    "engine": "이 엔진은 선택한 코인을 채굴할 수 없습니다. 호환되는 엔진이나 코인을 선택하세요.",
+    "coin": "이 코인은 더 이상 제공되지 않습니다. 다른 코인을 선택하세요."
   }
 }

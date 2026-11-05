@@ -1,10 +1,14 @@
 import type { MiningConfig } from '../types/mining';
+import { getCryptocurrencyById } from '../data/miningCatalog.ts';
+import { coinFitsEngine, normalizeEngine } from './engines.ts';
 
 /**
  * Returns a message key (see `validation.*` in the locale files) per invalid field, or '' when valid.
  * Pool usernames are valid too; do not enforce a coin-specific address length.
  */
 export const validateMiningSetup = (config: MiningConfig) => ({
+  coin: config.coin && !getCryptocurrencyById(config.coin.id) ? 'validation.coin' : '',
+  engine: coinFitsEngine(config.coin, normalizeEngine(config.engine)) ? '' : 'validation.engine',
   wallet:
     !config.walletAddress.trim() || /^YOUR_/i.test(config.walletAddress.trim())
       ? 'validation.wallet'

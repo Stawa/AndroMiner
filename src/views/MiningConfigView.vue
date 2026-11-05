@@ -4,12 +4,15 @@ import ConfigCard from '../components/ConfigCard.vue';
 import ConfigInput from '../components/ConfigInput.vue';
 import PoolConnectionTest from '../components/PoolConnectionTest.vue';
 import ConfigSelect from '../components/ConfigSelect.vue';
+import EngineCard from '../components/EngineCard.vue';
 import MaterialIcon from '../components/MaterialIcon.vue';
 import SavedSetupPicker from '../components/SavedSetupPicker.vue';
 import ProfileChip from '../components/ProfileChip.vue';
 import RangeSlider from '../components/RangeSlider.vue';
 import ToggleRow from '../components/ToggleRow.vue';
 import { profilePresets, type MinerBackendState } from '../composables/useMiningController';
+import { useNativeMinerInfo } from '../composables/useNativeMinerInfo';
+import { normalizeEngine } from '../utils/engines';
 import { cryptocurrencies } from '../data/miningCatalog';
 import {
   maxBatteryStopPercent,
@@ -26,7 +29,8 @@ import type {
   MiningConfig,
   MiningProfile,
   MiningProtocol,
-  SavedMiningProfile
+  SavedMiningProfile,
+  MiningEngineId
 } from '../types/mining';
 
 interface MiningConfigViewProps {
@@ -55,6 +59,8 @@ const props = defineProps<MiningConfigViewProps>();
 const emit = defineEmits<{
   profile: [value: MiningProfile];
   coin: [value: string];
+  engine: [value: MiningEngineId];
+  downloadEngines: [];
   applyProfile: [profile: SavedMiningProfile];
   start: [];
 }>();
@@ -62,6 +68,7 @@ const emit = defineEmits<{
 const profileNameDraft = ref('');
 const setupSection = ref<SetupSection>('setup');
 const saveFeedbackVisible = ref(false);
+const { engines: nativeEngines } = useNativeMinerInfo();
 const validationVisible = ref(false);
 const errors = computed(() => validateMiningSetup(props.config));
 const errorText = (key: string): string => (key ? t(key) : '');
@@ -231,20 +238,43 @@ const safetyAlert = computed(() => {
   return '';
 });
 
+/** Why the selected engine cannot start yet, or '' when it can. Shown under the start button. */
+const engineBlock = computed(() => {
+  const engine = nativeEngines.value.find(
+    (item) => item.id === normalizeEngine(props.config.engine)
+  );
+  const name = engine?.name ?? normalizeEngine(props.config.engine);
+  if (engine) {
+    if (engine.status === 'unsupported') return t('engine.blocked.unsupported', { engine: name });
+    if (!engine.abiSupported) return t('engine.blocked.abi', { engine: name });
+    if (!engine.installed) {
+      return t(engine.downloadApproved ? 'engine.blocked.download' : 'engine.cannotDownload', {
+        engine: name
+      });
+    }
+    return '';
+  }
+  return props.backendState === 'missing' ? t('engine.cannotDownload', { engine: name }) : '';
+});
+
 const canStartMining = computed(
   () =>
     !safetyAlert.value &&
-    (props.backendState === 'ready' ||
-      props.backendState === 'missing' ||
-      props.backendState === 'error')
+    !engineBlock.value &&
+    (props.backendState === 'ready' || props.backendState === 'error')
 );
 
 const startButtonLabel = computed(() =>
-  props.backendState === 'missing'
-    ? t('config.saveDownload')
-    : props.backendState === 'error'
-      ? t('config.saveAgain')
-      : t('config.saveStart')
+  props.backendState === 'error' ? t('config.saveAgain') : t('config.saveStart')
+);
+
+/** Every problem the setup still has, listed together because the field may sit on another tab. */
+const errorMessages = computed(() =>
+  validationVisible.value
+    ? Object.values(errors.value)
+        .filter(Boolean)
+        .map((key) => t(key))
+    : []
 );
 
 const saveButtonLabel = computed(() =>
@@ -315,7 +345,8 @@ const saveCurrentSetup = (): void => {
 const saveAndStartMining = (): void => {
   validationVisible.value = true;
   if (Object.values(errors.value).some(Boolean)) {
-    setupSection.value = errors.value.wallet ? 'setup' : 'pool';
+    setupSection.value =
+      errors.value.wallet || errors.value.coin || errors.value.engine ? 'setup' : 'pool';
     return;
   }
   saveCurrentSetup();
@@ -423,7 +454,12 @@ onBeforeUnmount(() => {
       <h1>{{ $t('config.title') }}</h1>
       <p>{{ $t('config.subtitle') }}</p>
     </header>
-    <div v-if="backendState !== 'ready'" class="notice">
+    <div
+      v-if="backendState !== 'ready'"
+      class="notice"
+      :class="backendState === 'error' ? 'notice-error' : 'notice-warn'"
+      :role="backendState === 'error' ? 'alert' : 'status'"
+    >
       <MaterialIcon :name="backendStatus.icon" :size="20" />
       <div>
         <strong>{{ setupNoticeTitle }}</strong>
@@ -455,10 +491,21 @@ onBeforeUnmount(() => {
             :model-value="config.coin.id"
             :label="$t('config.coin')"
             :options="coinOptions"
-            :supporting-text="$t('config.algorithmLine', { algorithm: config.algorithm })"
+            :supporting-text="
+              errors.coin
+                ? errorText(errors.coin)
+                : $t('config.algorithmLine', { algorithm: config.algorithm })
+            "
             @update:model-value="handleCoinChange"
           />
         </ConfigCard>
+        <EngineCard
+          :model-value="config.engine"
+          :coin="config.coin"
+          :error="validationVisible ? errorText(errors.engine) : ''"
+          @update:model-value="(engine) => emit('engine', engine)"
+          @download="emit('downloadEngines')"
+        />
         <ConfigCard icon="account_balance_wallet" :title="$t('config.walletWorker')">
           <ConfigInput
             v-model="config.walletAddress"
@@ -686,6 +733,12 @@ onBeforeUnmount(() => {
       <p v-if="safetyAlert" class="cfg-alert" role="alert">
         <MaterialIcon name="health_and_safety" :size="20" />{{ safetyAlert }}
       </p>
+      <div v-if="errorMessages.length" class="cfg-alert" role="alert">
+        <MaterialIcon name="error" :size="20" />
+        <ul>
+          <li v-for="message in errorMessages" :key="message">{{ message }}</li>
+        </ul>
+      </div>
       <div class="cfg-actions">
         <button
           class="outline-button"
@@ -706,6 +759,9 @@ onBeforeUnmount(() => {
           <span>{{ startButtonLabel }}</span>
         </button>
       </div>
+      <p v-if="engineBlock" class="cfg-start-note" role="status">
+        <MaterialIcon name="info" :size="18" />{{ engineBlock }}
+      </p>
     </fieldset>
   </div>
 </template>

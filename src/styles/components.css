@@ -321,6 +321,14 @@
 }
 .notice-error {
   border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, rgb(var(--color-app-card)));
+}
+.notice-error strong {
+  color: var(--danger);
+}
+.notice-warn {
+  border-color: rgb(var(--color-app-yellow));
+  background: color-mix(in srgb, rgb(var(--color-app-yellow)) 12%, rgb(var(--color-app-card)));
 }
 .notice-error > .material-symbols-rounded,
 .danger-text {
@@ -662,8 +670,12 @@
 .field-error {
   display: block;
   margin-top: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
   color: var(--danger);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
 }
 .profile-options {
   display: grid;

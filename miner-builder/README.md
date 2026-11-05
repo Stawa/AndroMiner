@@ -3,7 +3,7 @@
 Builds the CPU-only XMRig executable used by AndroMiner. The default target is
 `arm64-v8a`, Android API 29, with TLS enabled. `ABI=armeabi-v7a` builds the 32-bit ARM
 miner (API 24, NEON required, stripped release flags); see
-[docs/native-arm-miners.md](../docs/native-arm-miners.md) for what is and is not verified.
+[docs/engines.md](../docs/engines.md#armv7-armeabi-v7a) for what is and is not verified.
 
 The app can download prebuilt miners from the
 [`miner-builder` branch](https://github.com/Stawa/AndroMiner/tree/miner-builder).
@@ -15,6 +15,21 @@ Publishing a new binary does not automatically authorize existing APKs to run it
 Review the binary's source/version, independently verify both variant hashes, and
 update the APK pins when approving a new engine. APK signing authenticates those pins;
 this is not a replacement for reproducible builds or signed build provenance.
+
+## Engines
+
+`ENGINE` selects the upstream miner: `xmrig` (default), `xmrigcc` (miner only, remote-control
+client, shell and server disabled) or `xlarig` (Scala, Panthera). Each engine builds in its own
+source and build directories and installs its own library (`libxmrig.so`, `libxmrigcc.so`,
+`libxlarig.so`). XMRigCC and XLArig are built for `arm64-v8a` and `armeabi-v7a`.
+`build-all-engines.sh` builds every engine for every ABI into `jniLibs`, and
+`print-engine-pins.sh` produces the download pins after a publish. See
+[docs/engines.md](../docs/engines.md) for status and
+[validate-engine-device.sh](validate-engine-device.sh) for checking one on a real device.
+
+```bash
+ENGINE=xmrigcc WITH_TLS=ON RELEASE_BUILD=1 bash miner-builder/build-xmrig-android.sh
+```
 
 ## Requirements
 

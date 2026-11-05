@@ -170,7 +170,6 @@
     "saveAgain": "Guardar e iniciar de nuevo",
     "saveChanges": "Guardar cambios",
     "saved": "Guardado",
-    "saveDownload": "Guardar y descargar",
     "saveStart": "Guardar e iniciar minería",
     "scheduling": "Planificación de CPU",
     "sec": {
@@ -263,6 +262,46 @@
     "checkConnected": "Conectado",
     "limitValue": "límite {value}"
   },
+  "engine": {
+    "title": "Motor de minería",
+    "select": "Motor",
+    "status": {
+      "supported": "Compatible",
+      "experimental": "Experimental",
+      "unsupported": "No compatible con Android"
+    },
+    "version": "Versión",
+    "algorithms": "Algoritmos",
+    "protocols": "Protocolos de pool",
+    "architectures": "Arquitecturas",
+    "intensity": "Control de intensidad",
+    "intensityUnverified": "Pausa el minero en ciclos cortos; aún no verificado en hardware",
+    "intensityVerified": "Verificado en hardware",
+    "license": "Licencia",
+    "install": {
+      "label": "Instalación",
+      "bundled": "Incluido en este APK",
+      "downloaded": "Descargado y verificado",
+      "missing": "No incluido en este APK",
+      "missingDownload": "No descargado",
+      "abi": "No compilado para esta CPU",
+      "unsupported": "No puede ejecutarse en Android"
+    },
+    "experimental": "Experimental: compilado para Android pero aún no validado en un dispositivo. Puede no funcionar y su protección no se ha verificado.",
+    "unavailable": "Los detalles del motor están disponibles en la app de Android.",
+    "unknown": "Desconocido",
+    "none": "Ninguno",
+    "download": "Descargar motores…",
+    "cannotDownload": "{engine} no está instalado y este APK no tiene una descarga aprobada para él. Usa un APK TLS o No-TLS con el motor incluido.",
+    "cannotMine": "No puede minar {coin}",
+    "hintAuto": "Elegido automáticamente para {coin}. Puedes elegir otro motor compatible.",
+    "hintCustom": "Elección personalizada. {engine} es el motor automático para esta moneda.",
+    "blocked": {
+      "download": "{engine} no está instalado. Descárgalo desde la tarjeta del motor y luego inicia.",
+      "abi": "{engine} no está compilado para esta CPU. Elige otro motor.",
+      "unsupported": "{engine} no puede ejecutarse en Android. Elige otro motor."
+    }
+  },
   "protection": {
     "title": "Protección del dispositivo",
     "state": {
@@ -331,7 +370,8 @@
       "monitoringLost": "Supervisión de protección no disponible: {reading} dejó de informar. Intensidad mantenida en {to}%.",
       "monitoringRestored": "La supervisión de protección se ha restablecido: el sensor vuelve a informar.",
       "detail": "Lectura {value} · límite {threshold} · intensidad {from}% → {to}%"
-    }
+    },
+    "throttleNote": "La intensidad se reduce pausando el minero en ciclos cortos. No se ha verificado en todos los dispositivos, así que considera la protección de mejor esfuerzo."
   },
   "device": {
     "androidCpu": "Android CPU",
@@ -391,13 +431,16 @@
     "bytesDownloaded": "{size} descargados",
     "close": "Cerrar aviso de descarga",
     "confirm": "Descargar y continuar",
-    "copy": "Este APK necesita un ejecutable XMRig ARM64. Se descarga de la rama miner-builder del proyecto AndroMiner en GitHub y se ejecuta localmente en tu teléfono.",
+    "copy": "{engine} no está instalado en este APK. Se descarga de la rama miner-builder del proyecto AndroMiner en GitHub, se comprueba con un hash SHA-256 fijado en esta app y se ejecuta localmente en tu teléfono.",
     "downloading": "Descargando…",
     "notice": "Continúa solo si confías en esta fuente. Las apps de seguridad pueden marcar el software de minería. Los binarios descargados requieren el APK compatible con descarga.",
     "noTlsHint": "Solo TCP sin cifrar",
     "progress": "Progreso de la descarga del minero",
     "title": "Descargar motor de minería",
-    "tlsHint": "Se admiten pools cifrados"
+    "tlsHint": "Se admiten pools cifrados",
+    "engines": "motores de minería",
+    "confirmOne": "Descargar {engine}",
+    "confirmAll": "Descargar todos los motores ({count})"
   },
   "guard": {
     "battery": "La batería bajó del límite configurado ({threshold}%). Carga el teléfono antes de continuar.",
@@ -562,7 +605,6 @@
     "didNotStart": "El minero no se inició. Revisa los registros de minería.",
     "downloadBeforeStart": "Descarga el binario del minero de Android antes de iniciar.",
     "downloadFailed": "Falló la descarga del minero.",
-    "downloadingMiner": "Descargando el binario del minero de Android {variant} desde GitHub...",
     "downloadRequired": "Se requiere descargar el minero nativo antes de la primera sesión de minería.",
     "exitCode": " Código de salida: {code}.",
     "historyNotSaved": "El historial de sesiones no se pudo guardar en este dispositivo.",
@@ -581,7 +623,8 @@
     "stopFailed": "Falló la detención. Reintenta Detener.",
     "stopped": "Minero detenido.",
     "stopRequested": "Detención solicitada. Finalizando el proceso de inicio…",
-    "tooHot": "El dispositivo supera el límite de temperatura. Deja que se enfríe antes de iniciar."
+    "tooHot": "El dispositivo supera el límite de temperatura. Deja que se enfríe antes de iniciar.",
+    "downloadingEngine": "Descargando {engine} ({variant})…"
   },
   "nav": {
     "about": "Acerca de",
@@ -1022,6 +1065,8 @@
     "duration": "Usa una duración de sesión entre 0 y 1440 minutos.",
     "pool": "Introduce un host del pool sin espacios.",
     "port": "Usa un puerto entre 1 y 65535.",
-    "wallet": "Introduce tu dirección de cartera o el nombre de usuario que te dio tu pool."
+    "wallet": "Introduce tu dirección de cartera o el nombre de usuario que te dio tu pool.",
+    "engine": "Este motor no puede minar la moneda seleccionada. Elige un motor o una moneda compatible.",
+    "coin": "Esta moneda ya no está disponible. Elige otra moneda."
   }
 }

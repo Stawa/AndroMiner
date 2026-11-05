@@ -65,7 +65,7 @@ android {
         jniLibs {
             useLegacyPackaging = true
             if (!bundleMiner) {
-                excludes += ['**/libxmrig.so']
+                excludes += ['**/libxmrig.so', '**/libxmrigcc.so', '**/libxlarig.so']
             }
         }
     }

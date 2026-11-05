@@ -170,7 +170,6 @@
     "saveAgain": "Lưu và bắt đầu lại",
     "saveChanges": "Lưu thay đổi",
     "saved": "Đã lưu",
-    "saveDownload": "Lưu và tải",
     "saveStart": "Lưu và bắt đầu đào",
     "scheduling": "Lập lịch CPU",
     "sec": {
@@ -263,6 +262,46 @@
     "checkConnected": "Đã cắm",
     "limitValue": "giới hạn {value}"
   },
+  "engine": {
+    "title": "Công cụ đào",
+    "select": "Công cụ",
+    "status": {
+      "supported": "Được hỗ trợ",
+      "experimental": "Thử nghiệm",
+      "unsupported": "Không hỗ trợ trên Android"
+    },
+    "version": "Phiên bản",
+    "algorithms": "Thuật toán",
+    "protocols": "Giao thức pool",
+    "architectures": "Kiến trúc",
+    "intensity": "Điều khiển cường độ",
+    "intensityUnverified": "Tạm dừng trình đào theo chu kỳ ngắn; chưa được xác minh trên phần cứng",
+    "intensityVerified": "Đã xác minh trên phần cứng",
+    "license": "Giấy phép",
+    "install": {
+      "label": "Cài đặt",
+      "bundled": "Đi kèm trong APK này",
+      "downloaded": "Đã tải và xác minh",
+      "missing": "Không có trong APK này",
+      "missingDownload": "Chưa tải",
+      "abi": "Chưa được dựng cho CPU này",
+      "unsupported": "Không chạy được trên Android"
+    },
+    "experimental": "Thử nghiệm: đã dựng cho Android nhưng chưa được kiểm chứng trên thiết bị. Có thể không hoạt động và chế độ bảo vệ chưa được xác minh.",
+    "unavailable": "Chi tiết công cụ có trong ứng dụng Android.",
+    "unknown": "Không rõ",
+    "none": "Không có",
+    "download": "Tải công cụ…",
+    "cannotDownload": "{engine} chưa được cài và APK này không có bản tải đã được duyệt cho nó. Hãy dùng APK TLS hoặc No-TLS có đi kèm.",
+    "cannotMine": "Không đào được {coin}",
+    "hintAuto": "Tự động chọn cho {coin}. Bạn có thể chọn công cụ khác hỗ trợ đồng này.",
+    "hintCustom": "Lựa chọn tùy chỉnh. {engine} là công cụ tự động cho đồng này.",
+    "blocked": {
+      "download": "{engine} chưa được cài đặt. Tải về từ thẻ công cụ ở trên rồi bắt đầu.",
+      "abi": "{engine} không được xây dựng cho CPU này. Hãy chọn công cụ khác.",
+      "unsupported": "{engine} không chạy được trên Android. Hãy chọn công cụ khác."
+    }
+  },
   "protection": {
     "title": "Bảo vệ thiết bị",
     "state": {
@@ -331,7 +370,8 @@
       "monitoringLost": "Không thể giám sát bảo vệ: {reading} ngừng báo cáo. Giữ cường độ ở {to}%.",
       "monitoringRestored": "Giám sát bảo vệ đã hoạt động lại: cảm biến báo cáo trở lại.",
       "detail": "Số đo {value} · giới hạn {threshold} · cường độ {from}% → {to}%"
-    }
+    },
+    "throttleNote": "Cường độ được giảm bằng cách tạm dừng trình đào theo chu kỳ ngắn. Chưa xác minh trên mọi thiết bị nên hãy coi bảo vệ chỉ ở mức cố gắng tối đa."
   },
   "device": {
     "androidCpu": "CPU Android",
@@ -391,13 +431,16 @@
     "bytesDownloaded": "Đã tải {size}",
     "close": "Đóng cảnh báo tải xuống",
     "confirm": "Tải và tiếp tục",
-    "copy": "APK này cần một tệp thực thi XMRig ARM64. Tệp được tải từ nhánh miner-builder của dự án AndroMiner trên GitHub và chạy cục bộ trên điện thoại của bạn.",
+    "copy": "{engine} chưa được cài trong APK này. Nó được tải từ nhánh miner-builder của dự án AndroMiner trên GitHub, đối chiếu với mã băm SHA-256 được ghim trong ứng dụng và chạy cục bộ trên điện thoại của bạn.",
     "downloading": "Đang tải…",
     "notice": "Chỉ tiếp tục nếu bạn tin tưởng nguồn này. Ứng dụng bảo mật có thể gắn cờ phần mềm đào. Tệp nhị phân đã tải cần APK tải xuống tương thích.",
     "noTlsHint": "Chỉ TCP thuần",
     "progress": "Tiến trình tải thợ đào",
     "title": "Tải công cụ đào",
-    "tlsHint": "Hỗ trợ pool mã hóa"
+    "tlsHint": "Hỗ trợ pool mã hóa",
+    "engines": "công cụ đào",
+    "confirmOne": "Tải {engine}",
+    "confirmAll": "Tải tất cả công cụ ({count})"
   },
   "guard": {
     "battery": "Pin đã xuống dưới giới hạn đã cấu hình ({threshold}%). Hãy sạc điện thoại trước khi tiếp tục.",
@@ -562,7 +605,6 @@
     "didNotStart": "Thợ đào không khởi động. Hãy kiểm tra nhật ký đào.",
     "downloadBeforeStart": "Hãy tải tệp nhị phân thợ đào Android trước khi bắt đầu.",
     "downloadFailed": "Tải thợ đào thất bại.",
-    "downloadingMiner": "Đang tải tệp nhị phân thợ đào Android {variant} từ GitHub...",
     "downloadRequired": "Cần tải thợ đào gốc trước phiên đào đầu tiên.",
     "exitCode": " Mã thoát: {code}.",
     "historyNotSaved": "Không thể lưu lịch sử phiên trên thiết bị này.",
@@ -581,7 +623,8 @@
     "stopFailed": "Dừng thất bại. Hãy thử lại Dừng.",
     "stopped": "Thợ đào đã dừng.",
     "stopRequested": "Đã yêu cầu dừng. Đang kết thúc tiến trình khởi động…",
-    "tooHot": "Thiết bị vượt quá giới hạn nhiệt độ. Hãy để nguội trước khi bắt đầu."
+    "tooHot": "Thiết bị vượt quá giới hạn nhiệt độ. Hãy để nguội trước khi bắt đầu.",
+    "downloadingEngine": "Đang tải {engine} ({variant})…"
   },
   "nav": {
     "about": "Giới thiệu",
@@ -1022,6 +1065,8 @@
     "duration": "Hãy dùng thời lượng phiên từ 0 đến 1440 phút.",
     "pool": "Nhập máy chủ pool không có khoảng trắng.",
     "port": "Hãy dùng cổng từ 1 đến 65535.",
-    "wallet": "Nhập địa chỉ ví của bạn hoặc tên người dùng do pool cung cấp."
+    "wallet": "Nhập địa chỉ ví của bạn hoặc tên người dùng do pool cung cấp.",
+    "engine": "Công cụ này không đào được đồng đã chọn. Hãy chọn công cụ hoặc đồng tương thích.",
+    "coin": "Đồng này không còn được hỗ trợ. Hãy chọn đồng khác."
   }
 }

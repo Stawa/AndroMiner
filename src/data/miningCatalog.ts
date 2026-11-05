@@ -85,6 +85,59 @@ export const cryptocurrencies: Cryptocurrency[] = [
     logoClass: 'bg-app-elevated'
   },
   {
+    id: 'sal',
+    name: 'Salvium',
+    symbol: 'SAL',
+    algorithm: 'RandomX',
+    xmrigAlgo: 'rx/0',
+    miner: 'xmrig',
+    supportStatus: 'bundled',
+    supportNote: 'experimental: not yet tested with a live pool',
+    workerSeparator: '/',
+    defaultPort: 7028,
+    defaultPoolUrl: 'sal.kryptex.network',
+    defaultProtocol: 'stratum+tcp',
+    walletAddressPattern: 'Salvium wallet address',
+    poolExamples: [
+      {
+        name: 'Kryptex',
+        host: 'sal.kryptex.network',
+        port: 7028,
+        protocol: 'stratum+tcp',
+        notes:
+          'Worker names use WALLET/WORKER with letters and numbers only. Regional hosts: sal-eu and sal-us'
+      }
+    ],
+    logoText: 'S',
+    logoClass: 'bg-app-elevated'
+  },
+  {
+    id: 'xtm',
+    name: 'Tari',
+    symbol: 'XTM',
+    algorithm: 'RandomX',
+    xmrigAlgo: 'rx/0',
+    miner: 'xmrig',
+    supportStatus: 'bundled',
+    supportNote: 'experimental: pool recommends XMRig, algorithm flag not yet confirmed',
+    workerSeparator: '/',
+    defaultPort: 7038,
+    defaultPoolUrl: 'xtm-rx.kryptex.network',
+    defaultProtocol: 'stratum+tcp',
+    walletAddressPattern: 'Tari wallet address',
+    poolExamples: [
+      {
+        name: 'Kryptex (RandomX)',
+        host: 'xtm-rx.kryptex.network',
+        port: 7038,
+        protocol: 'stratum+tcp',
+        notes: 'Worker names use WALLET/WORKER with letters and numbers only'
+      }
+    ],
+    logoText: 'T',
+    logoClass: 'bg-app-elevated'
+  },
+  {
     id: 'wow',
     name: 'Wownero',
     symbol: 'WOW',
@@ -106,78 +159,6 @@ export const cryptocurrencies: Cryptocurrency[] = [
       }
     ],
     logoText: 'W',
-    logoClass: 'bg-app-elevated'
-  },
-  {
-    id: 'arq',
-    name: 'ArQmA',
-    symbol: 'ARQ',
-    algorithm: 'RandomARQ',
-    xmrigAlgo: 'rx/arq',
-    miner: 'xmrig',
-    supportStatus: 'bundled',
-    defaultPort: 5907,
-    defaultPoolUrl: 'stratum.aikapool.com',
-    defaultProtocol: 'stratum+tcp',
-    walletAddressPattern: 'ArQmA pool username or wallet, depending on pool',
-    poolExamples: [
-      {
-        name: 'AikaPool',
-        host: 'stratum.aikapool.com',
-        port: 5907,
-        protocol: 'stratum+tcp',
-        notes: 'RandomARQ pool example'
-      }
-    ],
-    logoText: 'A',
-    logoClass: 'bg-app-elevated'
-  },
-  {
-    id: 'sfx',
-    name: 'Safex Cash',
-    symbol: 'SFX',
-    algorithm: 'RandomSFX',
-    xmrigAlgo: 'rx/sfx',
-    miner: 'xmrig',
-    supportStatus: 'bundled',
-    defaultPort: 5555,
-    defaultPoolUrl: '',
-    defaultProtocol: 'stratum+tcp',
-    walletAddressPattern: 'Safex Cash wallet address',
-    poolExamples: [
-      {
-        name: 'Custom SFX pool',
-        host: '',
-        port: 5555,
-        protocol: 'stratum+tcp',
-        notes: 'Enter a current Safex Cash pool that supports rx/sfx'
-      }
-    ],
-    logoText: 'S',
-    logoClass: 'bg-app-elevated'
-  },
-  {
-    id: 'kva',
-    name: 'KevaCoin',
-    symbol: 'KVA',
-    algorithm: 'RandomKEVA',
-    xmrigAlgo: 'rx/keva',
-    miner: 'xmrig',
-    supportStatus: 'bundled',
-    defaultPort: 8999,
-    defaultPoolUrl: 'kva.ss.dxpool.com',
-    defaultProtocol: 'stratum+ssl',
-    walletAddressPattern: 'KevaCoin wallet address',
-    poolExamples: [
-      {
-        name: 'DxPool',
-        host: 'kva.ss.dxpool.com',
-        port: 8999,
-        protocol: 'stratum+ssl',
-        notes: 'RandomKEVA pool example'
-      }
-    ],
-    logoText: 'K',
     logoClass: 'bg-app-elevated'
   },
   {
@@ -267,78 +248,6 @@ export const cryptocurrencies: Cryptocurrency[] = [
     logoClass: 'bg-app-elevated'
   },
   {
-    id: 'chukwa',
-    name: 'Chukwa',
-    symbol: 'CHUKWA',
-    algorithm: 'Argon2id Chukwa',
-    xmrigAlgo: 'argon2/chukwa',
-    miner: 'xmrig',
-    supportStatus: 'bundled',
-    defaultPort: 3333,
-    defaultPoolUrl: '',
-    defaultProtocol: 'stratum+tcp',
-    walletAddressPattern: 'Wallet address for a coin or pool using argon2/chukwa',
-    poolExamples: [
-      {
-        name: 'Custom Chukwa pool',
-        host: '',
-        port: 3333,
-        protocol: 'stratum+tcp',
-        notes: 'Enter a pool that supports argon2/chukwa'
-      }
-    ],
-    logoText: 'C',
-    logoClass: 'bg-app-elevated'
-  },
-  {
-    id: 'chukwav2',
-    name: 'Chukwa v2',
-    symbol: 'CHUKWA2',
-    algorithm: 'Argon2id Chukwa v2',
-    xmrigAlgo: 'argon2/chukwav2',
-    miner: 'xmrig',
-    supportStatus: 'bundled',
-    defaultPort: 3333,
-    defaultPoolUrl: '',
-    defaultProtocol: 'stratum+tcp',
-    walletAddressPattern: 'Wallet address for a coin or pool using argon2/chukwav2',
-    poolExamples: [
-      {
-        name: 'Custom Chukwa v2 pool',
-        host: '',
-        port: 3333,
-        protocol: 'stratum+tcp',
-        notes: 'Enter a pool that supports argon2/chukwav2'
-      }
-    ],
-    logoText: 'C2',
-    logoClass: 'bg-app-elevated'
-  },
-  {
-    id: 'ninja',
-    name: 'NinjaCoin',
-    symbol: 'NINJA',
-    algorithm: 'Argon2id Ninja',
-    xmrigAlgo: 'argon2/ninja',
-    miner: 'xmrig',
-    supportStatus: 'bundled',
-    defaultPort: 3333,
-    defaultPoolUrl: '',
-    defaultProtocol: 'stratum+tcp',
-    walletAddressPattern: 'NinjaCoin wallet address',
-    poolExamples: [
-      {
-        name: 'Custom NINJA pool',
-        host: '',
-        port: 3333,
-        protocol: 'stratum+tcp',
-        notes: 'Enter a current NinjaCoin pool'
-      }
-    ],
-    logoText: 'N',
-    logoClass: 'bg-app-elevated'
-  },
-  {
     id: 'ccx',
     name: 'Conceal',
     symbol: 'CCX',
@@ -363,39 +272,15 @@ export const cryptocurrencies: Cryptocurrency[] = [
     logoClass: 'bg-app-elevated'
   },
   {
-    id: 'tlo',
-    name: 'Talleo',
-    symbol: 'TLO',
-    algorithm: 'CryptoNight-Pico Talleo',
-    xmrigAlgo: 'cn-pico/tlo',
-    miner: 'xmrig',
-    supportStatus: 'bundled',
-    defaultPort: 3333,
-    defaultPoolUrl: '',
-    defaultProtocol: 'stratum+tcp',
-    walletAddressPattern: 'Talleo wallet address',
-    poolExamples: [
-      {
-        name: 'Custom TLO pool',
-        host: '',
-        port: 3333,
-        protocol: 'stratum+tcp',
-        notes: 'Enter a current Talleo pool that supports cn-pico/tlo'
-      }
-    ],
-    logoText: 'T',
-    logoClass: 'bg-app-elevated'
-  },
-  {
     id: 'xla',
     name: 'Scala',
     symbol: 'XLA',
     algorithm: 'Panthera',
     xmrigAlgo: 'panthera',
-    miner: 'external',
-    minerName: 'XLArig or a Panthera-capable miner',
-    supportStatus: 'custom-miner-required',
-    supportNote: 'needs XLArig/Panthera support',
+    miner: 'xmrig',
+    requiredEngine: 'xlarig',
+    supportStatus: 'bundled',
+    supportNote: 'experimental: mined with XLArig, not yet validated on a device',
     defaultPort: 3333,
     defaultPoolUrl: 'mine.scala.network',
     defaultProtocol: 'stratum+tcp',
@@ -406,62 +291,10 @@ export const cryptocurrencies: Cryptocurrency[] = [
         host: 'mine.scala.network',
         port: 3333,
         protocol: 'stratum+tcp',
-        notes: 'Requires XLArig or another Panthera-capable miner'
+        notes: 'Mined with the XLArig engine; check the pool is still running before use'
       }
     ],
     logoText: 'X',
-    logoClass: 'bg-app-elevated'
-  },
-  {
-    id: 'dero',
-    name: 'Dero',
-    symbol: 'DERO',
-    algorithm: 'AstroBWT',
-    xmrigAlgo: 'astrobwt',
-    miner: 'external',
-    minerName: 'DERO miner',
-    supportStatus: 'custom-miner-required',
-    supportNote: 'current DERO mining uses AstroBWT',
-    defaultPort: 10100,
-    defaultPoolUrl: 'minernode1.dero.live',
-    defaultProtocol: 'stratum+tcp',
-    walletAddressPattern: 'Dero wallet address',
-    poolExamples: [
-      {
-        name: 'DERO miner node',
-        host: 'minernode1.dero.live',
-        port: 10100,
-        protocol: 'stratum+tcp',
-        notes: 'Requires the official DERO miner flow, not bundled XMRig'
-      }
-    ],
-    logoText: 'D',
-    logoClass: 'bg-app-elevated'
-  },
-  {
-    id: 'vkax',
-    name: 'Vkax',
-    symbol: 'VKAX',
-    algorithm: 'Mike',
-    xmrigAlgo: 'mike',
-    miner: 'external',
-    minerName: 'XMRigCC VKAX fork',
-    supportStatus: 'custom-miner-required',
-    supportNote: 'needs XMRigCC Mike algorithm support',
-    defaultPort: 3333,
-    defaultPoolUrl: '',
-    defaultProtocol: 'stratum+tcp',
-    walletAddressPattern: 'VKAX wallet address',
-    poolExamples: [
-      {
-        name: 'Custom VKAX pool',
-        host: '',
-        port: 3333,
-        protocol: 'stratum+tcp',
-        notes: 'Requires an XMRigCC build with the Mike algorithm'
-      }
-    ],
-    logoText: 'V',
     logoClass: 'bg-app-elevated'
   }
 ];

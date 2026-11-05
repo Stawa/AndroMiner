@@ -17,7 +17,43 @@ case "$ABI" in
   *) DEFAULT_PLATFORM="android-29" ;;
 esac
 ANDROID_PLATFORM="${ANDROID_PLATFORM:-$DEFAULT_PLATFORM}"
-XMRIG_REF="${XMRIG_REF:-v6.26.0}"
+# ENGINE selects the upstream miner. Each engine builds into its own source and build directories
+# and installs a separately named library, so engines never overwrite one another.
+ENGINE="${ENGINE:-xmrig}"
+case "$ENGINE" in
+  xmrig)
+    ENGINE_NAME="XMRig"
+    ENGINE_REPO="https://github.com/xmrig/xmrig.git"
+    ENGINE_REF="${XMRIG_REF:-v6.26.0}"
+    ENGINE_BINARIES=(xmrig xmrig-notls)
+    ENGINE_CMAKE_ARGS=()
+    ENGINE_LIB="libxmrig.so"
+    ;;
+  xmrigcc)
+    # Miner only: the command-and-control client, remote shell and server stay out of the binary.
+    ENGINE_NAME="XMRigCC"
+    ENGINE_REPO="https://github.com/Bendr0id/xmrigCC.git"
+    ENGINE_REF="${XMRIGCC_REF:-3.4.9}"
+    ENGINE_BINARIES=(xmrigMiner)
+    ENGINE_CMAKE_ARGS=(-DWITH_CC_CLIENT=OFF -DWITH_CC_SERVER=OFF -DWITH_CC_SHELL_EXEC=OFF
+      -DWITH_ASM=OFF -DWITH_MSR=OFF -DWITH_DMI=OFF -DWITH_ARGON2=OFF)
+    ENGINE_LIB="libxmrigcc.so"
+    ;;
+  xlarig)
+    ENGINE_NAME="XLArig"
+    ENGINE_REPO="https://github.com/scala-network/XLArig.git"
+    ENGINE_REF="${XLARIG_REF:-v5.2.4}"
+    ENGINE_BINARIES=(xlarig xlarig-notls)
+    # XLArig 5.x declares a CMake minimum that current CMake refuses; its code is otherwise unchanged.
+    ENGINE_CMAKE_ARGS=(-DWITH_ASM=OFF -DCMAKE_POLICY_VERSION_MINIMUM=3.5)
+    ENGINE_LIB="libxlarig.so"
+    ;;
+  *)
+    echo "Unknown ENGINE '$ENGINE'. Use xmrig, xmrigcc or xlarig." >&2
+    exit 1
+    ;;
+esac
+XMRIG_REF="$ENGINE_REF"
 LIBUV_REF="${LIBUV_REF:-v1.48.0}"
 OPENSSL_REF="${OPENSSL_REF:-openssl-4.0.0}"
 WITH_TLS="${WITH_TLS:-ON}"
@@ -98,7 +134,7 @@ fi
 
 TOOLCHAIN="$NDK_DIR/build/cmake/android.toolchain.cmake"
 INSTALL_DIR="$ROOT_DIR/android/app/src/main/jniLibs/$ABI"
-OUTPUT_BINARY="$INSTALL_DIR/libxmrig.so"
+OUTPUT_BINARY="$INSTALL_DIR/$ENGINE_LIB"
 
 command -v git >/dev/null || { echo "git is required." >&2; exit 1; }
 command -v cmake >/dev/null || { echo "cmake is required." >&2; exit 1; }
@@ -319,11 +355,17 @@ if [[ "$WITH_TLS" == "ON" ]]; then
   OPENSSL_TARGET="$(openssl_android_target)"
   ANDROID_API="$(android_api_level)"
 
-  log_step "Restoring OpenSSL ($OPENSSL_REF)"
-  clone_or_update "https://github.com/openssl/openssl.git" "$OPENSSL_REF" "$SRC_DIR/openssl"
+  # SKIP_OPENSSL_BUILD=1 reuses an OpenSSL already installed in the prefix. OpenSSL's Android build
+  # needs a Linux host, so this lets other hosts rebuild an engine against a prebuilt copy.
+  if [[ "${SKIP_OPENSSL_BUILD:-0}" == "1" && -f "$PREFIX_DIR/openssl-$ABI/lib/libssl.a" ]]; then
+    log_step "Reusing OpenSSL from $PREFIX_DIR/openssl-$ABI"
+  else
+    log_step "Restoring OpenSSL ($OPENSSL_REF)"
+    clone_or_update "https://github.com/openssl/openssl.git" "$OPENSSL_REF" "$SRC_DIR/openssl"
 
-  run_logged "Building OpenSSL ($OPENSSL_TARGET, API $ANDROID_API)" "$LOG_DIR/openssl.log" \
-    build_openssl "$SRC_DIR/openssl" "$PREFIX_DIR/openssl-$ABI" "$OPENSSL_TARGET" "$ANDROID_API"
+    run_logged "Building OpenSSL ($OPENSSL_TARGET, API $ANDROID_API)" "$LOG_DIR/openssl.log" \
+      build_openssl "$SRC_DIR/openssl" "$PREFIX_DIR/openssl-$ABI" "$OPENSSL_TARGET" "$ANDROID_API"
+  fi
 
   export PKG_CONFIG_LIBDIR="$PREFIX_DIR/openssl-$ABI/lib/pkgconfig:$PKG_CONFIG_LIBDIR"
   run_logged "Checking OpenSSL static dependencies" "$LOG_DIR/openssl-static-libs.log" \
@@ -341,23 +383,23 @@ else
   log_step "Skipping OpenSSL because WITH_TLS=$WITH_TLS"
 fi
 
-log_step "Restoring XMRig ($XMRIG_REF)"
-clone_or_update "https://github.com/xmrig/xmrig.git" "$XMRIG_REF" "$SRC_DIR/xmrig"
+log_step "Restoring $ENGINE_NAME ($ENGINE_REF)"
+clone_or_update "$ENGINE_REPO" "$ENGINE_REF" "$SRC_DIR/$ENGINE"
 
-log_step "Preparing XMRig Android CMake patch"
-if grep -q "pthread rt dl log" "$SRC_DIR/xmrig/CMakeLists.txt"; then
-  perl -0pi -e 's/pthread rt dl log/dl/g' "$SRC_DIR/xmrig/CMakeLists.txt"
+log_step "Preparing $ENGINE_NAME Android CMake patch"
+if grep -q "pthread rt dl log" "$SRC_DIR/$ENGINE/CMakeLists.txt"; then
+  perl -0pi -e 's/pthread rt dl log/dl/g' "$SRC_DIR/$ENGINE/CMakeLists.txt"
 fi
-perl -0pi -e 's/if \(WIN32\)/if (WIN32 AND NOT ANDROID)/g' "$SRC_DIR/xmrig/CMakeLists.txt"
-perl -0pi -e 's/NOT CMAKE_GENERATOR STREQUAL Xcode\)/NOT CMAKE_GENERATOR STREQUAL Xcode AND NOT ANDROID)/g' "$SRC_DIR/xmrig/CMakeLists.txt"
-if [[ -f "$SRC_DIR/xmrig/src/base/net/tls/TlsGen.cpp" ]]; then
-  perl -0pi -e 's/auto name = X509_get_subject_name\(m_x509\);/auto name = const_cast<X509_NAME *>(X509_get_subject_name(m_x509));/g' "$SRC_DIR/xmrig/src/base/net/tls/TlsGen.cpp"
+perl -0pi -e 's/if \(WIN32\)/if (WIN32 AND NOT ANDROID)/g' "$SRC_DIR/$ENGINE/CMakeLists.txt"
+perl -0pi -e 's/NOT CMAKE_GENERATOR STREQUAL Xcode\)/NOT CMAKE_GENERATOR STREQUAL Xcode AND NOT ANDROID)/g' "$SRC_DIR/$ENGINE/CMakeLists.txt"
+if [[ -f "$SRC_DIR/$ENGINE/src/base/net/tls/TlsGen.cpp" ]]; then
+  perl -0pi -e 's/auto name = X509_get_subject_name\(m_x509\);/auto name = const_cast<X509_NAME *>(X509_get_subject_name(m_x509));/g' "$SRC_DIR/$ENGINE/src/base/net/tls/TlsGen.cpp"
 fi
-if [[ -f "$SRC_DIR/xmrig/src/donate.h" ]]; then
-  perl -0pi -e 's/constexpr const int kDefaultDonateLevel = 1;/constexpr const int kDefaultDonateLevel = 0;/g; s/constexpr const int kMinimumDonateLevel = 1;/constexpr const int kMinimumDonateLevel = 0;/g' "$SRC_DIR/xmrig/src/donate.h"
+if [[ -f "$SRC_DIR/$ENGINE/src/donate.h" ]]; then
+  perl -0pi -e 's/constexpr const int kDefaultDonateLevel = \d+;/constexpr const int kDefaultDonateLevel = 0;/g; s/constexpr const int kMinimumDonateLevel = \d+;/constexpr const int kMinimumDonateLevel = 0;/g' "$SRC_DIR/$ENGINE/src/donate.h"
 fi
 
-log_step "Building XMRig"
+log_step "Building $ENGINE_NAME"
 log_detail "TLS" "$WITH_TLS"
 log_detail "Backend" "CPU"
 log_detail "HTTP API" "Enabled"
@@ -376,7 +418,7 @@ else
   log_detail "Thin LTO" "Disabled"
 fi
 log_detail "Release build" "$RELEASE_BUILD"
-rm -rf "$BUILD_DIR/xmrig-$ABI"
+rm -rf "$BUILD_DIR/$ENGINE-$ABI"
 XMRIG_EXTRA_FLAGS=()
 XMRIG_LINK_FLAGS=()
 if [[ "$RELEASE_BUILD" == "1" ]]; then
@@ -391,8 +433,8 @@ if [[ "$THIN_LTO" == "1" ]]; then
 fi
 XMRIG_CMAKE_ARGS=(
   -G Ninja
-  -S "$SRC_DIR/xmrig"
-  -B "$BUILD_DIR/xmrig-$ABI"
+  -S "$SRC_DIR/$ENGINE"
+  -B "$BUILD_DIR/$ENGINE-$ABI"
   -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN"
   -DANDROID_ABI="$ABI"
   -DANDROID_PLATFORM="$ANDROID_PLATFORM"
@@ -421,13 +463,16 @@ fi
 if (( ${#XMRIG_LINK_FLAGS[@]} > 0 )); then
   XMRIG_CMAKE_ARGS+=("-DCMAKE_EXE_LINKER_FLAGS=${XMRIG_LINK_FLAGS[*]}")
 fi
+XMRIG_CMAKE_ARGS+=("${ENGINE_CMAKE_ARGS[@]}")
 XMRIG_CMAKE_ARGS+=("${OPENSSL_CMAKE_ARGS[@]}")
 run_logged "Configuring XMRig" "$LOG_DIR/xmrig-configure-$ABI-$WITH_TLS.log" cmake "${XMRIG_CMAKE_ARGS[@]}"
 run_logged "Recording XMRig linker commands" "$LOG_DIR/xmrig-commands.log" \
-  ninja -C "$BUILD_DIR/xmrig-$ABI" -t commands
-run_logged "Building XMRig" "$LOG_DIR/xmrig-build-$ABI-$WITH_TLS.log" cmake --build "$BUILD_DIR/xmrig-$ABI" --parallel "$JOBS"
+  ninja -C "$BUILD_DIR/$ENGINE-$ABI" -t commands
+run_logged "Building XMRig" "$LOG_DIR/xmrig-build-$ABI-$WITH_TLS.log" cmake --build "$BUILD_DIR/$ENGINE-$ABI" --parallel "$JOBS"
 
-BUILT_XMRIG="$(find "$BUILD_DIR/xmrig-$ABI" -type f \( -name xmrig -o -name xmrig-notls \) -perm -111 | head -n 1)"
+FIND_NAMES=()
+for name in "${ENGINE_BINARIES[@]}"; do FIND_NAMES+=(-o -name "$name"); done
+BUILT_XMRIG="$(find "$BUILD_DIR/$ENGINE-$ABI" -type f \( -false "${FIND_NAMES[@]}" \) | head -n 1)"
 if [[ -z "$BUILT_XMRIG" || ! -s "$BUILT_XMRIG" ]]; then
   echo "XMRig build finished, but the xmrig executable was not found." >&2
   exit 1
@@ -438,7 +483,7 @@ run_logged "Verifying Android miner" "$LOG_DIR/xmrig-elf.log" \
 
 if [[ "$RELEASE_BUILD" == "1" ]]; then
   LLVM_BIN="$(ls -d "$NDK_DIR"/toolchains/llvm/prebuilt/*/bin | head -n 1)"
-  STRIPPED_XMRIG="$BUILD_DIR/xmrig-$ABI/libxmrig.so"
+  STRIPPED_XMRIG="$BUILD_DIR/$ENGINE-$ABI/$ENGINE_LIB"
   cp "$BUILT_XMRIG" "$STRIPPED_XMRIG"
   "$LLVM_BIN/llvm-strip" --strip-unneeded "$STRIPPED_XMRIG"
   run_logged "Verifying stripped Android miner" "$LOG_DIR/xmrig-elf-stripped.log" \

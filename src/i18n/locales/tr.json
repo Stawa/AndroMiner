@@ -170,7 +170,6 @@
     "saveAgain": "Kaydet ve yeniden başlat",
     "saveChanges": "Değişiklikleri kaydet",
     "saved": "Kaydedildi",
-    "saveDownload": "Kaydet ve indir",
     "saveStart": "Kaydet ve madenciliği başlat",
     "scheduling": "CPU zamanlaması",
     "sec": {
@@ -263,6 +262,46 @@
     "checkConnected": "Bağlı",
     "limitValue": "sınır {value}"
   },
+  "engine": {
+    "title": "Madencilik motoru",
+    "select": "Motor",
+    "status": {
+      "supported": "Destekleniyor",
+      "experimental": "Deneysel",
+      "unsupported": "Android'de desteklenmiyor"
+    },
+    "version": "Sürüm",
+    "algorithms": "Algoritmalar",
+    "protocols": "Havuz protokolleri",
+    "architectures": "Mimariler",
+    "intensity": "Yoğunluk kontrolü",
+    "intensityUnverified": "Madenciyi kısa döngülerle duraklatır; donanımda henüz doğrulanmadı",
+    "intensityVerified": "Donanımda doğrulandı",
+    "license": "Lisans",
+    "install": {
+      "label": "Kurulum",
+      "bundled": "Bu APK'ya dahil",
+      "downloaded": "İndirildi ve doğrulandı",
+      "missing": "Bu APK'ya dahil değil",
+      "missingDownload": "İndirilmedi",
+      "abi": "Bu CPU için derlenmedi",
+      "unsupported": "Android'de çalışamaz"
+    },
+    "experimental": "Deneysel: Android için derlendi ancak henüz bir cihazda doğrulanmadı. Çalışmayabilir ve koruması doğrulanmadı.",
+    "unavailable": "Motor ayrıntıları Android uygulamasında kullanılabilir.",
+    "unknown": "Bilinmiyor",
+    "none": "Yok",
+    "download": "Motorları indir…",
+    "cannotDownload": "{engine} kurulu değil ve bu APK'nın onun için onaylı bir indirmesi yok. Onu içeren TLS veya TLS'siz bir APK kullanın.",
+    "cannotMine": "{coin} madenleyemez",
+    "hintAuto": "{coin} için otomatik seçildi. Onu destekleyen başka bir motor seçebilirsiniz.",
+    "hintCustom": "Özel seçim. Bu para için otomatik motor {engine}.",
+    "blocked": {
+      "download": "{engine} yüklü değil. Yukarıdaki motor kartından indirin, sonra başlatın.",
+      "abi": "{engine} bu işlemci için derlenmedi. Başka bir motor seçin.",
+      "unsupported": "{engine} Android üzerinde çalışamaz. Başka bir motor seçin."
+    }
+  },
   "protection": {
     "title": "Cihaz koruması",
     "state": {
@@ -331,7 +370,8 @@
       "monitoringLost": "Koruma izleme kullanılamıyor: {reading} bildirim yapmayı bıraktı. Yoğunluk %{to} seviyesinde tutuluyor.",
       "monitoringRestored": "Koruma izleme geri geldi: sensör yeniden bildirim yapıyor.",
       "detail": "Ölçüm {value} · sınır {threshold} · yoğunluk %{from} → %{to}"
-    }
+    },
+    "throttleNote": "Yoğunluk, madenci kısa döngülerle duraklatılarak azaltılır. Bu her cihazda doğrulanmadı; korumayı elinden geleni yapan bir önlem olarak değerlendirin."
   },
   "device": {
     "androidCpu": "Android CPU",
@@ -391,13 +431,16 @@
     "bytesDownloaded": "{size} indirildi",
     "close": "İndirme uyarısını kapat",
     "confirm": "İndir ve devam et",
-    "copy": "Bu APK, ARM64 bir XMRig çalıştırılabilir dosyasına ihtiyaç duyar. AndroMiner projesinin GitHub miner-builder dalından indirilir ve telefonunuzda yerel olarak çalışır.",
+    "copy": "{engine} bu APK'da kurulu değil. AndroMiner projesinin GitHub miner-builder dalından indirilir, bu uygulamaya sabitlenmiş bir SHA-256 özetiyle doğrulanır ve telefonunuzda yerel olarak çalışır.",
     "downloading": "İndiriliyor…",
     "notice": "Yalnızca bu kaynağa güveniyorsanız devam edin. Güvenlik uygulamaları madencilik yazılımını işaretleyebilir. İndirilen ikili dosyalar uyumlu indirme APK'sı gerektirir.",
     "noTlsHint": "Yalnızca düz TCP",
     "progress": "Madenci indirme ilerlemesi",
     "title": "Madencilik motorunu indir",
-    "tlsHint": "Şifreli havuzlar desteklenir"
+    "tlsHint": "Şifreli havuzlar desteklenir",
+    "engines": "madencilik motorları",
+    "confirmOne": "{engine} indir",
+    "confirmAll": "Tüm motorları indir ({count})"
   },
   "guard": {
     "battery": "Pil yapılandırılan sınırın (%{threshold}) altına düştü. Devam etmeden önce telefonu şarj edin.",
@@ -562,7 +605,6 @@
     "didNotStart": "Madenci başlamadı. Madencilik günlüklerini kontrol edin.",
     "downloadBeforeStart": "Başlamadan önce Android madenci ikili dosyasını indirin.",
     "downloadFailed": "Madenci indirmesi başarısız oldu.",
-    "downloadingMiner": "{variant} Android madenci ikili dosyası GitHub'dan indiriliyor...",
     "downloadRequired": "İlk madencilik oturumundan önce yerel madenci indirmesi gerekir.",
     "exitCode": " Çıkış kodu: {code}.",
     "historyNotSaved": "Oturum geçmişi bu cihazda kaydedilemedi.",
@@ -581,7 +623,8 @@
     "stopFailed": "Durdurma başarısız oldu. Durdur'u yeniden deneyin.",
     "stopped": "Madenci durduruldu.",
     "stopRequested": "Durdurma istendi. Başlatma işlemi sonlandırılıyor…",
-    "tooHot": "Cihaz sıcaklık sınırının üzerinde. Başlamadan önce soğumasını bekleyin."
+    "tooHot": "Cihaz sıcaklık sınırının üzerinde. Başlamadan önce soğumasını bekleyin.",
+    "downloadingEngine": "{engine} indiriliyor ({variant})…"
   },
   "nav": {
     "about": "Hakkında",
@@ -1022,6 +1065,8 @@
     "duration": "0 ile 1440 dakika arasında bir oturum süresi kullanın.",
     "pool": "Boşluk içermeyen bir havuz ana bilgisayarı girin.",
     "port": "1 ile 65535 arasında bir bağlantı noktası kullanın.",
-    "wallet": "Cüzdan adresinizi veya havuzunuzun verdiği kullanıcı adını girin."
+    "wallet": "Cüzdan adresinizi veya havuzunuzun verdiği kullanıcı adını girin.",
+    "engine": "Bu motor seçilen parayı madenleyemez. Uyumlu bir motor veya para seçin.",
+    "coin": "Bu para artık sunulmuyor. Başka bir para seçin."
   }
 }

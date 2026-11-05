@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import MaterialIcon from './MaterialIcon.vue';
 import { useDialogFocus } from '../composables/useDialogFocus';
 import type { MinerBinaryVariant } from '../composables/useMiningController';
+import { downloadableEngines } from '../utils/engineDownloads';
+import type { NativeEngineInfo } from '../utils/engines';
 
 interface MinerDownloadProgress {
+  engine: string;
   variant: MinerBinaryVariant;
   percent: number;
   downloadedBytes: number;
@@ -16,12 +19,15 @@ interface MinerDownloadWarningSheetProps {
   downloading: boolean;
   progress: MinerDownloadProgress;
   error?: string;
+  /** What this device reports for every engine; empty until the native layer has answered. */
+  engines: readonly NativeEngineInfo[];
+  selectedId: string;
 }
 
 const props = defineProps<MinerDownloadWarningSheetProps>();
 
 const emit = defineEmits<{
-  confirm: [variant: MinerBinaryVariant];
+  confirm: [variant: MinerBinaryVariant, scope: 'selected' | 'all'];
   cancel: [];
 }>();
 
@@ -38,6 +44,13 @@ const formatBytes = (bytes: number): string => {
 
   return `${Math.round(bytes)} B`;
 };
+const missing = computed(() => downloadableEngines(props.engines));
+const selectedMissing = computed(() =>
+  missing.value.some((engine) => engine.id === props.selectedId)
+);
+const nameOf = (id: string): string =>
+  props.engines.find((engine) => engine.id === id)?.name ?? (id === 'xmrig' ? 'XMRig' : id);
+const selectedName = computed(() => nameOf(props.selectedId));
 const panel = ref<HTMLElement | null>(null);
 useDialogFocus(
   () => props.open,
@@ -70,7 +83,11 @@ useDialogFocus(
         </button>
       </div>
       <p class="section-copy">
-        {{ $t('download.copy') }}
+        {{
+          $t('download.copy', {
+            engine: selectedMissing || !missing.length ? selectedName : $t('download.engines')
+          })
+        }}
       </p>
       <div class="notice">
         <MaterialIcon name="info" :size="20" />
@@ -96,9 +113,11 @@ useDialogFocus(
         </button>
       </div>
       <div v-if="downloading" class="download-progress" role="status" aria-live="polite">
-        <strong>{{
-          progress.totalBytes ? Math.round(progress.percent) + '%' : $t('download.downloading')
-        }}</strong
+        <strong
+          >{{ nameOf(progress.engine) }} ·
+          {{
+            progress.totalBytes ? Math.round(progress.percent) + '%' : $t('download.downloading')
+          }}</strong
         ><progress
           v-if="progress.totalBytes"
           :value="progress.percent"
@@ -120,11 +139,29 @@ useDialogFocus(
         <button class="outline-button" :disabled="downloading" @click="emit('cancel')">
           {{ $t('common.cancel') }}</button
         ><button
+          v-if="selectedMissing || !missing.length"
           class="primary-button"
           :disabled="downloading"
-          @click="emit('confirm', selectedVariant)"
+          @click="emit('confirm', selectedVariant, 'selected')"
         >
-          {{ downloading ? $t('download.downloading') : $t('download.confirm') }}
+          {{
+            downloading
+              ? $t('download.downloading')
+              : missing.length
+                ? $t('download.confirmOne', { engine: selectedName })
+                : $t('download.confirm')
+          }}</button
+        ><button
+          v-if="missing.length > 1 || (missing.length === 1 && !selectedMissing)"
+          :class="selectedMissing ? 'outline-button' : 'primary-button'"
+          :disabled="downloading"
+          @click="emit('confirm', selectedVariant, 'all')"
+        >
+          {{
+            missing.length === 1
+              ? $t('download.confirmOne', { engine: missing[0].name })
+              : $t('download.confirmAll', { count: missing.length })
+          }}
         </button>
       </div>
     </section>

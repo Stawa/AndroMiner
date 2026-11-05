@@ -3,6 +3,8 @@ import { App } from '@capacitor/app';
 import { useSettingsStore } from '../stores/settings';
 import { formatDate, t } from '../i18n';
 import { maxTemperatureLimitC, validateMiningSetup } from '../utils/configValidation';
+import { useNativeMinerInfo } from './useNativeMinerInfo';
+import { coinFitsEngine, engineForCoin, normalizeEngine } from '../utils/engines';
 import { isFresh, nonNegative, readHashrates } from '../utils/miningTelemetry';
 import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
@@ -60,6 +62,7 @@ interface NativeMinerStatus {
 }
 
 interface NativeMinerDownloadProgress {
+  engine?: string;
   variant?: MinerBinaryVariant;
   percent?: number;
   downloadedBytes?: number;
@@ -68,7 +71,10 @@ interface NativeMinerDownloadProgress {
 
 interface NativeMinerPlugin {
   start: (options: { config: MiningConfig }) => Promise<NativeMinerStatus>;
-  download: (options: { variant: MinerBinaryVariant }) => Promise<NativeMinerStatus>;
+  download: (options: {
+    variant: MinerBinaryVariant;
+    engine?: string;
+  }) => Promise<NativeMinerStatus>;
   addListener: (
     eventName: 'downloadProgress',
     listenerFunc: (progress: NativeMinerDownloadProgress) => void
@@ -77,7 +83,7 @@ interface NativeMinerPlugin {
   stop: () => Promise<NativeMinerStatus>;
   restartAfterCrash: () => Promise<NativeMinerStatus>;
   cancelRestartAfterCrash: () => Promise<NativeMinerStatus>;
-  status: () => Promise<NativeMinerStatus>;
+  status: (options?: { engine: string }) => Promise<NativeMinerStatus>;
   deleteHistory: (options: { id?: string }) => Promise<NativeMinerStatus>;
   updateSafety: (options: {
     batteryFloor: number;
@@ -99,6 +105,7 @@ const defaultCoin = getCryptocurrencyById('xmr') || cryptocurrencies[0];
 
 const initialConfig: MiningConfig = {
   coin: defaultCoin,
+  engine: 'xmrig',
   algorithm: defaultCoin.algorithm,
   poolUrl: defaultCoin.defaultPoolUrl,
   poolPort: defaultCoin.defaultPort,
@@ -254,6 +261,7 @@ const writeSessionHistory = (history: MiningSessionHistoryItem[]): boolean => {
 };
 
 const emptyDownloadProgress = (): Required<NativeMinerDownloadProgress> => ({
+  engine: 'xmrig',
   variant: 'tls',
   percent: 0,
   downloadedBytes: 0,
@@ -262,6 +270,7 @@ const emptyDownloadProgress = (): Required<NativeMinerDownloadProgress> => ({
 
 const cloneConfig = (config: MiningConfig): MiningConfig => ({
   ...config,
+  engine: normalizeEngine(config.engine),
   maxDurationMinutes: config.maxDurationMinutes ?? 0,
   hardwareMode: normalizeHardwareMode(config.hardwareMode),
   affinity: normalizeCpuAffinity(config.affinity),
@@ -273,6 +282,7 @@ const cloneConfig = (config: MiningConfig): MiningConfig => ({
 
 export const useMiningController = () => {
   const settings = useSettingsStore();
+  const { engines: engineInfo, refreshNativeMinerInfo } = useNativeMinerInfo();
   let stopAfterStart = false;
   const isLoading = ref(true);
   const state = ref<MiningState>('idle');
@@ -544,7 +554,7 @@ export const useMiningController = () => {
 
     pollBusy = true;
     try {
-      const status = await NativeMiner.status();
+      const status = await NativeMiner.status({ engine: config.engine });
       if (disposed || actionBusy) return;
       if (status.running && status.activeConfig)
         Object.assign(config, cloneConfig(status.activeConfig));
@@ -576,39 +586,43 @@ export const useMiningController = () => {
     }
   };
 
-  const downloadMiner = async (variant: MinerBinaryVariant): Promise<boolean> => {
+  /**
+   * Downloads engines one after another, in the given order. Every download is hash-checked by the
+   * native layer before it is installed. Resolves to the failure messages, empty on full success,
+   * so one failing engine never hides another's result or blocks the ones after it.
+   */
+  const downloadEngines = async (
+    ids: readonly string[],
+    variant: MinerBinaryVariant
+  ): Promise<string[]> => {
     if (!Capacitor.isNativePlatform()) {
       backendState.value = 'web-unavailable';
       backendMessage.value = t('msg.buildToDownload');
-      return false;
+      return [backendMessage.value];
     }
+    if (backendState.value === 'downloading' || actionBusy) return [];
 
-    if (backendState.value === 'ready') return true;
-    if (backendState.value === 'downloading' || actionBusy) return false;
-
-    downloadProgress.value = {
-      ...emptyDownloadProgress(),
-      variant
-    };
+    const failures: string[] = [];
     backendState.value = 'downloading';
-    backendMessage.value = t('msg.downloadingMiner', {
-      variant: variant === 'tls' ? 'TLS' : 'no-TLS'
-    });
-
-    try {
-      const status = await NativeMiner.download({ variant });
-      setBackendStatus(status);
-      downloadProgress.value = {
-        ...downloadProgress.value,
-        percent: status.available ? 100 : downloadProgress.value.percent
-      };
-      return status.available;
-    } catch (error) {
-      connected.value = false;
-      backendState.value = 'missing';
-      backendMessage.value = error instanceof Error ? error.message : t('msg.downloadFailed');
-      return false;
+    for (const id of ids) {
+      const name = engineInfo.value.find((engine) => engine.id === id)?.name ?? id;
+      downloadProgress.value = { ...emptyDownloadProgress(), engine: id, variant };
+      backendMessage.value = t('msg.downloadingEngine', {
+        engine: name,
+        variant: variant === 'tls' ? 'TLS' : 'no-TLS'
+      });
+      try {
+        await NativeMiner.download({ engine: id, variant });
+      } catch (error) {
+        failures.push(error instanceof Error ? error.message : t('msg.downloadFailed'));
+      }
     }
+    connected.value = false;
+    backendState.value = 'checking';
+    await refreshNativeMinerInfo().catch(() => undefined);
+    await refreshStatus();
+    if (failures.length) backendMessage.value = failures.join(' ');
+    return failures;
   };
 
   const tickTelemetry = (): void => {
@@ -914,6 +928,13 @@ export const useMiningController = () => {
     const placeholderWallet = /^YOUR_[A-Z0-9]+_WALLET_ADDRESS$/;
 
     config.coin = coin;
+    /* The coin picks its engine. A custom engine the user chose stays only while it can still mine
+       the new coin. */
+    const previousEngine = config.engine;
+    if (!coinFitsEngine(coin, config.engine, engineInfo.value)) {
+      config.engine = engineForCoin(coin, engineInfo.value);
+    }
+    if (config.engine !== previousEngine) void refreshStatus();
     config.algorithm = coin.algorithm;
     config.poolUrl = coin.defaultPoolUrl;
     config.poolPort = coin.defaultPort;
@@ -925,6 +946,13 @@ export const useMiningController = () => {
     if (!config.walletAddress || placeholderWallet.test(config.walletAddress)) {
       config.walletAddress = `YOUR_${coin.symbol}_WALLET_ADDRESS`;
     }
+  };
+
+  const updateEngine = (engineId: string): void => {
+    const engine = normalizeEngine(engineId);
+    if (!coinFitsEngine(config.coin, engine, engineInfo.value)) return;
+    config.engine = engine;
+    void refreshStatus();
   };
 
   const applySavedProfile = (profile: SavedMiningProfile): void => {
@@ -982,6 +1010,7 @@ export const useMiningController = () => {
     if (Capacitor.isNativePlatform()) {
       void NativeMiner.addListener('downloadProgress', (progress) => {
         downloadProgress.value = {
+          engine: progress.engine ?? 'xmrig',
           variant: progress.variant === 'notls' ? 'notls' : 'tls',
           percent: bounded(Number(progress.percent ?? 0), 0, 100),
           downloadedBytes: Math.max(0, Number(progress.downloadedBytes ?? 0)),
@@ -1054,11 +1083,12 @@ export const useMiningController = () => {
     pauseMining,
     updateProfile,
     updateCoin,
+    updateEngine,
     applySavedProfile,
     deleteSessionHistoryItem,
     clearSessionHistory,
     syncDeviceTelemetry,
-    downloadMiner,
+    downloadEngines,
     refreshStatus,
     syncSafetySettings
   };

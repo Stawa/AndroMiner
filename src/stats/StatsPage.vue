@@ -172,7 +172,7 @@ const activeFor = (tag: string): number | null => {
     <header class="bar">
       <a class="brand" :href="repoUrl">AndroMiner <span>Usage</span></a>
       <nav aria-label="Project links">
-        <a :href="`${repoUrl}/blob/main/docs/statistics-methodology.md`">Methodology</a>
+        <a :href="`${repoUrl}/blob/main/docs/statistics.md`">Methodology</a>
         <a :href="`${repoUrl}/blob/main/docs/privacy.md`">Privacy</a>
         <a :href="repoUrl">Source</a>
       </nav>

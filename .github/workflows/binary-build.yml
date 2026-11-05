@@ -97,11 +97,123 @@ jobs:
           mkdir -p miner-payload/lib/armeabi-v7a/notls
           cp android/app/src/main/jniLibs/armeabi-v7a/libxmrig.so miner-payload/lib/armeabi-v7a/notls/libxmrig.so
 
+      - name: Build TLS XMRigCC arm64-v8a miner
+        env:
+          ENGINE: xmrigcc
+          WITH_TLS: 'ON'
+          RELEASE_BUILD: '1'
+          QUIET: 'ON'
+        run: bash miner-builder/build-xmrig-android.sh
+
+      - name: Collect TLS XMRigCC arm64-v8a miner
+        run: |
+          mkdir -p miner-payload/lib/arm64-v8a/tls
+          cp android/app/src/main/jniLibs/arm64-v8a/libxmrigcc.so miner-payload/lib/arm64-v8a/tls/libxmrigcc.so
+
+      - name: Build no-TLS XMRigCC arm64-v8a miner
+        env:
+          ENGINE: xmrigcc
+          WITH_TLS: 'OFF'
+          RELEASE_BUILD: '1'
+          QUIET: 'ON'
+        run: bash miner-builder/build-xmrig-android.sh
+
+      - name: Collect no-TLS XMRigCC arm64-v8a miner
+        run: |
+          mkdir -p miner-payload/lib/arm64-v8a/notls
+          cp android/app/src/main/jniLibs/arm64-v8a/libxmrigcc.so miner-payload/lib/arm64-v8a/notls/libxmrigcc.so
+
+      - name: Build TLS XMRigCC armeabi-v7a miner
+        env:
+          ENGINE: xmrigcc
+          ABI: armeabi-v7a
+          ANDROID_PLATFORM: android-24
+          WITH_TLS: 'ON'
+          RELEASE_BUILD: '1'
+          QUIET: 'ON'
+        run: bash miner-builder/build-xmrig-android.sh
+
+      - name: Collect TLS XMRigCC armeabi-v7a miner
+        run: |
+          mkdir -p miner-payload/lib/armeabi-v7a/tls
+          cp android/app/src/main/jniLibs/armeabi-v7a/libxmrigcc.so miner-payload/lib/armeabi-v7a/tls/libxmrigcc.so
+
+      - name: Build no-TLS XMRigCC armeabi-v7a miner
+        env:
+          ENGINE: xmrigcc
+          ABI: armeabi-v7a
+          ANDROID_PLATFORM: android-24
+          WITH_TLS: 'OFF'
+          RELEASE_BUILD: '1'
+          QUIET: 'ON'
+        run: bash miner-builder/build-xmrig-android.sh
+
+      - name: Collect no-TLS XMRigCC armeabi-v7a miner
+        run: |
+          mkdir -p miner-payload/lib/armeabi-v7a/notls
+          cp android/app/src/main/jniLibs/armeabi-v7a/libxmrigcc.so miner-payload/lib/armeabi-v7a/notls/libxmrigcc.so
+
+      - name: Build TLS XLArig arm64-v8a miner
+        env:
+          ENGINE: xlarig
+          WITH_TLS: 'ON'
+          RELEASE_BUILD: '1'
+          QUIET: 'ON'
+        run: bash miner-builder/build-xmrig-android.sh
+
+      - name: Collect TLS XLArig arm64-v8a miner
+        run: |
+          mkdir -p miner-payload/lib/arm64-v8a/tls
+          cp android/app/src/main/jniLibs/arm64-v8a/libxlarig.so miner-payload/lib/arm64-v8a/tls/libxlarig.so
+
+      - name: Build no-TLS XLArig arm64-v8a miner
+        env:
+          ENGINE: xlarig
+          WITH_TLS: 'OFF'
+          RELEASE_BUILD: '1'
+          QUIET: 'ON'
+        run: bash miner-builder/build-xmrig-android.sh
+
+      - name: Collect no-TLS XLArig arm64-v8a miner
+        run: |
+          mkdir -p miner-payload/lib/arm64-v8a/notls
+          cp android/app/src/main/jniLibs/arm64-v8a/libxlarig.so miner-payload/lib/arm64-v8a/notls/libxlarig.so
+
+      - name: Build TLS XLArig armeabi-v7a miner
+        env:
+          ENGINE: xlarig
+          ABI: armeabi-v7a
+          ANDROID_PLATFORM: android-24
+          WITH_TLS: 'ON'
+          RELEASE_BUILD: '1'
+          QUIET: 'ON'
+        run: bash miner-builder/build-xmrig-android.sh
+
+      - name: Collect TLS XLArig armeabi-v7a miner
+        run: |
+          mkdir -p miner-payload/lib/armeabi-v7a/tls
+          cp android/app/src/main/jniLibs/armeabi-v7a/libxlarig.so miner-payload/lib/armeabi-v7a/tls/libxlarig.so
+
+      - name: Build no-TLS XLArig armeabi-v7a miner
+        env:
+          ENGINE: xlarig
+          ABI: armeabi-v7a
+          ANDROID_PLATFORM: android-24
+          WITH_TLS: 'OFF'
+          RELEASE_BUILD: '1'
+          QUIET: 'ON'
+        run: bash miner-builder/build-xmrig-android.sh
+
+      - name: Collect no-TLS XLArig armeabi-v7a miner
+        run: |
+          mkdir -p miner-payload/lib/armeabi-v7a/notls
+          cp android/app/src/main/jniLibs/armeabi-v7a/libxlarig.so miner-payload/lib/armeabi-v7a/notls/libxlarig.so
+
       - name: Prepare branch payload
         run: |
           cp miner-payload/lib/arm64-v8a/tls/libxmrig.so miner-payload/lib/arm64-v8a/libxmrig.so
           cp miner-payload/lib/armeabi-v7a/tls/libxmrig.so miner-payload/lib/armeabi-v7a/libxmrig.so
-          (cd miner-payload && sha256sum lib/*/libxmrig.so lib/*/tls/libxmrig.so lib/*/notls/libxmrig.so > SHA256SUMS)
+          (cd miner-payload && sha256sum lib/*/libxmrig.so lib/*/tls/*.so lib/*/notls/*.so > SHA256SUMS)
           cat > miner-payload/README.md <<'EOF'
           # AndroMiner Miner Binaries
 
@@ -114,7 +226,12 @@ jobs:
           lib/arm64-v8a/notls/libxmrig.so
           lib/armeabi-v7a/tls/libxmrig.so
           lib/armeabi-v7a/notls/libxmrig.so
+          lib/<abi>/{tls,notls}/libxmrigcc.so
+          lib/<abi>/{tls,notls}/libxlarig.so
           ```
+
+          XMRigCC and XLArig are Experimental. The app downloads them only when its pinned hashes
+          cover the commit of this branch that it was built against.
 
           `lib/<abi>/libxmrig.so` is kept as the TLS default for compatibility.
 

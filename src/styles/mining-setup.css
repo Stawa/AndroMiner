@@ -302,6 +302,22 @@
   background: color-mix(in srgb, var(--danger) 14%, transparent);
   color: var(--danger);
 }
+.cfg-alert ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-weight: 600;
+}
+.cfg-start-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: rgb(var(--color-app-yellow));
+  overflow-wrap: anywhere;
+}
 @media (min-width: 48rem) {
   .cfg-tabs-wrap {
     margin-inline: 0;

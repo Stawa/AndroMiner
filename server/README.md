@@ -1,6 +1,6 @@
 # AndroMiner statistics service
 
-A small Node.js service (Node 22.13+; dependency-free when self-hosted with SQLite) that receives optional anonymous check-ins from the AndroMiner app and publishes aggregate statistics. See [privacy](../docs/privacy.md), [methodology](../docs/statistics-methodology.md), [API](../docs/stats-api.md) and [architecture](../docs/telemetry-architecture.md).
+A small Node.js service (Node 22.13+; dependency-free when self-hosted with SQLite) that receives optional anonymous check-ins from the AndroMiner app and publishes aggregate statistics. See the [privacy policy](../docs/privacy.md) and [usage statistics](../docs/statistics.md) (counting rules, API, design, contributing).
 
 ## Run
 

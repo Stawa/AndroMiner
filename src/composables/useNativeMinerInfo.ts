@@ -1,5 +1,6 @@
 import { computed, readonly, ref } from 'vue';
 import { Capacitor, registerPlugin } from '@capacitor/core';
+import type { NativeEngineInfo } from '../utils/engines';
 
 export type AppApkVariant = 'download' | 'tls' | 'notls';
 export type InstalledMinerVariant = 'tls' | 'notls' | 'unknown';
@@ -28,6 +29,7 @@ interface NativeMinerInfoResponse {
   apkVariant?: string;
   apkVariantLabel?: string;
   miner?: Partial<NativeMinerBinaryInfo>;
+  engines?: Array<Partial<NativeEngineInfo>>;
 }
 
 interface NativeMinerInfoPlugin {
@@ -96,7 +98,32 @@ const minerInfo = ref<NativeMinerBinaryInfo>({
     cuda: false
   }
 });
+const engines = ref<NativeEngineInfo[]>([]);
 let activeRefresh: Promise<void> | null = null;
+
+const readEngine = (item: Partial<NativeEngineInfo>): NativeEngineInfo => ({
+  id: String(item.id ?? ''),
+  name: String(item.name ?? item.id ?? ''),
+  status:
+    item.status === 'supported' || item.status === 'experimental' ? item.status : 'unsupported',
+  version: item.version ?? '',
+  installedVersion: item.installedVersion ?? null,
+  license: item.license ?? '',
+  upstream: item.upstream ?? '',
+  note: item.note ?? '',
+  algorithms: Array.isArray(item.algorithms) ? item.algorithms : [],
+  protocols: Array.isArray(item.protocols) ? item.protocols : [],
+  abis: Array.isArray(item.abis) ? item.abis : [],
+  abiSupported: Boolean(item.abiSupported),
+  installed: Boolean(item.installed),
+  downloadable: Boolean(item.downloadable),
+  downloadApproved: Boolean(item.downloadApproved),
+  source: item.source ?? 'missing',
+  intensityControl: {
+    method: item.intensityControl?.method ?? 'none',
+    verifiedOnDevice: Boolean(item.intensityControl?.verifiedOnDevice)
+  }
+});
 
 const refreshNativeMinerInfo = async (): Promise<void> => {
   if (!nativePlatform) {
@@ -122,6 +149,7 @@ const refreshNativeMinerInfo = async (): Promise<void> => {
   const info = await NativeMiner.info();
   const nextApkVariant = normalizeApkVariant(info.apkVariant);
   const nextMiner = info.miner ?? {};
+  engines.value = Array.isArray(info.engines) ? info.engines.map(readEngine) : [];
   const nextInstalledVariant = normalizeInstalledVariant(nextMiner.variant);
 
   apkVariant.value = nextApkVariant;
@@ -173,5 +201,6 @@ export const useNativeMinerInfo = () => ({
   apkVariant: readonly(apkVariant),
   apkVariantLabel: computed(() => formatApkVariant(apkVariant.value)),
   minerInfo: readonly(minerInfo),
+  engines: readonly(engines),
   refreshNativeMinerInfo: refreshOnce
 });

@@ -123,6 +123,8 @@ const rows = computed(() => [
     </div>
     <p class="dv-note dv-summary" role="status" aria-live="polite">{{ summary }}</p>
 
+    <p v-if="live" class="dv-note">{{ $t('protection.throttleNote') }}</p>
+
     <dl v-if="live" class="dv-list">
       <div>
         <dt>{{ $t('protection.configured') }}</dt>

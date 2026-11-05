@@ -26,6 +26,9 @@ export type CpuPriority = 'low' | 'normal' | 'high';
 
 export type MiningHardwareMode = 'cpu';
 
+/** Engines AndroMiner can launch. A saved config without one means XMRig. */
+export type MiningEngineId = 'xmrig' | 'xmrigcc' | 'xlarig';
+
 export interface Cryptocurrency {
   id: string;
   name: string;
@@ -35,6 +38,10 @@ export interface Cryptocurrency {
   miner: 'xmrig' | 'external';
   minerName?: string;
   supportStatus: 'bundled' | 'custom-miner-required';
+  /** How this coin's pools attach a worker name to the wallet. Defaults to `.`. */
+  workerSeparator?: '.' | '/';
+  /** Set when only one engine implements the algorithm (for example XLArig for Panthera). */
+  requiredEngine?: MiningEngineId;
   supportNote?: string;
   defaultPort: number;
   defaultPoolUrl: string;
@@ -53,6 +60,7 @@ export interface Cryptocurrency {
 
 export interface MiningConfig {
   coin: Cryptocurrency;
+  engine: MiningEngineId;
   algorithm: string;
   poolUrl: string;
   poolPort: number;

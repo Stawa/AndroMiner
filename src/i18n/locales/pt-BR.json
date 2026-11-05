@@ -170,7 +170,6 @@
     "saveAgain": "Salvar e iniciar novamente",
     "saveChanges": "Salvar alterações",
     "saved": "Salvo",
-    "saveDownload": "Salvar e baixar",
     "saveStart": "Salvar e iniciar mineração",
     "scheduling": "Agendamento de CPU",
     "sec": {
@@ -263,6 +262,46 @@
     "checkConnected": "Conectado",
     "limitValue": "limite {value}"
   },
+  "engine": {
+    "title": "Motor de mineração",
+    "select": "Motor",
+    "status": {
+      "supported": "Compatível",
+      "experimental": "Experimental",
+      "unsupported": "Incompatível com Android"
+    },
+    "version": "Versão",
+    "algorithms": "Algoritmos",
+    "protocols": "Protocolos de pool",
+    "architectures": "Arquiteturas",
+    "intensity": "Controle de intensidade",
+    "intensityUnverified": "Pausa o minerador em ciclos curtos; ainda não verificado em hardware",
+    "intensityVerified": "Verificado em hardware",
+    "license": "Licença",
+    "install": {
+      "label": "Instalação",
+      "bundled": "Incluído neste APK",
+      "downloaded": "Baixado e verificado",
+      "missing": "Não incluído neste APK",
+      "missingDownload": "Não baixado",
+      "abi": "Não compilado para esta CPU",
+      "unsupported": "Não roda no Android"
+    },
+    "experimental": "Experimental: compilado para Android, mas ainda não validado em um aparelho. Pode não funcionar e a proteção não foi verificada.",
+    "unavailable": "Os detalhes do motor estão disponíveis no app Android.",
+    "unknown": "Desconhecido",
+    "none": "Nenhum",
+    "download": "Baixar motores…",
+    "cannotDownload": "{engine} não está instalado e este APK não tem um download aprovado para ele. Use um APK TLS ou No-TLS que o inclua.",
+    "cannotMine": "Não consegue minerar {coin}",
+    "hintAuto": "Escolhido automaticamente para {coin}. Você pode escolher outro motor compatível.",
+    "hintCustom": "Escolha personalizada. {engine} é o motor automático desta moeda.",
+    "blocked": {
+      "download": "{engine} não está instalado. Baixe pelo cartão do motor acima e depois inicie.",
+      "abi": "{engine} não foi compilado para esta CPU. Escolha outro motor.",
+      "unsupported": "{engine} não pode rodar no Android. Escolha outro motor."
+    }
+  },
   "protection": {
     "title": "Proteção do dispositivo",
     "state": {
@@ -331,7 +370,8 @@
       "monitoringLost": "Monitoramento de proteção indisponível: {reading} deixou de informar. Intensidade mantida em {to}%.",
       "monitoringRestored": "O monitoramento de proteção voltou: o sensor está informando de novo.",
       "detail": "Leitura {value} · limite {threshold} · intensidade {from}% → {to}%"
-    }
+    },
+    "throttleNote": "A intensidade é reduzida pausando o minerador em ciclos curtos. Isso não foi verificado em todos os aparelhos, então trate a proteção como melhor esforço."
   },
   "device": {
     "androidCpu": "CPU Android",
@@ -391,13 +431,16 @@
     "bytesDownloaded": "{size} baixados",
     "close": "Fechar aviso de download",
     "confirm": "Baixar e continuar",
-    "copy": "Este APK precisa de um executável XMRig ARM64. Ele é baixado da branch miner-builder do projeto AndroMiner no GitHub e executado localmente no seu celular.",
+    "copy": "{engine} não está instalado neste APK. Ele é baixado da branch miner-builder do projeto AndroMiner no GitHub, conferido com um hash SHA-256 fixado neste app e executado localmente no seu celular.",
     "downloading": "Baixando…",
     "notice": "Continue apenas se confiar nesta fonte. Apps de segurança podem sinalizar software de mineração. Binários baixados exigem o APK compatível com download.",
     "noTlsHint": "Somente TCP simples",
     "progress": "Progresso do download do minerador",
     "title": "Baixar mecanismo de mineração",
-    "tlsHint": "Pools criptografados suportados"
+    "tlsHint": "Pools criptografados suportados",
+    "engines": "motores de mineração",
+    "confirmOne": "Baixar {engine}",
+    "confirmAll": "Baixar todos os motores ({count})"
   },
   "guard": {
     "battery": "A bateria ficou abaixo do limite configurado ({threshold}%). Carregue o celular antes de continuar.",
@@ -562,7 +605,6 @@
     "didNotStart": "O minerador não iniciou. Verifique os logs de mineração.",
     "downloadBeforeStart": "Baixe o binário do minerador Android antes de iniciar.",
     "downloadFailed": "Falha no download do minerador.",
-    "downloadingMiner": "Baixando o binário do minerador Android {variant} do GitHub...",
     "downloadRequired": "É necessário baixar o minerador nativo antes da primeira sessão de mineração.",
     "exitCode": " Código de saída: {code}.",
     "historyNotSaved": "Não foi possível salvar o histórico de sessões neste dispositivo.",
@@ -581,7 +623,8 @@
     "stopFailed": "Falha ao parar. Tente Parar novamente.",
     "stopped": "Minerador parado.",
     "stopRequested": "Parada solicitada. Encerrando o processo de inicialização…",
-    "tooHot": "O dispositivo está acima do limite de temperatura. Deixe-o esfriar antes de iniciar."
+    "tooHot": "O dispositivo está acima do limite de temperatura. Deixe-o esfriar antes de iniciar.",
+    "downloadingEngine": "Baixando {engine} ({variant})…"
   },
   "nav": {
     "about": "Sobre",
@@ -1022,6 +1065,8 @@
     "duration": "Use uma duração de sessão entre 0 e 1440 minutos.",
     "pool": "Informe um host de pool sem espaços.",
     "port": "Use uma porta entre 1 e 65535.",
-    "wallet": "Informe o endereço da sua carteira ou o nome de usuário fornecido pelo seu pool."
+    "wallet": "Informe o endereço da sua carteira ou o nome de usuário fornecido pelo seu pool.",
+    "engine": "Este motor não consegue minerar a moeda selecionada. Escolha um motor ou uma moeda compatível.",
+    "coin": "Esta moeda não é mais oferecida. Escolha outra moeda."
   }
 }

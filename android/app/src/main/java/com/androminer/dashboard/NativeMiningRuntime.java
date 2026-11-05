@@ -145,14 +145,10 @@ final class NativeMiningRuntime {
     private static final Pattern LATENCY_PATTERN =
             Pattern.compile("\\(([0-9]+)\\s*ms\\)", Pattern.CASE_INSENSITIVE);
     private static final Pattern XMRIG_VERSION_PATTERN =
-            Pattern.compile("\\bXMRig\\s+([^\\s]+)", Pattern.CASE_INSENSITIVE);
+            Pattern.compile("\\b(?:XMRigCC|XLArig|XMRig)[/\\s]+([0-9][^\\s]*)", Pattern.CASE_INSENSITIVE);
     private static final String[] BINARY_CANDIDATES = {
         "miners/libxmrig.so", "miners/xmrig", "miners/xmrig-aarch64", "libxmrig.so"
     };
-    private static final String MINER_DOWNLOAD_URL_FORMAT =
-            "https://raw.githubusercontent.com/Stawa/AndroMiner/"
-                    + MinerIntegrity.REVISION
-                    + "/lib/%s/%s/libxmrig.so";
     private static final String DEVICE_ABI = MinerAbi.select(Build.SUPPORTED_ABIS);
     private static final String API_HOST = "127.0.0.1";
     private static final int DOWNLOAD_CONNECT_TIMEOUT_MS = 15000;
@@ -279,6 +275,9 @@ final class NativeMiningRuntime {
     private long lastMinerCpuJiffies;
     private long lastCpuSampleAtMs;
     private volatile int minerPid = -1;
+    private MinerEngine activeEngine = MinerEngine.byId(MinerEngine.XMRIG);
+    /** Engine the UI currently has selected; decides which binary the status reports on. */
+    private volatile MinerEngine selectedEngine = MinerEngine.byId(MinerEngine.XMRIG);
     private ProtectionEngine protection;
     private MinerThrottle throttle;
     private volatile int measuredIntensity = 100;
@@ -455,6 +454,8 @@ final class NativeMiningRuntime {
     }
 
     public void status(PluginCall call) {
+        MinerEngine requested = MinerEngine.byId(call.getString("engine", null));
+        if (requested != null && requested.launchable()) selectedEngine = requested;
         controlExecutor.execute(() -> call.resolve(createStatus()));
     }
 
@@ -464,12 +465,19 @@ final class NativeMiningRuntime {
 
     public void download(PluginCall call) {
         String variant = normalizeMinerVariant(call.getString("variant", "tls"));
+        MinerEngine engine = MinerEngine.byId(call.getString("engine", MinerEngine.XMRIG));
+        if (engine == null || !engine.launchable() || !engine.downloadable) {
+            call.reject("This engine cannot be downloaded.");
+            return;
+        }
 
-        if (!MinerIntegrity.hasApprovedDownload(DEVICE_ABI)) {
+        if (!MinerIntegrity.hasApprovedDownload(engine.id, DEVICE_ABI)) {
             call.reject(
-                    "No approved miner download exists for this device ("
+                    "No approved "
+                            + engine.name
+                            + " download exists for this device ("
                             + (DEVICE_ABI == null ? Build.SUPPORTED_ABIS[0] : DEVICE_ABI)
-                            + "). Use an APK that bundles the miner.");
+                            + "). Use an APK that bundles it.");
             return;
         }
 
@@ -478,7 +486,7 @@ final class NativeMiningRuntime {
             return;
         }
 
-        File existing = findMinerBinary();
+        File existing = findMinerBinary(engine);
         boolean verified = false;
         if (existing != null) {
             try {
@@ -491,7 +499,7 @@ final class NativeMiningRuntime {
         if (verified) {
             existing.setExecutable(true);
             synchronized (this) {
-                lastMessage = "Miner binary is already installed.";
+                lastMessage = engine.name + " miner binary is already installed.";
                 appendLog(lastMessage);
             }
             call.resolve(createStatus());
@@ -508,25 +516,30 @@ final class NativeMiningRuntime {
                     synchronized (NativeMiningRuntime.this) {
                         lastMessage =
                                 "Downloading "
+                                        + engine.name
+                                        + " ("
                                         + formatMinerVariant(variant)
-                                        + " Android miner binary.";
+                                        + ") Android miner binary.";
                         lastFailureReason = "";
                         appendLog(lastMessage);
                     }
 
                     try {
-                        File binary = downloadMinerBinary(variant);
-                        saveInstalledMinerVariant(variant);
+                        File binary = downloadMinerBinary(engine, variant);
+                        saveInstalledMinerVariant(engine, variant);
                         synchronized (NativeMiningRuntime.this) {
                             lastMessage =
-                                    formatMinerVariant(variant)
-                                            + " miner binary downloaded and ready.";
+                                    engine.name
+                                            + " ("
+                                            + formatMinerVariant(variant)
+                                            + ") miner binary downloaded and ready.";
                             appendLog(lastMessage + " " + binary.getAbsolutePath());
                         }
                         call.resolve(createStatus());
                     } catch (IOException exception) {
                         synchronized (NativeMiningRuntime.this) {
-                            lastMessage = "Miner download failed: " + exception.getMessage();
+                            lastMessage =
+                                    engine.name + " download failed: " + exception.getMessage();
                             lastFailureReason = lastMessage;
                             appendLog(lastMessage);
                         }
@@ -572,13 +585,33 @@ final class NativeMiningRuntime {
             return;
         }
 
-        File binary = findMinerBinary();
-        if (binary == null) {
-            appendLog("Android miner binary is not installed.");
-            call.reject(
-                    "Miner binary is not installed. Download the Android XMRig binary before starting.");
+        MinerEngine engine = MinerEngine.byId(config.optString("engine", MinerEngine.XMRIG));
+        if (engine == null) {
+            call.reject("Unknown mining engine.");
             return;
         }
+        JSObject selectedCoin = config.getJSObject("coin");
+        String engineProblem =
+                engine.problem(
+                        DEVICE_ABI,
+                        selectedCoin == null ? "rx/0" : selectedCoin.optString("xmrigAlgo", "rx/0"));
+        if (engineProblem != null) {
+            call.reject(engineProblem);
+            return;
+        }
+        File binary = findMinerBinary(engine);
+        if (binary == null) {
+            appendLog(engine.name + " miner binary is not installed.");
+            call.reject(
+                    MinerIntegrity.hasApprovedDownload(engine.id, DEVICE_ABI)
+                            ? engine.name
+                                    + " is not installed. Download it before starting."
+                            : engine.name
+                                    + " is not installed and has no approved download in this APK."
+                                    + " Use a bundled TLS or No-TLS APK to run it.");
+            return;
+        }
+        activeEngine = engine;
 
         try {
             OwnedMinerProcess.stopOrphans(getContext());
@@ -636,6 +669,7 @@ final class NativeMiningRuntime {
                 && "notls"
                         .equals(
                                 resolveInstalledMinerVariant(
+                                        engine,
                                         resolveMinerSource(binary),
                                         normalizeApkVariant(BuildConfig.ANDROMINER_APK_VARIANT),
                                         ""))) {
@@ -837,8 +871,10 @@ final class NativeMiningRuntime {
         sessionRecord.put("requestedThreads", config.optInt("threadCount"));
         sessionRecord.put("priority", config.optString("priority"));
         sessionRecord.put("affinity", config.optString("affinity"));
-        String version = parseMinerVersion(readMinerVersionOutput(findMinerBinary()));
+        String version = parseMinerVersion(readMinerVersionOutput(findMinerBinary(activeEngine)));
         sessionRecord.put("minerVersion", version.isEmpty() ? JSONObject.NULL : version);
+        sessionRecord.put("engine", activeEngine.id);
+        sessionRecord.put("engineName", activeEngine.name);
         sessionRecord.put("appVersion", BuildConfig.VERSION_NAME);
         sessionRecord.put("apkVariant", BuildConfig.ANDROMINER_APK_VARIANT);
         sessionRecord.put("sampleSource", "xmrig-stdout-10s");
@@ -1081,11 +1117,11 @@ final class NativeMiningRuntime {
         String priority = config.getString("priority", "low");
         JSObject coin = config.getJSObject("coin");
         String algo = coin == null ? "rx/0" : coin.getString("xmrigAlgo", "rx/0");
-        String user = walletAddress;
-
-        if (!workerName.isBlank() && !walletAddress.contains(".")) {
-            user = walletAddress + "." + workerName;
-        }
+        String user =
+                PoolLogin.user(
+                        walletAddress,
+                        workerName,
+                        coin == null ? "." : coin.getString("workerSeparator", "."));
 
         List<String> command = new ArrayList<>();
         command.add(binary.getAbsolutePath());
@@ -1506,7 +1542,51 @@ final class NativeMiningRuntime {
         result.put("apkVariant", apkVariant);
         result.put("apkVariantLabel", formatApkVariant(apkVariant));
         result.put("miner", createMinerInfo(binary, apkVariant));
+        result.put("engines", createEnginesInfo());
         return result;
+    }
+
+    /**
+     * Every known engine with what is true about it on this device. Nothing here is inferred from
+     * the engine's name: status, supported algorithms and install state all come from the registry
+     * and the files actually present in this APK.
+     */
+    private JSArray createEnginesInfo() {
+        JSArray engines = new JSArray();
+        for (MinerEngine engine : MinerEngine.all()) {
+            File binary = engine.launchable() ? findMinerBinary(engine) : null;
+            JSObject item = new JSObject();
+            item.put("id", engine.id);
+            item.put("name", engine.name);
+            item.put("status", engine.status.name().toLowerCase(Locale.US));
+            item.put("version", engine.version);
+            item.put("license", engine.license);
+            item.put("upstream", engine.upstream);
+            item.put("note", engine.note);
+            item.put("algorithms", new JSArray(engine.algorithms));
+            item.put("protocols", new JSArray(engine.protocols));
+            item.put("abis", new JSArray(engine.abis));
+            item.put("abiSupported", engine.supportsAbi(DEVICE_ABI));
+            item.put("installed", binary != null);
+            item.put("downloadable", engine.downloadable);
+            item.put(
+                    "downloadApproved",
+                    engine.downloadable
+                            && MinerIntegrity.hasApprovedDownload(engine.id, DEVICE_ABI));
+            item.put("source", binary == null ? "missing" : resolveMinerSource(binary));
+            item.put("fileName", engine.libraryName);
+            String versionOutput = binary == null ? "" : readMinerVersionOutput(binary);
+            String installedVersion = parseMinerVersion(versionOutput);
+            item.put("installedVersion", installedVersion.isEmpty() ? JSONObject.NULL : installedVersion);
+            /* Throttling pauses the process, which works for any native engine, but it has only
+             * been exercised in unit tests, not on hardware. Say so instead of implying otherwise. */
+            JSObject intensity = new JSObject();
+            intensity.put("method", "duty-cycle");
+            intensity.put("verifiedOnDevice", false);
+            item.put("intensityControl", intensity);
+            engines.put(item);
+        }
+        return engines;
     }
 
     private JSObject createMinerInfo(File binary, String apkVariant) {
@@ -1515,7 +1595,9 @@ final class NativeMiningRuntime {
         String source = resolveMinerSource(binary);
         String versionOutput = installed ? readMinerVersionOutput(binary) : "";
         String version = parseMinerVersion(versionOutput);
-        String variant = resolveInstalledMinerVariant(source, apkVariant, versionOutput);
+        String variant =
+                resolveInstalledMinerVariant(
+                        MinerEngine.byId(MinerEngine.XMRIG), source, apkVariant, versionOutput);
 
         miner.put("installed", installed);
         miner.put("version", version);
@@ -1540,7 +1622,7 @@ final class NativeMiningRuntime {
     }
 
     private JSObject createStatus() {
-        File binary = findMinerBinary();
+        File binary = findMinerBinary(selectedEngine);
         boolean trusted = binary != null;
         if (trusted && !isRunning()) {
             try {
@@ -2236,6 +2318,15 @@ final class NativeMiningRuntime {
         }
     }
 
+    /** A bundled library wins; otherwise a verified download in app storage. */
+    private File findMinerBinary(MinerEngine engine) {
+        if (engine == null || MinerEngine.XMRIG.equals(engine.id)) return findMinerBinary();
+        File bundled = new File(getContext().getApplicationInfo().nativeLibraryDir, engine.libraryName);
+        if (bundled.exists()) return bundled;
+        File downloaded = new File(getContext().getFilesDir(), "miners/" + engine.libraryName);
+        return downloaded.exists() ? downloaded : null;
+    }
+
     private File findMinerBinary() {
         Context context = getContext();
         ApplicationInfo info = context.getApplicationInfo();
@@ -2290,13 +2381,13 @@ final class NativeMiningRuntime {
     }
 
     private String resolveInstalledMinerVariant(
-            String source, String apkVariant, String versionOutput) {
+            MinerEngine engine, String source, String apkVariant, String versionOutput) {
         if ("bundled".equals(source)) {
             return "notls".equals(apkVariant) ? "notls" : "tls";
         }
 
         if ("downloaded".equals(source)) {
-            String savedVariant = readInstalledMinerVariant();
+            String savedVariant = readInstalledMinerVariant(engine);
             return "unknown".equals(savedVariant)
                     ? inferMinerVariantFromVersionOutput(versionOutput)
                     : savedVariant;
@@ -2433,8 +2524,15 @@ final class NativeMiningRuntime {
         return getContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
     }
 
-    private String readInstalledMinerVariant() {
-        String variant = getMinerPreferences().getString(PREF_MINER_VARIANT, "unknown");
+    private String variantPreferenceKey(MinerEngine engine) {
+        return MinerEngine.XMRIG.equals(engine.id)
+                ? PREF_MINER_VARIANT
+                : PREF_MINER_VARIANT + "_" + engine.id;
+    }
+
+    private String readInstalledMinerVariant(MinerEngine engine) {
+        String variant =
+                getMinerPreferences().getString(variantPreferenceKey(engine), "unknown");
         String normalized = variant == null ? "unknown" : variant.trim().toLowerCase(Locale.US);
         if (normalized.equals("notls") || normalized.equals("no-tls")) {
             return "notls";
@@ -2447,11 +2545,18 @@ final class NativeMiningRuntime {
         return "unknown";
     }
 
-    private void saveInstalledMinerVariant(String variant) {
+    private void saveInstalledMinerVariant(MinerEngine engine, String variant) {
         getMinerPreferences()
                 .edit()
-                .putString(PREF_MINER_VARIANT, normalizeMinerVariant(variant))
+                .putString(variantPreferenceKey(engine), normalizeMinerVariant(variant))
                 .apply();
+    }
+
+    /** The engine a library file belongs to; unrecognised names are the legacy XMRig files. */
+    private MinerEngine engineForFile(File binary) {
+        for (MinerEngine engine : MinerEngine.all())
+            if (engine.launchable() && engine.libraryName.equals(binary.getName())) return engine;
+        return MinerEngine.byId(MinerEngine.XMRIG);
     }
 
     private String normalizeMinerVariant(String variant) {
@@ -2467,33 +2572,42 @@ final class NativeMiningRuntime {
         return "notls".equals(variant) ? "No-TLS" : "TLS";
     }
 
-    private String getMinerDownloadUrl(String variant) {
-        return String.format(MINER_DOWNLOAD_URL_FORMAT, DEVICE_ABI, variant);
+    private String getMinerDownloadUrl(MinerEngine engine, String variant) {
+        return "https://raw.githubusercontent.com/Stawa/AndroMiner/"
+                + MinerIntegrity.revision(engine.id)
+                + "/lib/"
+                + DEVICE_ABI
+                + "/"
+                + variant
+                + "/"
+                + engine.libraryName;
     }
 
     private void verifyInstalledBinary(File binary) throws IOException {
         if ("downloaded".equals(resolveMinerSource(binary))) {
-            String variant = readInstalledMinerVariant();
+            MinerEngine engine = engineForFile(binary);
+            String variant = readInstalledMinerVariant(engine);
             if (!"tls".equals(variant) && !"notls".equals(variant))
                 throw new IOException(
                         "Installed miner has no verified variant. Download the approved miner again.");
-            MinerIntegrity.verify(binary, MinerIntegrity.expectedHash(DEVICE_ABI, variant));
+            MinerIntegrity.verify(
+                    binary, MinerIntegrity.expectedHash(engine.id, DEVICE_ABI, variant));
         }
         verifiedPath = binary.getAbsolutePath();
         verifiedLength = binary.length();
         verifiedModified = binary.lastModified();
     }
 
-    private File downloadMinerBinary(String variant) throws IOException {
+    private File downloadMinerBinary(MinerEngine engine, String variant) throws IOException {
         File minersDir = new File(getContext().getFilesDir(), "miners");
         if (!minersDir.exists() && !minersDir.mkdirs()) {
             throw new IOException("Could not create miner storage directory.");
         }
 
-        File target = new File(minersDir, "libxmrig.so");
-        File temp = new File(minersDir, "libxmrig.so.download");
+        File target = new File(minersDir, engine.libraryName);
+        File temp = new File(minersDir, engine.libraryName + ".download");
         HttpURLConnection connection =
-                (HttpURLConnection) new URL(getMinerDownloadUrl(variant)).openConnection();
+                (HttpURLConnection) new URL(getMinerDownloadUrl(engine, variant)).openConnection();
         connection.setRequestMethod("GET");
         connection.setInstanceFollowRedirects(false);
         connection.setConnectTimeout(DOWNLOAD_CONNECT_TIMEOUT_MS);
@@ -2513,7 +2627,7 @@ final class NativeMiningRuntime {
             }
             long downloadedBytes = 0;
             long lastProgressAtMs = 0;
-            notifyDownloadProgress(variant, 0, downloadedBytes, totalBytes);
+            notifyDownloadProgress(engine, variant, 0, downloadedBytes, totalBytes);
 
             try (InputStream input = connection.getInputStream();
                     FileOutputStream output = new FileOutputStream(temp, false)) {
@@ -2528,6 +2642,7 @@ final class NativeMiningRuntime {
                     long now = System.currentTimeMillis();
                     if (now - lastProgressAtMs >= DOWNLOAD_PROGRESS_INTERVAL_MS) {
                         notifyDownloadProgress(
+                                engine,
                                 variant,
                                 calculateDownloadPercent(downloadedBytes, totalBytes),
                                 downloadedBytes,
@@ -2544,7 +2659,8 @@ final class NativeMiningRuntime {
 
             if (totalBytes > 0 && downloadedBytes != totalBytes)
                 throw new IOException("Miner download was interrupted.");
-            MinerIntegrity.verify(temp, MinerIntegrity.expectedHash(DEVICE_ABI, variant));
+            MinerIntegrity.verify(
+                    temp, MinerIntegrity.expectedHash(engine.id, DEVICE_ABI, variant));
             // POSIX rename replaces the old file atomically, without a delete-before-install gap.
             try {
                 android.system.Os.rename(temp.getAbsolutePath(), target.getAbsolutePath());
@@ -2554,7 +2670,11 @@ final class NativeMiningRuntime {
             target.setReadable(true, true);
             target.setExecutable(true, true);
             notifyDownloadProgress(
-                    variant, 100, target.length(), totalBytes > 0 ? totalBytes : target.length());
+                    engine,
+                    variant,
+                    100,
+                    target.length(),
+                    totalBytes > 0 ? totalBytes : target.length());
             return target;
         } finally {
             connection.disconnect();
@@ -2573,8 +2693,9 @@ final class NativeMiningRuntime {
     }
 
     private void notifyDownloadProgress(
-            String variant, int percent, long downloadedBytes, long totalBytes) {
+            MinerEngine engine, String variant, int percent, long downloadedBytes, long totalBytes) {
         JSObject progress = new JSObject();
+        progress.put("engine", engine.id);
         progress.put("variant", variant);
         progress.put("percent", percent);
         progress.put("downloadedBytes", downloadedBytes);

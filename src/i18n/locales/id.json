@@ -170,7 +170,6 @@
     "saveAgain": "Simpan & Mulai Lagi",
     "saveChanges": "Simpan perubahan",
     "saved": "Tersimpan",
-    "saveDownload": "Simpan & Unduh",
     "saveStart": "Simpan & Mulai Menambang",
     "scheduling": "Penjadwalan CPU",
     "sec": {
@@ -263,6 +262,46 @@
     "checkConnected": "Terhubung",
     "limitValue": "batas {value}"
   },
+  "engine": {
+    "title": "Mesin penambangan",
+    "select": "Mesin",
+    "status": {
+      "supported": "Didukung",
+      "experimental": "Eksperimental",
+      "unsupported": "Tidak didukung di Android"
+    },
+    "version": "Versi",
+    "algorithms": "Algoritma",
+    "protocols": "Protokol pool",
+    "architectures": "Arsitektur",
+    "intensity": "Kontrol intensitas",
+    "intensityUnverified": "Menjeda penambang dalam siklus singkat; belum diverifikasi di perangkat keras",
+    "intensityVerified": "Terverifikasi di perangkat keras",
+    "license": "Lisensi",
+    "install": {
+      "label": "Instalasi",
+      "bundled": "Disertakan di APK ini",
+      "downloaded": "Diunduh dan diverifikasi",
+      "missing": "Tidak disertakan di APK ini",
+      "missingDownload": "Belum diunduh",
+      "abi": "Tidak dibangun untuk CPU ini",
+      "unsupported": "Tidak bisa berjalan di Android"
+    },
+    "experimental": "Eksperimental: dibangun untuk Android tetapi belum divalidasi di perangkat. Mungkin tidak berfungsi, dan perlindungannya belum diverifikasi.",
+    "unavailable": "Detail mesin tersedia di aplikasi Android.",
+    "unknown": "Tidak diketahui",
+    "none": "Tidak ada",
+    "download": "Unduh mesin…",
+    "cannotDownload": "{engine} belum terpasang dan APK ini tidak punya unduhan yang disetujui untuknya. Gunakan APK TLS atau No-TLS yang menyertakannya.",
+    "cannotMine": "Tidak bisa menambang {coin}",
+    "hintAuto": "Dipilih otomatis untuk {coin}. Anda bisa memilih mesin lain yang mendukungnya.",
+    "hintCustom": "Pilihan khusus. {engine} adalah mesin otomatis untuk koin ini.",
+    "blocked": {
+      "download": "{engine} belum terpasang. Unduh lewat kartu mesin di atas, lalu mulai.",
+      "abi": "{engine} tidak dibuat untuk CPU ini. Pilih mesin lain.",
+      "unsupported": "{engine} tidak bisa berjalan di Android. Pilih mesin lain."
+    }
+  },
   "protection": {
     "title": "Perlindungan perangkat",
     "state": {
@@ -331,7 +370,8 @@
       "monitoringLost": "Pemantauan perlindungan tidak tersedia: {reading} berhenti melapor. Intensitas dipertahankan di {to}%.",
       "monitoringRestored": "Pemantauan perlindungan kembali: sensor melapor lagi.",
       "detail": "Pembacaan {value} · batas {threshold} · intensitas {from}% → {to}%"
-    }
+    },
+    "throttleNote": "Intensitas dikurangi dengan menjeda penambang dalam siklus singkat. Ini belum diverifikasi di semua perangkat, jadi anggap perlindungan sebagai upaya terbaik."
   },
   "device": {
     "androidCpu": "CPU Android",
@@ -391,13 +431,16 @@
     "bytesDownloaded": "{size} diunduh",
     "close": "Tutup peringatan unduhan",
     "confirm": "Unduh & lanjutkan",
-    "copy": "APK ini memerlukan executable XMRig ARM64. File diunduh dari branch miner-builder di GitHub proyek AndroMiner dan berjalan secara lokal di ponsel Anda.",
+    "copy": "{engine} belum terpasang di APK ini. Diunduh dari branch miner-builder proyek AndroMiner di GitHub, diperiksa dengan hash SHA-256 yang disematkan di aplikasi ini, dan berjalan lokal di ponsel Anda.",
     "downloading": "Mengunduh…",
     "notice": "Lanjutkan hanya jika Anda memercayai sumber ini. Aplikasi keamanan mungkin menandai perangkat lunak penambangan. Biner yang diunduh memerlukan APK unduhan yang kompatibel.",
     "noTlsHint": "Hanya TCP biasa",
     "progress": "Progres unduhan penambang",
     "title": "Unduh mesin penambangan",
-    "tlsHint": "Mendukung pool terenkripsi"
+    "tlsHint": "Mendukung pool terenkripsi",
+    "engines": "mesin penambangan",
+    "confirmOne": "Unduh {engine}",
+    "confirmAll": "Unduh semua mesin ({count})"
   },
   "guard": {
     "battery": "Baterai turun di bawah batas yang dikonfigurasi ({threshold}%). Isi daya ponsel sebelum melanjutkan.",
@@ -562,7 +605,6 @@
     "didNotStart": "Penambang tidak berjalan. Periksa log penambangan.",
     "downloadBeforeStart": "Unduh biner penambang Android sebelum memulai.",
     "downloadFailed": "Unduhan penambang gagal.",
-    "downloadingMiner": "Mengunduh biner penambang Android {variant} dari GitHub...",
     "downloadRequired": "Penambang native perlu diunduh sebelum sesi penambangan pertama.",
     "exitCode": " Kode keluar: {code}.",
     "historyNotSaved": "Riwayat sesi tidak dapat disimpan di perangkat ini.",
@@ -581,7 +623,8 @@
     "stopFailed": "Gagal menghentikan. Coba Hentikan lagi.",
     "stopped": "Penambang berhenti.",
     "stopRequested": "Permintaan berhenti diterima. Mengakhiri proses awal…",
-    "tooHot": "Perangkat melebihi batas suhu. Biarkan dingin sebelum memulai."
+    "tooHot": "Perangkat melebihi batas suhu. Biarkan dingin sebelum memulai.",
+    "downloadingEngine": "Mengunduh {engine} ({variant})…"
   },
   "nav": {
     "about": "Tentang",
@@ -1022,6 +1065,8 @@
     "duration": "Gunakan durasi sesi antara 0 dan 1440 menit.",
     "pool": "Masukkan host pool tanpa spasi.",
     "port": "Gunakan port antara 1 dan 65535.",
-    "wallet": "Masukkan alamat dompet Anda atau nama pengguna dari pool Anda."
+    "wallet": "Masukkan alamat dompet Anda atau nama pengguna dari pool Anda.",
+    "engine": "Mesin ini tidak bisa menambang koin yang dipilih. Pilih mesin atau koin yang kompatibel.",
+    "coin": "Koin ini tidak lagi tersedia. Pilih koin lain."
   }
 }

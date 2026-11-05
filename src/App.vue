@@ -22,6 +22,9 @@ import MinerDownloadWarningSheet from './components/MinerDownloadWarningSheet.vu
 import PhoneMiningRiskView from './components/PhoneMiningRiskView.vue';
 import StartMiningWarningSheet from './components/StartMiningWarningSheet.vue';
 import CrashRestartPrompt from './components/CrashRestartPrompt.vue';
+import { useNativeMinerInfo } from './composables/useNativeMinerInfo';
+import { downloadOrder, missingEngineAction } from './utils/engineDownloads';
+import { normalizeEngine } from './utils/engines';
 import { useDeviceTelemetry } from './composables/useDeviceTelemetry';
 import { useGitHubReleaseUpdater } from './composables/useGitHubReleaseUpdater';
 import { useMiningController, type MinerBinaryVariant } from './composables/useMiningController';
@@ -53,6 +56,9 @@ const systemCheckComplete = ref(false);
 const phoneRiskWarningAccepted = ref(localStorage.getItem(phoneRiskWarningKey) === 'true');
 const minerDownloadWarningOpen = ref(false);
 const minerDownloadError = ref('');
+/** True when the download sheet was opened because a start needs a missing engine. */
+const downloadThenStart = ref(false);
+const { engines: nativeEngines } = useNativeMinerInfo();
 const startWarningOpen = ref(false);
 const dataFeedback = ref('');
 let removeBackListener: (() => Promise<void>) | undefined;
@@ -122,8 +128,22 @@ const requestStartMining = (): void => {
     activeTab.value = 'mining';
     return;
   }
-  if (miner.backendState.value === 'missing') {
+  const engine = normalizeEngine(miner.config.engine);
+  const action = nativeEngines.value.length
+    ? missingEngineAction(engine, nativeEngines.value)
+    : miner.backendState.value === 'missing'
+      ? 'download'
+      : 'none';
+  if (action === 'unavailable') {
+    dataFeedback.value = t('engine.cannotDownload', {
+      engine: nativeEngines.value.find((item) => item.id === engine)?.name ?? engine
+    });
+    activeTab.value = 'mining';
+    return;
+  }
+  if (action === 'download') {
     minerDownloadError.value = '';
+    downloadThenStart.value = true;
     minerDownloadWarningOpen.value = true;
     return;
   }
@@ -136,16 +156,39 @@ const saveAndStartMining = (): void => {
   requestStartMining();
 };
 
-const confirmMinerDownloadAndStart = async (variant: MinerBinaryVariant): Promise<void> => {
+const openEngineDownloads = (): void => {
+  if (sessionActive.value) return;
   minerDownloadError.value = '';
-  const ready = await miner.downloadMiner(variant);
-  if (!ready) {
-    minerDownloadError.value = miner.backendMessage.value;
+  downloadThenStart.value = false;
+  minerDownloadWarningOpen.value = true;
+};
+
+const confirmMinerDownload = async (
+  variant: MinerBinaryVariant,
+  scope: 'selected' | 'all'
+): Promise<void> => {
+  minerDownloadError.value = '';
+  const selected = normalizeEngine(miner.config.engine);
+  const ids = nativeEngines.value.length
+    ? downloadOrder(scope, selected, nativeEngines.value)
+    : ['xmrig'];
+  const failures = await miner.downloadEngines(ids, variant);
+  const selectedReady =
+    nativeEngines.value.length === 0
+      ? miner.backendState.value === 'ready'
+      : missingEngineAction(selected, nativeEngines.value) === 'none';
+  if (!selectedReady && downloadThenStart.value) {
+    minerDownloadError.value = failures.join(' ') || miner.backendMessage.value;
+    return;
+  }
+  if (failures.length) {
+    minerDownloadError.value = failures.join(' ');
     return;
   }
 
   minerDownloadWarningOpen.value = false;
-  startWarningOpen.value = true;
+  if (downloadThenStart.value) startWarningOpen.value = true;
+  downloadThenStart.value = false;
 };
 
 const confirmStartMining = async (): Promise<void> => {
@@ -657,6 +700,8 @@ onBeforeUnmount(() => {
             :backend-message="miner.backendMessage.value"
             @profile="updateProfile"
             @coin="miner.updateCoin"
+            @engine="miner.updateEngine"
+            @download-engines="openEngineDownloads"
             @apply-profile="applyProfile"
             @start="saveAndStartMining"
           />
@@ -698,7 +743,9 @@ onBeforeUnmount(() => {
         :downloading="miner.backendState.value === 'downloading'"
         :progress="miner.downloadProgress.value"
         :error="minerDownloadError"
-        @confirm="confirmMinerDownloadAndStart"
+        :engines="nativeEngines"
+        :selected-id="miner.config.engine"
+        @confirm="confirmMinerDownload"
         @cancel="minerDownloadWarningOpen = false"
       />
       <StartMiningWarningSheet
