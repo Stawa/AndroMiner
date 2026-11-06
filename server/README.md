@@ -1,6 +1,6 @@
 # AndroMiner statistics service
 
-A small Node.js service (Node 22.13+; dependency-free when self-hosted with SQLite) that receives optional anonymous check-ins from the AndroMiner app and publishes aggregate statistics. See the [privacy policy](../docs/privacy.md) and [usage statistics](../docs/statistics.md) (counting rules, API, design, contributing).
+A small Node.js service (Node 22.13+; dependency-free when self-hosted with SQLite) that receives optional anonymous check-ins from the AndroMiner app and publishes aggregate statistics. See the [privacy policy](https://andro-miner.vercel.app/privacy) and [usage statistics](../docs/statistics.md) (counting rules, API, design, contributing).
 
 ## Run
 
@@ -46,7 +46,7 @@ The repository root is a Vercel project: `vercel.json` builds the public page (`
 
 Other settings in `.env.example` apply too (`MIN_GROUP_SIZE`, `RETENTION_DAYS`, …); `CLIENT_IP_HEADER` defaults to `x-real-ip` here.
 
-Quota. Figures are recomputed from the installations active in the last 30 days at most once per `STATS_CACHE_SECONDS`, and the daily history at most every 6 hours. Each recompute reads one document per active installation, so the 50,000 reads/day free quota covers roughly 1,500 active installations at the default; raise `STATS_CACHE_SECONDS` for more. Writes (about four per installation per day at most) allow thousands of installations. Privacy. Vercel may keep request logs including IP addresses; the service itself never stores them (see [privacy](../docs/privacy.md)). Rate limiting is per serverless instance, so it is a best-effort guard; the body-size cap, the once-per-interval rule and the hourly new-installation cap still hold.
+Quota. Figures are recomputed from the installations active in the last 30 days at most once per `STATS_CACHE_SECONDS`, and the daily history at most every 6 hours. Each recompute reads one document per active installation, so the 50,000 reads/day free quota covers roughly 1,500 active installations at the default; raise `STATS_CACHE_SECONDS` for more. Writes (about four per installation per day at most) allow thousands of installations. Privacy. Vercel may keep request logs including IP addresses; the service itself never stores them (see the [privacy policy](https://andro-miner.vercel.app/privacy)). Rate limiting is per serverless instance, so it is a best-effort guard; the body-size cap, the once-per-interval rule and the hourly new-installation cap still hold.
 
 ## Configuration
 

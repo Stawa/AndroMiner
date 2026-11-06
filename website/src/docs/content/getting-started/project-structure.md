@@ -48,7 +48,7 @@ AndroMiner/
 
 ## Existing documentation
 
-The `docs/` folder in the repository holds deeper notes: `engines.md`, `device-protection.md`, `statistics.md`, `privacy.md` and `localization.md`.
+The `docs/` folder in the repository holds deeper notes: `engines.md`, `device-protection.md`, `statistics.md` and `localization.md`. The privacy policy and terms of use live on the website.
 
 ## Rule of thumb
 

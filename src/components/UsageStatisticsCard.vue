@@ -10,7 +10,7 @@ import { countryFlag } from '../utils/countryFlag';
 import { useTelemetry } from '../composables/useTelemetry';
 import { formatDate, regionName, t } from '../i18n';
 
-const privacyUrl = 'https://github.com/Stawa/AndroMiner/blob/main/docs/privacy.md';
+const privacyUrl = 'https://andro-miner.vercel.app/privacy';
 const statsPageUrl = String(import.meta.env.VITE_STATS_PAGE_URL || '');
 
 const telemetry = useTelemetry();

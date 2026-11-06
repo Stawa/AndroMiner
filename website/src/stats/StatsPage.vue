@@ -227,7 +227,7 @@ const explainer = [
             <a :href="`${repoUrl}/blob/main/docs/statistics.md`" :class="textLink"
               >Methodology <span aria-hidden="true">→</span></a
             >
-            <a :href="`${repoUrl}/blob/main/docs/privacy.md`" :class="textLink"
+            <a :href="'/privacy'" :class="textLink"
               >Privacy policy <span aria-hidden="true">→</span></a
             >
           </p>

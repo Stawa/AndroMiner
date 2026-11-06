@@ -10,6 +10,7 @@ const routes = (): Plugin => {
     const path = (req.url ?? '').split('?')[0]!;
     if (path === '/') req.url = '/landing.html';
     else if (path === '/stats') req.url = '/stats.html';
+    else if (path === '/privacy' || path === '/terms') req.url = '/legal.html';
     else if (path === '/docs' || path.startsWith('/docs/')) req.url = '/docs.html';
     next();
   };
@@ -28,6 +29,13 @@ export default defineConfig({
     target: 'es2020',
     outDir: 'dist',
     emptyOutDir: true,
-    rollupOptions: { input: { landing: 'landing.html', stats: 'stats.html', docs: 'docs.html' } }
+    rollupOptions: {
+      input: {
+        landing: 'landing.html',
+        stats: 'stats.html',
+        docs: 'docs.html',
+        legal: 'legal.html'
+      }
+    }
   }
 });

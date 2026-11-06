@@ -12,7 +12,8 @@ export const links = {
   repo,
   download: `${repo}/releases/latest`,
   releases: `${repo}/releases`,
-  privacy: `${repo}/blob/main/docs/privacy.md`,
+  privacy: '/privacy',
+  terms: '/terms',
   engines: `${repo}/blob/main/docs/engines.md`,
   issues: `${repo}/issues`,
   contributing: `${repo}/pulls`

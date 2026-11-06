@@ -52,6 +52,12 @@
   color: var(--muted);
   font-size: 1.0625rem;
 }
+.prose ul {
+  list-style: disc;
+}
+.prose ol {
+  list-style: decimal;
+}
 .prose ul,
 .prose ol {
   padding-left: 1.4rem;

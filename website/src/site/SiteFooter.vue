@@ -25,33 +25,49 @@ const columns = [
     items: [
       { label: 'Source', href: links.repo },
       { label: 'Report a bug', href: links.issues },
-      { label: 'Privacy', href: links.privacy },
       { label: 'Engines', href: links.engines }
+    ]
+  },
+  {
+    title: 'Legal',
+    items: [
+      { label: 'Privacy policy', href: links.privacy },
+      { label: 'Terms of use', href: links.terms }
     ]
   }
 ];
 </script>
 
 <template>
-  <footer class="mt-section border-t border-line py-12">
-    <div class="mx-auto grid max-w-[88rem] gap-10 px-gutter md:grid-cols-[1.4fr_repeat(3,1fr)]">
-      <div>
-        <p class="mb-2 text-lg font-extrabold">AndroMiner</p>
-        <p class="text-[.9375rem] text-muted">
-          Open-source Android CPU miner. App code is MIT; XMRig, XMRigCC and XLArig are GPL-3.0.
-          Mining on a phone is low-yield and heats the device.
+  <footer class="mt-section border-t border-line">
+    <div
+      class="mx-auto grid max-w-[88rem] gap-x-8 gap-y-12 px-gutter py-14 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,3fr)] lg:gap-x-16"
+    >
+      <div class="max-w-sm">
+        <p class="mb-3 text-lg font-extrabold">AndroMiner</p>
+        <p class="m-0 text-[.9375rem] leading-relaxed text-muted">
+          Open-source Android CPU miner. Mining on a phone is low-yield and heats the device.
         </p>
       </div>
-      <nav v-for="column in columns" :key="column.title" :aria-label="column.title">
-        <p class="eyebrow">{{ column.title }}</p>
-        <ul class="m-0 grid list-none gap-2.5 p-0">
-          <li v-for="item in column.items" :key="item.href">
-            <a class="text-[.9375rem] text-muted no-underline hover:text-ink" :href="item.href">{{
-              item.label
-            }}</a>
-          </li>
-        </ul>
-      </nav>
+      <div class="grid grid-cols-2 gap-x-6 gap-y-10 sm:grid-cols-4">
+        <nav v-for="column in columns" :key="column.title" :aria-label="column.title">
+          <p class="eyebrow mb-4">{{ column.title }}</p>
+          <ul class="m-0 grid list-none gap-3 p-0">
+            <li v-for="item in column.items" :key="item.href">
+              <a
+                class="inline-block text-[.9375rem] text-muted no-underline transition-colors hover:text-ink"
+                :href="item.href"
+                >{{ item.label }}</a
+              >
+            </li>
+          </ul>
+        </nav>
+      </div>
+    </div>
+    <div class="border-t border-line">
+      <p class="mx-auto m-0 max-w-[88rem] px-gutter py-5 text-sm text-muted">
+        App code is MIT. XMRig, XMRigCC and XLArig are GPL-3.0.
+      </p>
     </div>
   </footer>
 </template>

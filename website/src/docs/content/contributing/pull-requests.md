@@ -30,7 +30,7 @@ android/gradlew -p android :app:testDebugUnitTest :app:lintDebug spotlessCheck
 ## Review expectations
 
 - Small, focused changes are reviewed fastest.
-- A change that alters what leaves the phone needs a privacy review and updates to `docs/privacy.md`.
+- A change that alters what leaves the phone needs a privacy review and updates to `website/src/legal/privacy.md`.
 - CI builds the TLS, No-TLS and Download APK variants for pull requests, so a variant-specific failure will show up there.
 
 ## Merging

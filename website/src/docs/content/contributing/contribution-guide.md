@@ -12,7 +12,7 @@ AndroMiner is MIT-licensed application code that drives GPL-3.0 miners. Contribu
 
 - Phones overheat. Changes to protection, throttling or session limits need extra care and a clear note on what was and was not tested on a device.
 - Never present an unmeasured value as measured. Missing readings stay "not reported".
-- Do not add telemetry fields without updating `docs/privacy.md` and `docs/statistics.md`.
+- Do not add telemetry fields without updating `website/src/legal/privacy.md` and `docs/statistics.md`.
 - Do not claim a feature in the UI or on this site unless it is implemented.
 
 ## Workflow

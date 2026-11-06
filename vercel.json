@@ -6,6 +6,8 @@
     { "source": "/healthz", "destination": "/api" },
     { "source": "/", "destination": "/landing.html" },
     { "source": "/stats", "destination": "/stats.html" },
+    { "source": "/privacy", "destination": "/legal.html" },
+    { "source": "/terms", "destination": "/legal.html" },
     { "source": "/docs", "destination": "/docs.html" },
     { "source": "/docs/:path*", "destination": "/docs.html" }
   ],

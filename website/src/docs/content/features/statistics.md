@@ -30,4 +30,4 @@ Every installation figure is a lower bound. A breakdown is published only when a
 | Service     | `server/src/` (SQLite or Firestore store)                         |
 | Public page | `website/src/stats/StatsPage.vue`                                 |
 
-Read `docs/statistics.md` for the API and `docs/privacy.md` for the policy before changing any of it.
+Read `docs/statistics.md` for the API and the [privacy policy](/privacy) before changing any of it.

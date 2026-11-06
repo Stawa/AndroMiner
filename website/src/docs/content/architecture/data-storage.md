@@ -38,4 +38,4 @@ The drawer exports and imports configuration as a file. History results have a s
 
 ## What leaves the device
 
-Only the optional statistics check-in and a benchmark result you choose to share. See the [Statistics](/docs/features/statistics) page and `docs/privacy.md`.
+Only the optional statistics check-in and a benchmark result you choose to share. See the [Statistics](/docs/features/statistics) page and the [privacy policy](/privacy).

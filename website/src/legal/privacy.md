@@ -1,4 +1,4 @@
-# Privacy policy: anonymous usage statistics
+# Privacy policy
 
 AndroMiner works the same with statistics on or off. They are **on by default** in the Android app. Turn them off any time in Settings → Privacy → Anonymous usage statistics and nothing is sent. Builds with no statistics service configured, and the web build, can't send anything.
 
@@ -72,4 +72,4 @@ The host is separate: the public instance runs on Vercel, which may keep its own
 
 ## What gets published
 
-Public pages show totals only, apart from the leaderboard. A country, Android version, app version or APK variant is named only when at least 10 installations share it; smaller groups are combined into "Other". How numbers are counted, and their limits, is in [usage statistics](statistics.md). Only installations that leave reporting on are counted and nobody verifies reports, so treat figures as estimates. Download counts come from GitHub and count downloads, not users.
+Public pages show totals only, apart from the leaderboard. A country, Android version, app version or APK variant is named only when at least 10 installations share it; smaller groups are combined into "Other". How numbers are counted, and their limits, is in [usage statistics](/docs/features/statistics). Only installations that leave reporting on are counted and nobody verifies reports, so treat figures as estimates. Download counts come from GitHub and count downloads, not users.

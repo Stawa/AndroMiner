@@ -4,6 +4,7 @@ import { links } from '../site/content';
 import { vReveal } from '../site/reveal';
 import { formatSize, type VariantId } from '../site/release';
 import { useLatestRelease } from '../site/useLatestRelease';
+import DownloadConsent from './DownloadConsent.vue';
 
 const variants: { id: VariantId; title: string; summary: string; engines: string }[] = [
   {
@@ -41,6 +42,32 @@ const date = computed(() =>
     ? new Date(release.value.publishedAt).toLocaleDateString(undefined, { dateStyle: 'medium' })
     : ''
 );
+
+// Downloads wait for the reader to accept the risk notice. The choice is remembered in this browser.
+const ACK_KEY = 'androminer-download-terms-2026-11';
+const acknowledged = (): boolean => {
+  try {
+    return localStorage.getItem(ACK_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
+const pending = ref<{ title: string; url: string } | null>(null);
+const ask = (event: Event, title: string, url: string): void => {
+  if (acknowledged()) return;
+  event.preventDefault();
+  pending.value = { title, url };
+};
+const accept = (): void => {
+  const url = pending.value?.url;
+  try {
+    localStorage.setItem(ACK_KEY, '1');
+  } catch {
+    // Not remembered; the reader will be asked again next time.
+  }
+  pending.value = null;
+  if (url) location.assign(url);
+};
 
 const copy = async (name: string, value: string): Promise<void> => {
   try {
@@ -133,6 +160,7 @@ const copy = async (name: string, value: string): Promise<void> => {
             v-if="release?.apks[variant.id]"
             class="btn w-full"
             :href="release.apks[variant.id]!.url"
+            @click="ask($event, variant.title, release.apks[variant.id]!.url)"
             >Download {{ variant.title }} APK</a
           >
           <a v-else class="btn-ghost w-full" :href="release?.url || links.releases">{{
@@ -150,5 +178,17 @@ const copy = async (name: string, value: string): Promise<void> => {
       <a class="underline" href="/docs/getting-started/installation">installation guide</a> for
       compatibility and how to verify a checksum.
     </p>
+    <p class="mt-3 text-sm text-muted">
+      Mining can overheat and damage a phone. By downloading you accept the
+      <a class="underline" :href="links.terms">Terms of use</a> and
+      <a class="underline" :href="links.privacy">Privacy policy</a>.
+    </p>
+    <DownloadConsent
+      :open="pending !== null"
+      :title="pending?.title ?? ''"
+      :url="pending?.url ?? ''"
+      @close="pending = null"
+      @accept="accept"
+    />
   </section>
 </template>
