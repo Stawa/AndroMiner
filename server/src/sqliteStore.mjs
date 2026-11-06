@@ -30,6 +30,19 @@ CREATE TABLE IF NOT EXISTS daily_versions (
 CREATE TABLE IF NOT EXISTS download_snapshots (
   day TEXT PRIMARY KEY, total INTEGER NOT NULL, by_variant TEXT NOT NULL
 ) STRICT;
+CREATE TABLE IF NOT EXISTS benchmarks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts INTEGER NOT NULL,
+  device TEXT NOT NULL,
+  soc TEXT,
+  abi TEXT NOT NULL,
+  cpu_threads INTEGER NOT NULL,
+  engine TEXT NOT NULL,
+  engine_version TEXT,
+  app_version TEXT,
+  hashrate REAL NOT NULL
+) STRICT;
+CREATE INDEX IF NOT EXISTS benchmarks_ts ON benchmarks (ts);
 `;
 
 /**
@@ -241,6 +254,37 @@ export const createSqliteStore = (path) => {
         .map(({ id, ...entry }) => ({ id: publicIdOf(id), ...entry }));
     },
 
+    /** `busy` means the hourly cap on submissions is reached. */
+    async addBenchmark(benchmark, nowSeconds, { maxPerHour }) {
+      const recent = db
+        .prepare('SELECT COUNT(*) AS n FROM benchmarks WHERE ts >= ?')
+        .get(nowSeconds - 3600).n;
+      if (recent >= maxPerHour) return { busy: true };
+      db.prepare(
+        `INSERT INTO benchmarks (ts, device, soc, abi, cpu_threads, engine, engine_version, app_version, hashrate)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        nowSeconds,
+        benchmark.device,
+        benchmark.soc,
+        benchmark.abi,
+        benchmark.cpuThreads,
+        benchmark.engine,
+        benchmark.engineVersion,
+        benchmark.appVersion,
+        benchmark.hashrate
+      );
+      return { stored: true };
+    },
+
+    async readBenchmarkRows(sinceSeconds) {
+      return db
+        .prepare(
+          `SELECT device, soc, abi, cpu_threads AS cpuThreads, hashrate FROM benchmarks WHERE ts >= ?`
+        )
+        .all(sinceSeconds);
+    },
+
     async saveDownloadSnapshot(day, total, byVariant) {
       db.prepare(
         `INSERT INTO download_snapshots (day, total, by_variant) VALUES (?, ?, ?)
@@ -256,6 +300,9 @@ export const createSqliteStore = (path) => {
       db.prepare('DELETE FROM daily_active WHERE day < ?').run(cutoffDay);
       db.prepare('DELETE FROM daily_versions WHERE day < ?').run(cutoffDay);
       db.prepare('DELETE FROM download_snapshots WHERE day < ?').run(cutoffDay);
+      db.prepare('DELETE FROM benchmarks WHERE ts < ?').run(
+        nowSeconds - config.retentionDays * DAY
+      );
       db.prepare('DELETE FROM monthly_active WHERE month < ?').run(cutoffDay.slice(0, 7));
     }
   };

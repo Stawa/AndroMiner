@@ -9,8 +9,8 @@ The app can download prebuilt miners from the
 [`miner-builder` branch](https://github.com/Stawa/AndroMiner/tree/miner-builder).
 Build locally when you need a different XMRig version or build configuration.
 
-The downloader now uses an immutable revision and SHA-256 pins embedded in
-`MinerIntegrity.java`, rather than executing the current mutable branch head.
+The downloader uses an immutable revision and the SHA-256 pins embedded in
+`MinerIntegrity.java`. It never executes the current branch head.
 Publishing a new binary does not automatically authorize existing APKs to run it.
 Review the binary's source/version, independently verify both variant hashes, and
 update the APK pins when approving a new engine. APK signing authenticates those pins;

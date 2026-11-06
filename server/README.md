@@ -12,7 +12,7 @@ npm test
 
 ## Deploy
 
-Requirements: any host that runs Node 22.13+ or Docker, a persistent disk for the SQLite file, and **HTTPS in front of it** (Caddy, nginx, or a managed proxy). The app refuses plain `http://` except for localhost.
+Requirements: any host that runs Node 22.13+ or Docker, a persistent disk for the SQLite file, and HTTPS in front of it (Caddy, nginx, or a managed proxy). The app refuses plain `http://` except for localhost.
 
 ```bash
 docker build -t androminer-stats server
@@ -29,7 +29,7 @@ Then:
 
 ## Deploy on Vercel with Firestore (free tier)
 
-The repository root is a Vercel project: `vercel.json` builds the public page (`npm run build:stats` → `dist-stats/`), serves it at `/`, and routes `/v1/*` and `/healthz` to `api/index.mjs`, which runs this service on Firestore instead of SQLite. Everything below fits the free plans (Vercel Hobby, Firebase Spark).
+The repository root is a Vercel project: `vercel.json` builds the public page (`npm run build:stats` → `dist-stats/`), serves the landing page at `/` and the statistics dashboard at `/stats`, and routes `/v1/*` and `/healthz` to `api/index.mjs`, which runs this service on Firestore instead of SQLite. Everything below fits the free plans (Vercel Hobby, Firebase Spark).
 
 1. In the [Firebase console](https://console.firebase.google.com) create a project and add **Firestore Database** (production mode). Publish `firestore.rules` (it denies all client access; the server uses a service account).
 2. Project settings → Service accounts → **Generate new private key**. Keep the JSON file private.
@@ -46,7 +46,7 @@ The repository root is a Vercel project: `vercel.json` builds the public page (`
 
 Other settings in `.env.example` apply too (`MIN_GROUP_SIZE`, `RETENTION_DAYS`, …); `CLIENT_IP_HEADER` defaults to `x-real-ip` here.
 
-**Quota.** Figures are recomputed from the installations active in the last 30 days at most once per `STATS_CACHE_SECONDS`, and the daily history at most every 6 hours. Each recompute reads one document per active installation, so the 50,000 reads/day free quota covers roughly 1,500 active installations at the default; raise `STATS_CACHE_SECONDS` for more. Writes (about four per installation per day at most) allow thousands of installations. **Privacy.** Vercel may keep request logs including IP addresses; the service itself never stores them (see [privacy](../docs/privacy.md)). Rate limiting is per serverless instance, so it is a best-effort guard; the body-size cap, the once-per-interval rule and the hourly new-installation cap still hold.
+Quota. Figures are recomputed from the installations active in the last 30 days at most once per `STATS_CACHE_SECONDS`, and the daily history at most every 6 hours. Each recompute reads one document per active installation, so the 50,000 reads/day free quota covers roughly 1,500 active installations at the default; raise `STATS_CACHE_SECONDS` for more. Writes (about four per installation per day at most) allow thousands of installations. Privacy. Vercel may keep request logs including IP addresses; the service itself never stores them (see [privacy](../docs/privacy.md)). Rate limiting is per serverless instance, so it is a best-effort guard; the body-size cap, the once-per-interval rule and the hourly new-installation cap still hold.
 
 ## Configuration
 

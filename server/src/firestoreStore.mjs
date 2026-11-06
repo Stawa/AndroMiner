@@ -22,6 +22,7 @@ export const createFirestoreStore = ({ firestore, statsCacheSeconds = 3600 }) =>
   const monthlyActive = firestore.collection('monthly_active');
   const dailyVersions = firestore.collection('daily_versions');
   const snapshots = firestore.collection('download_snapshots');
+  const benchmarks = firestore.collection('benchmarks');
   const meta = firestore.collection('meta');
 
   const cached = async (name, ttlSeconds, nowSeconds, compute) => {
@@ -202,12 +203,35 @@ export const createFirestoreStore = ({ firestore, statsCacheSeconds = 3600 }) =>
       });
     },
 
+    /** `busy` means the hourly cap on submissions is reached. */
+    async addBenchmark(benchmark, nowSeconds, { maxPerHour }) {
+      const recent = await benchmarks
+        .where('ts', '>=', nowSeconds - 3600)
+        .count()
+        .get();
+      if (recent.data().count >= maxPerHour) return { busy: true };
+      await benchmarks.add({ ts: nowSeconds, ...benchmark });
+      return { stored: true };
+    },
+
+    async readBenchmarkRows(sinceSeconds, nowSeconds) {
+      // Cached with the other figures: every submission is a document, so each read is costly.
+      return cached('benchmarks', statsCacheSeconds, nowSeconds, async () => {
+        const snap = await benchmarks
+          .where('ts', '>=', sinceSeconds)
+          .select('device', 'soc', 'abi', 'cpuThreads', 'hashrate')
+          .get();
+        return snap.docs.map((doc) => doc.data());
+      });
+    },
+
     async saveDownloadSnapshot(day, total, byVariant) {
       await snapshots.doc(day).set({ day, total, byVariant });
     },
 
     async prune(nowSeconds, config) {
       await deleteWhere(installs.where('lastSeen', '<', nowSeconds - config.retentionDays * DAY));
+      await deleteWhere(benchmarks.where('ts', '<', nowSeconds - config.retentionDays * DAY));
       const cutoffDay = dayOf(nowSeconds - config.aggregateRetentionDays * DAY);
       for (const collection of [dailyActive, dailyVersions, snapshots]) {
         await deleteWhere(collection.where('day', '<', cutoffDay));

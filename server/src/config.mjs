@@ -15,6 +15,9 @@ export const loadConfig = (env = process.env) => ({
   // Install rows must outlive the 30-day window, so retention below 35 days is rejected.
   retentionDays: int(env, 'RETENTION_DAYS', 90, 35, 3650),
   aggregateRetentionDays: int(env, 'AGGREGATE_RETENTION_DAYS', 1095, 90, 36500),
+  // Benchmark results are published per device only once this many have been submitted.
+  minBenchmarkSamples: int(env, 'MIN_BENCHMARK_SAMPLES', 3, 1, 1000),
+  maxBenchmarksPerHour: int(env, 'MAX_BENCHMARKS_PER_HOUR', 1000, 1, 1000000),
   minGroupSize: int(env, 'MIN_GROUP_SIZE', 10, 2, 1000),
   minCheckinIntervalHours: int(env, 'MIN_CHECKIN_INTERVAL_HOURS', 20, 1, 168),
   // Firestore store only: how long computed figures are reused, to stay within its free read quota.

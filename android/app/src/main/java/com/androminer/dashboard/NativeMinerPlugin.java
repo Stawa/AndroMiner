@@ -25,6 +25,7 @@ public class NativeMinerPlugin extends Plugin {
     public void load() {
         runtime = MiningGuardService.runtime(getContext());
         runtime.setProgressListener(progress -> notifyListeners("downloadProgress", progress));
+        runtime.setBenchmarkListener(event -> notifyListeners("benchmarkLog", event));
     }
 
     @Override
@@ -40,6 +41,7 @@ public class NativeMinerPlugin extends Plugin {
     @Override
     protected void handleOnDestroy() {
         runtime.setProgressListener(null);
+        runtime.setBenchmarkListener(null);
         super.handleOnDestroy();
     }
 
@@ -97,6 +99,16 @@ public class NativeMinerPlugin extends Plugin {
     @PluginMethod
     public void deleteHistory(PluginCall call) {
         runtime.deleteHistory(call);
+    }
+
+    @PluginMethod
+    public void benchmark(PluginCall call) {
+        runtime.benchmark(call);
+    }
+
+    @PluginMethod
+    public void cancelBenchmark(PluginCall call) {
+        runtime.cancelBenchmark(call);
     }
 
     @PluginMethod

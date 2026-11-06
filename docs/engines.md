@@ -1,6 +1,6 @@
 # Mining engines
 
-One engine runs per session. XMRig is the default and the only one verified on a device. XMRigCC and XLArig are built and checked as binaries but never run on hardware, so the app marks them **Experimental**.
+One engine runs per session. XMRig is the default and the only one verified on a device. XMRigCC and XLArig are built and checked as binaries but never run on hardware, so the app marks them Experimental.
 
 | Engine  | Upstream                                                        | Version | Licence | Status       | ABIs                       |
 | ------- | --------------------------------------------------------------- | ------- | ------- | ------------ | -------------------------- |
@@ -16,13 +16,13 @@ All three share XMRig's command line, output format and HTTP API, so one runtime
 | XMRigCC | same as XMRig                    |
 | XLArig  | `panthera` (Scala) only          |
 
-Coins: Monero, Zephyr, Wownero, Salvium and Tari (`rx/0`/`rx/wow`), Raptoreum, Yerbas and GSP Coin (`gr`), Conceal (`cn/ccx`), Scala (`panthera`). **Salvium and Tari are experimental:** their default pool (Kryptex, `sal.kryptex.network:7028` and `xtm-rx.kryptex.network:7038`) wants logins as `WALLET/WORKER`, so these coins set a worker separator of `/`. The pool's command for Salvium uses `rx/0`; for Tari the pool recommends XMRig but doesn't state the algorithm, so `rx/0` is an assumption. Neither has been tried against a live pool.
+Coins: Monero, Zephyr, Wownero, Salvium and Tari (`rx/0`/`rx/wow`), Raptoreum, Yerbas and GSP Coin (`gr`), Conceal (`cn/ccx`), Scala (`panthera`). Salvium and Tari are experimental: their default pool (Kryptex, `sal.kryptex.network:7028` and `xtm-rx.kryptex.network:7038`) wants logins as `WALLET/WORKER`, so these coins set a worker separator of `/`. The pool's command for Salvium uses `rx/0`; for Tari the pool recommends XMRig but doesn't state the algorithm, so `rx/0` is an assumption. Neither has been tried against a live pool.
 
 The coin picks the engine: Monero selects XMRig, Scala selects XLArig. In the engine picker you can choose another engine that supports the coin; engines that can't mine it are listed but disabled. A custom choice stays until you pick a coin it can't mine, then the app falls back to that coin's automatic engine. If the selected engine isn't installed, the start button is disabled with a note under it.
 
-- **XMRigCC** is built **miner only**: the remote-control client, remote shell and server are compiled out. It adds nothing the app uses beyond XMRig, and its docs list `panthera` as removed.
-- **XLArig** is the only maintained route to Panthera. It is stale (XMRig 5.x code, last commit December 2023), has no Android binaries upstream, and needs `CMAKE_POLICY_VERSION_MINIMUM=3.5` to configure. Panthera hashing on ARM has not been checked against reference vectors.
-- **Not offered:** DERO (current AstroBWT v3 isn't implemented by any engine here, and the official miner's licence forbids redistribution) and coins with no sign of life (ArQmA, Safex Cash, KevaCoin, Chukwa, Chukwa v2, NinjaCoin, Talleo, Vkax). A saved setup for a removed coin fails validation with a message.
+- XMRigCC is built miner only: the remote-control client, remote shell and server are compiled out. It adds nothing the app uses beyond XMRig, and its docs list `panthera` as removed.
+- XLArig is the only maintained route to Panthera. It is stale (XMRig 5.x code, last commit December 2023), has no Android binaries upstream, and needs `CMAKE_POLICY_VERSION_MINIMUM=3.5` to configure. Panthera hashing on ARM has not been checked against reference vectors.
+- Not offered: DERO (current AstroBWT v3 isn't implemented by any engine here, and the official miner's licence forbids redistribution) and coins with no sign of life (ArQmA, Safex Cash, KevaCoin, Chukwa, Chukwa v2, NinjaCoin, Talleo, Vkax). A saved setup for a removed coin fails validation with a message.
 
 ## How the app uses them
 
@@ -48,9 +48,9 @@ WITH_TLS=ON miner-builder/build-all-engines.sh     # every engine, every ABI, in
 
 ## Release and downloads
 
-- **Bundled TLS and no-TLS APKs** carry all three engines for both ABIs. `release-build.yml` fails if a library is missing.
-- **The download APK** carries none. It can fetch an engine from the `miner-builder` branch, but only if the APK pins a reviewed commit and a SHA-256 per engine, ABI and TLS variant (`MinerIntegrity`). Downloads are hash-checked before install, redirects are refused, size is capped, and a failed download leaves any old file alone. Starting with a missing engine offers "Download {engine}" or "Download all engines".
-- **No engine other than XMRig is downloadable yet:** `ENGINE_REVISION` is empty, so the app says "no approved download" instead of trying. To enable it:
+- Bundled TLS and no-TLS APKs carry all three engines for both ABIs. `release-build.yml` fails if a library is missing.
+- The download APK carries none. It can fetch an engine from the `miner-builder` branch, but only if the APK pins a reviewed commit and a SHA-256 per engine, ABI and TLS variant (`MinerIntegrity`). Downloads are hash-checked before install, redirects are refused, size is capped, and a failed download leaves any old file alone. Starting with a missing engine offers "Download {engine}" or "Download all engines".
+- No engine other than XMRig is downloadable yet: `ENGINE_REVISION` is empty, so the app says "no approved download" instead of trying. To enable it:
   1. Run the _Android Miner Binary_ workflow (publishes XMRigCC and XLArig).
   2. Review that commit.
   3. Run `miner-builder/print-engine-pins.sh <commit>`. It downloads and hashes each file itself rather than trusting `SHA256SUMS`.
@@ -60,12 +60,12 @@ WITH_TLS=ON miner-builder/build-all-engines.sh     # every engine, every ABI, in
 ## ARMv7 (`armeabi-v7a`)
 
 - Built for API 24 (the app's `minSdk`), stripped, with OpenSSL `no-asm`. Needs only `libdl`, `libm`, `libc`.
-- **NEON is required.** The app reads `/proc/cpuinfo` and refuses to start without it, instead of crashing with SIGILL.
-- **AES is software**, so it runs everywhere but slower than hardware AES.
-- **RandomX runs in light mode** (`--randomx-mode=light`, 256 MB cache): a 32-bit process can't reliably hold the 2 GB dataset.
+- NEON is required. The app reads `/proc/cpuinfo` and refuses to start without it, instead of crashing with SIGILL.
+- AES is software, so it runs everywhere but slower than hardware AES.
+- RandomX runs in light mode (`--randomx-mode=light`, 256 MB cache): a 32-bit process can't reliably hold the 2 GB dataset.
 - ABI selection lives in `MinerAbi`; x86 and x86_64 are unsupported.
-- **Emulated check:** `miner-builder/validate-armv7-qemu.sh` computes the published RandomX vector under qemu-user and matches (GCC/glibc build, one hash, not the shipped binary). CI runs it on pull requests.
-- **Open risk:** a GCC 13 build hit SIGBUS from an alignment-hinted NEON load; the script now uses `-fno-tree-vectorize`. The shipped Clang binary doesn't do that in the function that crashed, but about 6,400 other alignment-hinted NEON accesses weren't audited. If a device crashes with SIGBUS or `BUS_ADRALN`, start there.
+- Emulated check: `miner-builder/validate-armv7-qemu.sh` computes the published RandomX vector under qemu-user and matches (GCC/glibc build, one hash, not the shipped binary). CI runs it on pull requests.
+- Open risk: a GCC 13 build hit SIGBUS from an alignment-hinted NEON load; the script now uses `-fno-tree-vectorize`. The shipped Clang binary doesn't do that in the function that crashed, but about 6,400 other alignment-hinted NEON accesses weren't audited. If a device crashes with SIGBUS or `BUS_ADRALN`, start there.
 
 ## Validating on a device
 

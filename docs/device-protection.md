@@ -13,17 +13,17 @@ The native foreground service (`MiningGuardService`) checks the device every 2 s
 
 Your temperature limit and battery stop level are the existing settings. Step offsets, hysteresis and delays are fixed in `ProtectionEngine`.
 
-- **Escalation** is immediate.
-- **Recovery** needs the reading to clear its threshold by a margin (2 °C, 3 battery points, 3 °C for a CPU sensor) and hold for 30 s, then moves back one state at a time (40% → 75% → 100%).
-- **Critical** ends the run; restart is manual.
-- **A missing or stale required reading never disables protection:** Caution for up to 10 s, then Throttled, then stop after 20 s.
+- Escalation is immediate.
+- Recovery needs the reading to clear its threshold by a margin (2 °C, 3 battery points, 3 °C for a CPU sensor) and hold for 30 s, then moves back one state at a time (40% → 75% → 100%).
+- Critical ends the run; restart is manual.
+- A missing or stale required reading never disables protection: Caution for up to 10 s, then Throttled, then stop after 20 s.
 
 ## What is measured
 
-- **Battery temperature** (`BatteryManager`): the sensor your limit applies to.
-- **Android thermal status** (`PowerManager`, Android 10+): "Not supported" below that.
-- **CPU temperature:** used only when a thermal zone named for the CPU is readable and reports 10–110 °C. Many phones block `/sys/class/thermal`; then it shows "Not exposed by this phone" and is never estimated.
-- **Headroom** is your limit minus battery temperature, hidden if either is missing. A reading older than 10 s is stale.
+- Battery temperature (`BatteryManager`): the sensor your limit applies to.
+- Android thermal status (`PowerManager`, Android 10+): "Not supported" below that.
+- CPU temperature: used only when a thermal zone named for the CPU is readable and reports 10–110 °C. Many phones block `/sys/class/thermal`; then it shows "Not exposed by this phone" and is never estimated.
+- Headroom is your limit minus battery temperature, hidden if either is missing. A reading older than 10 s is stale.
 
 ## Enforcement and history
 

@@ -1,9 +1,15 @@
 import { createServer } from 'node:http';
 import { createHash, timingSafeEqual } from 'node:crypto';
+import { computeBenchmarks } from './benchmarks.mjs';
 import { createDownloadsSource } from './github.mjs';
 import { createRateLimiter } from './ratelimit.mjs';
 import { computeStats } from './stats.mjs';
-import { isInstallationId, validateCheckin, validateHeartbeat } from './validate.mjs';
+import {
+  isInstallationId,
+  validateBenchmark,
+  validateCheckin,
+  validateHeartbeat
+} from './validate.mjs';
 
 const MAX_BODY_BYTES = 1024;
 const LEADERBOARD_SIZE = 50;
@@ -103,6 +109,27 @@ export const createApp = ({ config, store, now = Date.now, fetchImpl }) => {
       const entries = rows.map((row, index) => ({ rank: index + 1, ...row }));
       const payload = { generatedAt: new Date(now()).toISOString(), entries };
       return send(response, 200, payload, { 'Cache-Control': 'public, max-age=60' });
+    }
+
+    if (request.method === 'GET' && pathname === '/v1/benchmarks') {
+      limit(readLimiter, request, 'read');
+      const rows = await store.readBenchmarkRows(
+        nowSeconds() - config.retentionDays * 86_400,
+        nowSeconds()
+      );
+      const payload = computeBenchmarks(rows, config.minBenchmarkSamples, nowSeconds());
+      return send(response, 200, payload, { 'Cache-Control': 'public, max-age=300' });
+    }
+
+    if (request.method === 'POST' && pathname === '/v1/benchmark') {
+      limit(writeLimiter, request, 'benchmark');
+      const result = validateBenchmark(await readJson(request));
+      if (!result.ok) return send(response, 400, { ok: false, error: result.error });
+      const outcome = await store.addBenchmark(result.value, nowSeconds(), {
+        maxPerHour: config.maxBenchmarksPerHour
+      });
+      if (outcome.busy) throw new HttpError(429, 'busy', { 'Retry-After': '3600' });
+      return send(response, 200, { ok: true });
     }
 
     if (request.method === 'POST' && pathname === '/v1/heartbeat') {

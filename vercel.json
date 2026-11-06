@@ -4,7 +4,8 @@
   "rewrites": [
     { "source": "/v1/:path*", "destination": "/api" },
     { "source": "/healthz", "destination": "/api" },
-    { "source": "/", "destination": "/stats.html" }
+    { "source": "/", "destination": "/landing.html" },
+    { "source": "/stats", "destination": "/stats.html" }
   ],
   "functions": { "api/index.mjs": { "includeFiles": "server/data/**" } },
   "crons": [{ "path": "/v1/maintenance/prune", "schedule": "17 3 * * *" }]

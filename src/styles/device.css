@@ -126,3 +126,65 @@
     grid-column: 1 / -1;
   }
 }
+
+/* Speed benchmark. */
+.bench-running {
+  display: grid;
+  gap: 8px;
+}
+.bench-running progress {
+  width: 100%;
+}
+.bench-log summary {
+  cursor: pointer;
+  font-size: 0.8125rem;
+  color: rgb(var(--color-app-muted));
+}
+.bench-log ol {
+  margin-top: 8px;
+  padding: 12px;
+  max-height: 14rem;
+  overflow: auto;
+  list-style: none;
+  border: 1px solid rgb(var(--color-app-line));
+  border-radius: 12px;
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+.bench-log-warn {
+  font-weight: 600;
+}
+.bench-log-error {
+  font-weight: 700;
+  color: var(--danger);
+}
+.bench-share {
+  display: grid;
+  gap: 12px;
+  padding-top: 8px;
+}
+.bench-share-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+.bench-share .notice p + p {
+  margin-top: 6px;
+}
+.bench-preview summary {
+  cursor: pointer;
+  font-size: 0.8125rem;
+  color: rgb(var(--color-app-muted));
+}
+.bench-preview pre {
+  margin-top: 8px;
+  padding: 12px;
+  overflow-x: auto;
+  border: 1px solid rgb(var(--color-app-line));
+  border-radius: 12px;
+  font-size: 0.75rem;
+}
+.bench-actions {
+  display: flex;
+  gap: 12px;
+}

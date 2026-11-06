@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import DeviceBenchmark from '../components/DeviceBenchmark.vue';
 import DotMeter from '../components/DotMeter.vue';
 import ProtectionPanel from '../components/ProtectionPanel.vue';
 import { formatNumber, t } from '../i18n';
@@ -15,6 +16,7 @@ const props = defineProps<{
   config: MiningConfig;
   protection: ProtectionSnapshot | null;
   protectionEvents: ProtectionEvent[];
+  mining: boolean;
 }>();
 
 const missing = (): string => t('device.notReported');
@@ -129,6 +131,8 @@ const system = computed(() => [
         </div>
       </dl>
     </section>
+
+    <DeviceBenchmark :engine="config.engine" :mining="mining" />
 
     <section class="dv-group" :aria-label="$t('device.system')">
       <h2 class="eyebrow">{{ $t('device.system') }}</h2>

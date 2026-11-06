@@ -497,3 +497,71 @@ test('the leaderboard shows at most 50 installations', async (t) => {
   assert.equal(board.entries[0].miningSeconds, 120);
   assert.equal(board.entries[49].rank, 50);
 });
+
+const benchmark = (hashrate, overrides = {}) => ({
+  v: 1,
+  device: 'Google Pixel 8',
+  soc: 'Tensor G3',
+  abi: 'arm64-v8a',
+  cpuThreads: 9,
+  engine: 'xmrig',
+  engineVersion: '6.26.0',
+  appVersion: '1.4.0',
+  hashrate,
+  ...overrides
+});
+
+test('benchmarks are published per device as a median, only once enough results exist', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const send = (body) => s.call('/v1/benchmark', { method: 'POST', body: JSON.stringify(body) });
+  for (const rate of [900, 1100]) assert.equal((await send(benchmark(rate))).status, 200);
+  await send(benchmark(300, { device: 'Samsung SM-A135F', abi: 'armeabi-v7a', cpuThreads: 8 }));
+  let board = await (await s.call('/v1/benchmarks')).json();
+  assert.deepEqual(board.devices, []);
+  assert.equal(board.totalSubmissions, 3);
+
+  await send(benchmark(1000));
+  board = await (await s.call('/v1/benchmarks')).json();
+  assert.equal(board.devices.length, 1);
+  assert.deepEqual(board.devices[0], {
+    device: 'Google Pixel 8',
+    soc: 'Tensor G3',
+    abi: 'arm64-v8a',
+    cpuThreads: 9,
+    samples: 3,
+    median: 1000,
+    min: 900,
+    max: 1100
+  });
+  assert.ok(!JSON.stringify(board).includes('installationId'));
+});
+
+test('rejects malformed benchmark results', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const send = (body) => s.call('/v1/benchmark', { method: 'POST', body: JSON.stringify(body) });
+  const bad = [
+    benchmark(1000, { installationId: hex(1) }),
+    benchmark(1000, { abi: 'x86_64' }),
+    benchmark(1000, { engine: 'xlarig' }),
+    benchmark(1000, { device: '<script>' }),
+    benchmark(1000, { cpuThreads: 0 }),
+    benchmark(0),
+    benchmark(Number.MAX_SAFE_INTEGER),
+    benchmark('fast'),
+    { ...benchmark(1000), v: 2 }
+  ];
+  for (const body of bad) assert.equal((await send(body)).status, 400, JSON.stringify(body));
+  assert.equal((await s.call('/v1/benchmarks')).status, 200);
+});
+
+test('caps benchmark submissions per hour', async (t) => {
+  const s = await start({ env: { MAX_BENCHMARKS_PER_HOUR: '2' } });
+  t.after(s.stop);
+  const send = () =>
+    s.call('/v1/benchmark', { method: 'POST', body: JSON.stringify(benchmark(1000)) });
+  assert.equal((await send()).status, 200);
+  assert.equal((await send()).status, 200);
+  assert.equal((await send()).status, 429);
+});

@@ -99,3 +99,78 @@ export const validateCheckin = (body) => {
     }
   };
 };
+
+export const BENCHMARK_ABIS = ['arm64-v8a', 'armeabi-v7a'];
+export const BENCHMARK_ENGINES = ['xmrig', 'xmrigcc'];
+const benchmarkFields = new Set([
+  'v',
+  'device',
+  'soc',
+  'abi',
+  'cpuThreads',
+  'engine',
+  'engineVersion',
+  'appVersion',
+  'hashrate'
+]);
+const MAX_BENCHMARK_HASHRATE = 1_000_000;
+const labelPattern = /^[\p{L}\p{N}][\p{L}\p{N} ._+\-/()]{0,63}$/u;
+
+const optionalLabel = (value) =>
+  value === null || (typeof value === 'string' && labelPattern.test(value));
+
+/**
+ * A benchmark result carries the device model, never an installation ID: it is a one-off, opt-in
+ * submission that cannot be linked to the check-in record. Unknown fields are rejected.
+ */
+export const validateBenchmark = (body) => {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return { ok: false, error: 'Body must be a JSON object.' };
+  }
+  if (Object.keys(body).some((key) => !benchmarkFields.has(key))) {
+    return { ok: false, error: 'Request contains an unexpected field.' };
+  }
+  if (body.v !== 1) return { ok: false, error: 'Unsupported schema version.' };
+  if (typeof body.device !== 'string' || !labelPattern.test(body.device)) {
+    return { ok: false, error: 'device must be a short model name.' };
+  }
+  const soc = body.soc ?? null;
+  if (!optionalLabel(soc)) return { ok: false, error: 'soc must be a short name or null.' };
+  if (!BENCHMARK_ABIS.includes(body.abi)) {
+    return { ok: false, error: `abi must be one of: ${BENCHMARK_ABIS.join(', ')}.` };
+  }
+  if (!Number.isInteger(body.cpuThreads) || body.cpuThreads < 1 || body.cpuThreads > 256) {
+    return { ok: false, error: 'cpuThreads must be an integer between 1 and 256.' };
+  }
+  if (!BENCHMARK_ENGINES.includes(body.engine)) {
+    return { ok: false, error: `engine must be one of: ${BENCHMARK_ENGINES.join(', ')}.` };
+  }
+  const engineVersion = body.engineVersion ?? null;
+  const appVersion = body.appVersion ?? null;
+  for (const version of [engineVersion, appVersion]) {
+    if (version !== null && (typeof version !== 'string' || !versionPattern.test(version))) {
+      return { ok: false, error: 'engineVersion and appVersion must be version strings or null.' };
+    }
+  }
+  if (
+    typeof body.hashrate !== 'number' ||
+    !Number.isFinite(body.hashrate) ||
+    body.hashrate < 1 ||
+    body.hashrate > MAX_BENCHMARK_HASHRATE
+  ) {
+    return { ok: false, error: `hashrate must be between 1 and ${MAX_BENCHMARK_HASHRATE} H/s.` };
+  }
+  return {
+    ok: true,
+    value: {
+      device: body.device,
+      soc,
+      abi: body.abi,
+      cpuThreads: body.cpuThreads,
+      engine: body.engine,
+      engineVersion,
+      appVersion,
+      hashrate: Math.round(body.hashrate * 10) / 10
+    }
+  };
+};

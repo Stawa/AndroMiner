@@ -56,8 +56,101 @@ final class NativeMiningRuntime {
     private long verifiedLength;
     private long verifiedModified;
     private volatile java.util.function.Consumer<JSObject> progressListener;
+    private volatile java.util.function.Consumer<JSObject> benchmarkListener;
     private final java.util.concurrent.atomic.AtomicBoolean probing =
             new java.util.concurrent.atomic.AtomicBoolean();
+
+    private final java.util.concurrent.atomic.AtomicBoolean benchmarking =
+            new java.util.concurrent.atomic.AtomicBoolean();
+    private final java.util.concurrent.atomic.AtomicBoolean benchmarkCancelled =
+            new java.util.concurrent.atomic.AtomicBoolean();
+    private final ExecutorService benchmarkExecutor = Executors.newSingleThreadExecutor();
+
+    /**
+     * Runs the engine's offline benchmark and resolves with the measured speed. Nothing is sent
+     * anywhere: sharing the result is a separate, explicit step in the app.
+     */
+    void benchmark(PluginCall call) {
+        if (!benchmarking.compareAndSet(false, true)) {
+            call.reject("A benchmark is already running.");
+            return;
+        }
+        benchmarkCancelled.set(false);
+        benchmarkExecutor.execute(
+                () -> {
+                    try {
+                        call.resolve(runBenchmark(call.getString("engine", MinerEngine.XMRIG)));
+                    } catch (MinerBenchmark.Cancelled cancelled) {
+                        benchmarkLog("warn", "Benchmark cancelled.", -1, 0);
+                        call.reject("Benchmark cancelled.", "cancelled");
+                    } catch (IOException | RuntimeException failure) {
+                        String message =
+                                failure.getMessage() == null
+                                        ? "The benchmark could not finish."
+                                        : failure.getMessage();
+                        benchmarkLog("error", message, -1, 0);
+                        call.reject(message);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        call.reject("Benchmark cancelled.", "cancelled");
+                    } finally {
+                        benchmarking.set(false);
+                    }
+                });
+    }
+
+    void cancelBenchmark(PluginCall call) {
+        benchmarkCancelled.set(true);
+        call.resolve();
+    }
+
+    private JSObject runBenchmark(String engineId) throws IOException, InterruptedException {
+        benchmarkLog("info", "Preparing benchmark (" + engineId + ", " + DEVICE_ABI + ")", -1, 0);
+        MinerEngine engine = MinerEngine.byId(engineId);
+        if (engine == null) throw new IOException("Unknown mining engine.");
+        String problem = engine.problem(DEVICE_ABI, "rx/0");
+        if (problem != null) throw new IOException(problem);
+        File binary;
+        synchronized (this) {
+            if (isRunning()) throw new IOException("Stop mining before running a benchmark.");
+            binary = findMinerBinary(engine);
+            if (binary == null)
+                throw new IOException(engine.name + " is not installed. Download it first.");
+            OwnedMinerProcess.stopOrphans(getContext());
+            verifyInstalledBinary(binary);
+        }
+        boolean lightMode = MinerAbi.ARM32.equals(DEVICE_ABI);
+        if (lightMode && !MinerAbi.cpuInfoHasNeon(readCpuInfo()))
+            throw new IOException("This 32-bit ARM CPU does not report NEON, which the miner requires.");
+
+        benchmarkLog("info", "Starting " + engine.name + " offline benchmark", 0, 0);
+        MinerBenchmark.Result measured =
+                MinerBenchmark.run(
+                        MinerBenchmark.command(binary.getAbsolutePath(), lightMode),
+                        benchmarkCancelled,
+                        (line, samples, total) -> benchmarkLog("miner", line, samples, total));
+        benchmarkLog("info", "Finished. Median speed " + Math.round(measured.hashrate * 10) / 10.0 + " H/s", -1, 0);
+        String version = parseMinerVersion(readMinerVersionOutput(binary));
+
+        JSObject result = new JSObject();
+        result.put("hashrate", measured.hashrate);
+        result.put("samples", measured.samples);
+        result.put("seconds", measured.seconds);
+        result.put("engine", engine.id);
+        result.put("engineName", engine.name);
+        result.put("engineVersion", version.isEmpty() ? engine.version : version);
+        result.put("abi", DEVICE_ABI);
+        result.put("cpuThreads", Runtime.getRuntime().availableProcessors());
+        result.put("lightMode", lightMode);
+        result.put("device", MinerBenchmark.deviceLabel(Build.MANUFACTURER, Build.MODEL));
+        result.put(
+                "soc",
+                Build.VERSION.SDK_INT >= 31 && !"unknown".equalsIgnoreCase(Build.SOC_MODEL)
+                        ? MinerBenchmark.label(Build.SOC_MODEL, 64)
+                        : "");
+        result.put("completedAt", System.currentTimeMillis());
+        return result;
+    }
 
     void testPool(PluginCall call) {
         if (!probing.compareAndSet(false, true)) {
@@ -121,8 +214,26 @@ final class NativeMiningRuntime {
         progressListener = listener;
     }
 
+    void setBenchmarkListener(java.util.function.Consumer<JSObject> listener) {
+        benchmarkListener = listener;
+    }
+
+    /** Sends one benchmark log line to the app; samples is -1 when the line is not a reading. */
+    private void benchmarkLog(String level, String line, int samples, int total) {
+        java.util.function.Consumer<JSObject> listener = benchmarkListener;
+        if (listener == null) return;
+        JSObject event = new JSObject();
+        event.put("level", level);
+        event.put("line", line);
+        event.put("samples", samples);
+        event.put("total", total);
+        listener.accept(event);
+    }
+
     void setVisible(boolean visible) {
         activityVisible = visible;
+        /* The benchmark has no foreground service, so it never outlives the visible app. */
+        if (!visible) benchmarkCancelled.set(true);
         if (!visible)
             controlExecutor.execute(
                     () -> {
@@ -582,6 +693,10 @@ final class NativeMiningRuntime {
             JSObject config, boolean automatic, StartResult call) {
         if (isRunning()) {
             call.resolve();
+            return;
+        }
+        if (benchmarking.get()) {
+            call.reject("A benchmark is running. Wait for it to finish or cancel it first.");
             return;
         }
 

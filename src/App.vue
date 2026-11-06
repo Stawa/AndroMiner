@@ -718,6 +718,7 @@ onBeforeUnmount(() => {
             :config="miner.config"
             :protection="miner.protection.value"
             :protection-events="miner.protectionEvents.value"
+            :mining="sessionActive"
           />
           <SettingsView
             v-else-if="activeTab === 'settings'"

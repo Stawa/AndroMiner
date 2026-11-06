@@ -79,6 +79,7 @@ const createFakeFirestore = () => {
   return {
     collection: (name) => ({
       ...query(name),
+      add: async (value) => write(name, `auto-${bucket(name).size}`, value),
       doc: (id) => ({
         name,
         id,
@@ -258,4 +259,30 @@ test('heartbeats are measured by the server and cannot create or revive a record
   s.clock.t += MINUTE;
   assert.equal((await beat(s, 1)).counted, false, 'activity is no longer shared');
   assert.deepEqual((await (await s.call('/v1/leaderboard')).json()).entries, []);
+});
+
+test('benchmark results are stored, published as a median and pruned', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const send = (hashrate) =>
+    s.call('/v1/benchmark', {
+      method: 'POST',
+      body: JSON.stringify({
+        v: 1,
+        device: 'Google Pixel 8',
+        soc: null,
+        abi: 'arm64-v8a',
+        cpuThreads: 9,
+        engine: 'xmrig',
+        hashrate
+      })
+    });
+  for (const rate of [900, 1000, 1100]) assert.equal((await send(rate)).status, 200);
+  const board = await (await s.call('/v1/benchmarks')).json();
+  assert.equal(board.devices[0].median, 1000);
+  assert.equal(board.devices[0].samples, 3);
+
+  s.clock.t += 91 * DAY;
+  await s.app.prune();
+  assert.equal(s.firestore.size('benchmarks'), 0);
 });

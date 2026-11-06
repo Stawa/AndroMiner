@@ -72,8 +72,9 @@ existing runs. The wallet is a placeholder. Tap any image for full size.
 - Save mining setups and session history locally; import or export configuration.
 - Set a native session deadline, recover interrupted runs, and retain protection stop reasons.
 - Test pool DNS/TCP/TLS reachability without sending a wallet or password.
+- Measure the phone's RandomX speed with an offline benchmark (Device tab) and optionally share it anonymously after a warning. Results appear on [andro-miner.vercel.app](https://andro-miner.vercel.app).
 - Filter session history and preview a JSON results export with pool identifiers excluded by default.
-- Use the app in English, Bahasa Indonesia, or 简体中文 (Settings → General → Language), or follow the device language.
+- Use the app in one of ten languages (Settings → General → Language), or follow the device language.
 - Use light or dark mode and swipe between the main pages.
 - Install a bundled TLS or no-TLS miner, or download one after confirmation.
 
