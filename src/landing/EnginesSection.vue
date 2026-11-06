@@ -4,30 +4,35 @@ import { vReveal } from './reveal';
 </script>
 
 <template>
-  <section id="engines" class="engines" aria-labelledby="engines-title">
-    <h2 id="engines-title" v-reveal>Three engines, two CPU architectures</h2>
-    <div class="engines-grid">
+  <section id="engines" aria-labelledby="engines-title">
+    <h2 id="engines-title" v-reveal class="mb-[clamp(28px,4vw,56px)] max-w-[20ch] text-h2">
+      Three engines, two CPU architectures
+    </h2>
+    <div
+      class="grid grid-cols-1 items-start gap-[clamp(28px,5vw,72px)] lg:grid-cols-[minmax(0,.7fr)_minmax(0,1.3fr)]"
+    >
       <img
         v-reveal
+        class="w-full max-w-[360px] rounded-3xl"
         :src="images.engine.src"
         :alt="images.engine.alt"
         :width="shot.width"
         :height="shot.height"
         loading="lazy"
       />
-      <div class="engines-body">
-        <p v-reveal class="statement">
+      <div>
+        <p v-reveal class="text-lead">
           XMRig is the supported engine. XMRigCC and XLArig are experimental and say so in the app.
           Bundled APKs carry all three for 64-bit and 32-bit ARM phones.
         </p>
         <div
           v-reveal
-          class="table-scroll"
+          class="my-7 overflow-x-auto rounded-2xl bg-surface"
           tabindex="0"
           role="region"
           aria-label="Engine comparison, scrollable"
         >
-          <table>
+          <table class="data-table">
             <thead>
               <tr>
                 <th scope="col">Engine</th>
@@ -38,7 +43,7 @@ import { vReveal } from './reveal';
             </thead>
             <tbody>
               <tr v-for="row in engineRows" :key="row.name">
-                <th scope="row">{{ row.name }}</th>
+                <th scope="row" class="whitespace-nowrap">{{ row.name }}</th>
                 <td>{{ row.status }}</td>
                 <td>{{ row.mines }}</td>
                 <td>{{ row.abis }}</td>

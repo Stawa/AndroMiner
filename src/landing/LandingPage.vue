@@ -13,9 +13,13 @@ import StartSection from './StartSection.vue';
 </script>
 
 <template>
-  <a class="skip" href="#main">Skip to content</a>
+  <a
+    class="absolute top-[-100px] left-gutter z-20 bg-accent px-4 py-2.5 font-bold text-on-accent focus:top-3"
+    href="#main"
+    >Skip to content</a
+  >
   <SiteHeader />
-  <main id="main">
+  <main id="main" class="[&>section]:px-gutter [&>section+section]:mt-section">
     <HeroSection />
     <FeaturesSection />
     <BenchmarksSection />

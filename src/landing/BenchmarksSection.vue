@@ -41,19 +41,24 @@ const ariaSort = (key: SortKey | null): 'ascending' | 'descending' | 'none' | un
 </script>
 
 <template>
-  <section id="benchmarks" class="bench" aria-labelledby="bench-title">
-    <div class="bench-intro">
-      <h2 id="bench-title" v-reveal>What real phones hash</h2>
-      <p class="statement">
+  <section
+    id="benchmarks"
+    class="grid grid-cols-1 items-start gap-[clamp(28px,5vw,72px)] bg-surface py-[clamp(48px,8vw,112px)] lg:grid-cols-[minmax(0,.8fr)_minmax(0,1.2fr)]"
+    aria-labelledby="bench-title"
+  >
+    <div class="grid gap-2">
+      <h2 id="bench-title" v-reveal class="max-w-[20ch] text-h2">What real phones hash</h2>
+      <p class="mt-4 text-lead">
         Every row is the median of results that people chose to share from the app's benchmark. A
         phone appears once at least <strong>{{ table?.minSamples ?? 3 }}</strong> results are in.
       </p>
-      <p class="note" aria-live="polite">{{ summary }}</p>
-      <label class="search">
+      <p class="text-[.9375rem] text-muted" aria-live="polite">{{ summary }}</p>
+      <label class="mt-4 grid gap-2 font-bold">
         <span>Find a device</span>
         <input
           v-model="query"
           type="search"
+          class="w-full rounded-xl bg-surface-2 px-4 py-3.5 text-base text-ink placeholder:text-muted"
           placeholder="Pixel, Galaxy, Snapdragon…"
           autocomplete="off"
         />
@@ -62,22 +67,27 @@ const ariaSort = (key: SortKey | null): 'ascending' | 'descending' | 'none' | un
 
     <div
       v-reveal
-      class="bench-table"
+      class="overflow-x-auto rounded-2xl bg-surface-2"
       tabindex="0"
       role="region"
       aria-label="Benchmark results, scrollable"
     >
-      <table>
+      <table class="data-table">
         <thead>
           <tr>
             <th
               v-for="column in columns"
               :key="column.label"
               scope="col"
-              :class="{ num: column.numeric, 'hide-s': column.hideSmall }"
+              :class="[column.numeric && 'num', column.hideSmall && 'max-md:hidden']"
               :aria-sort="ariaSort(column.key)"
             >
-              <button v-if="column.key" class="sort" type="button" @click="sortBy(column.key)">
+              <button
+                v-if="column.key"
+                class="inline-flex cursor-pointer items-center gap-1.5 hover:text-ink"
+                type="button"
+                @click="sortBy(column.key)"
+              >
                 {{ column.label }}
                 <span aria-hidden="true">{{
                   sortKey === column.key ? (descending ? '↓' : '↑') : ''
@@ -89,26 +99,30 @@ const ariaSort = (key: SortKey | null): 'ascending' | 'descending' | 'none' | un
         </thead>
         <tbody>
           <tr v-if="rows.length === 0">
-            <td class="empty" colspan="6">{{ emptyMessage }}</td>
+            <td class="px-4 py-7 text-muted" colspan="6">{{ emptyMessage }}</td>
           </tr>
           <tr v-for="row in rows" :key="`${row.device}-${row.abi}`">
             <th scope="row">
               {{ row.abi === 'armeabi-v7a' ? `${row.device} (32-bit)` : row.device }}
             </th>
-            <td class="hide-s">{{ row.soc }}</td>
+            <td class="max-md:hidden">{{ row.soc }}</td>
             <td class="num">{{ row.cpuThreads }}</td>
             <td class="num">
-              <strong>{{ rate.format(row.median) }}</strong>
+              <strong class="text-lg text-accent">{{ rate.format(row.median) }}</strong>
             </td>
-            <td class="num hide-s">{{ number.format(row.min) }} to {{ number.format(row.max) }}</td>
+            <td class="num max-md:hidden">
+              {{ number.format(row.min) }} to {{ number.format(row.max) }}
+            </td>
             <td class="num">{{ number.format(row.samples) }}</td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <div class="bench-how">
-      <h3 v-reveal>Add your phone</h3>
+    <div
+      class="grid grid-cols-1 gap-[clamp(28px,5vw,72px)] lg:col-span-full lg:grid-cols-[minmax(0,.8fr)_minmax(0,1.2fr)]"
+    >
+      <h3 v-reveal class="text-h2">Add your phone</h3>
       <div v-reveal="1">
         <p>
           Open the app, go to Device, stop any mining and run the benchmark. It takes about a
