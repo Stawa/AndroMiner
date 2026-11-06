@@ -8,7 +8,7 @@ The app sends a small check-in. `server/` validates it, rate-limits it, keeps on
 
 | Metric                          | Meaning                                                                                                                                        |
 | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Release downloads               | Sum of `download_count` for `.apk` files on non-draft GitHub releases. Counts repeats, mirrors and bots. Not users or devices.             |
+| Release downloads               | Sum of `download_count` for `.apk` files on non-draft GitHub releases. Counts repeats, mirrors and bots. Not users or devices.                 |
 | Daily / weekly / monthly active | Installations with reporting on whose last accepted check-in was within 24 hours / 7 days / 30 days. "Estimated active" is the monthly figure. |
 
 Every installation figure is a lower bound: only installations that leave reporting on are counted.
