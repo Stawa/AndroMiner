@@ -11,15 +11,15 @@ const current = (href: string): boolean =>
 <template>
   <header class="sticky top-0 z-20 border-b border-line bg-ground/90 backdrop-blur-md">
     <div
-      class="mx-auto flex h-[calc(var(--header-h)-1px)] max-w-[88rem] items-center justify-between gap-4 px-gutter"
+      class="mx-auto flex h-[calc(var(--header-h)-1px)] max-w-[88rem] items-center justify-between gap-2 px-gutter sm:gap-4"
     >
       <a
-        class="flex items-center gap-2.5 font-extrabold no-underline"
+        class="flex min-w-0 items-center gap-2.5 font-extrabold no-underline"
         href="/"
         aria-label="AndroMiner home"
       >
         <img class="rounded-lg" :src="images.logo" alt="" width="28" height="28" />
-        <span>AndroMiner</span>
+        <span class="truncate">AndroMiner</span>
       </a>
       <nav class="hidden gap-[clamp(14px,2.5vw,32px)] md:flex" aria-label="Primary">
         <a
@@ -33,7 +33,7 @@ const current = (href: string): boolean =>
         >
       </nav>
       <div class="flex items-center gap-2">
-        <a class="btn" href="/#download">Download</a>
+        <a class="btn shrink-0 !px-4 text-sm sm:!px-5 sm:text-base" href="/#download">Download</a>
         <button
           type="button"
           class="grid size-11 cursor-pointer place-items-center rounded-full text-ink hover:bg-surface-2 md:hidden"

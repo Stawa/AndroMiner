@@ -161,66 +161,100 @@ useDialogFocus(
 );
 </script>
 <template>
-  <div class="app-page phone-page insights-page md:grid md:grid-cols-2 md:items-stretch">
+  <div class="app-page phone-page insights-page md:grid md:grid-cols-2 md:items-start">
     <header class="screen-heading">
       <h1>{{ $t('header.statistics') }}</h1>
       <p>{{ $t('history.subtitle') }}</p>
     </header>
-    <div class="st-toolbar md:col-span-2">
-      <div class="chip-row" role="group" :aria-label="$t('history.rangeLabel')">
+
+    <div class="flex flex-col gap-3 min-[480px]:flex-row min-[480px]:items-center md:col-span-2">
+      <div
+        class="grid flex-1 grid-cols-3 gap-1 rounded-full bg-app-elevated p-1"
+        role="group"
+        :aria-label="$t('history.rangeLabel')"
+      >
         <button
           v-for="option in rangeOptions"
           :key="option.value"
           type="button"
-          class="chip"
+          class="min-h-10 min-w-0 truncate rounded-full px-2 text-[0.8125rem] font-semibold transition-colors duration-200"
+          :class="range === option.value ? 'bg-app-on text-app-bg shadow-sm' : 'text-app-muted'"
           :aria-pressed="range === option.value"
           @click="range = option.value"
         >
           {{ option.label }}
         </button>
       </div>
-      <div class="st-tools">
-        <button class="st-tool" type="button" @click="filterOpen = true">
+      <div class="grid grid-cols-2 gap-2 min-[480px]:flex">
+        <button
+          type="button"
+          class="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-app-line px-4 text-sm font-semibold"
+          @click="filterOpen = true"
+        >
           <MaterialIcon name="tune" :size="20" />{{ $t('history.filters') }}
-          <b v-if="activeFilters" class="st-count">{{ activeFilters }}</b>
+          <b
+            v-if="activeFilters"
+            class="grid h-5 min-w-5 place-items-center rounded-full bg-app-green px-1.5 text-xs text-black"
+            >{{ activeFilters }}</b
+          >
         </button>
-        <button class="st-tool" type="button" :disabled="!runs.length" @click="openExport">
+        <button
+          type="button"
+          class="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-app-line px-4 text-sm font-semibold disabled:opacity-45"
+          :disabled="!runs.length"
+          @click="openExport"
+        >
           <MaterialIcon name="ios_share" :size="20" />{{ $t('history.export') }}
         </button>
       </div>
     </div>
-    <section class="st-hero md:col-span-2">
-      <span class="eyebrow">{{
-        $t('history.measuredAverage', { symbol: config.coin.symbol })
-      }}</span>
-      <p class="st-number">{{ formatHashrate(average) }}</p>
-      <p class="section-copy">
-        {{
-          measured.runs
-            ? $t('history.weighted', {
-                samples: measured.samples,
-                runs: measured.runs,
-                algorithm: config.coin.xmrigAlgo
-              })
-            : $t('history.baseline')
-        }}
-        {{ $t('history.excluded') }}
-      </p>
-      <dl class="st-kpis" :aria-label="$t('history.totals')">
-        <div>
-          <dt>{{ $t('history.completed') }}</dt>
-          <dd>
-            <strong>{{ formatNumber(runs.length) }}</strong>
-            <span>{{ $t('history.totalRuntime', { duration: formatDuration(seconds) }) }}</span>
+
+    <section
+      class="min-w-0 rounded-[28px] border border-app-line bg-app-card bg-[radial-gradient(110%_80%_at_100%_0%,rgb(var(--color-app-green)/0.16),transparent_60%)] p-5 md:col-span-2 md:grid md:grid-cols-2 md:items-center md:gap-8"
+    >
+      <div class="grid gap-2">
+        <span class="eyebrow">{{
+          $t('history.measuredAverage', { symbol: config.coin.symbol })
+        }}</span>
+        <p
+          class="text-[clamp(2.25rem,12vw,3.75rem)] leading-none font-light tracking-tighter tabular-nums"
+        >
+          {{ formatHashrate(average) }}
+        </p>
+        <p class="section-copy">
+          {{
+            measured.runs
+              ? $t('history.weighted', {
+                  samples: measured.samples,
+                  runs: measured.runs,
+                  algorithm: config.coin.xmrigAlgo
+                })
+              : $t('history.baseline')
+          }}
+          {{ $t('history.excluded') }}
+        </p>
+      </div>
+      <dl class="mt-4 grid grid-cols-2 gap-2 md:mt-0" :aria-label="$t('history.totals')">
+        <div class="grid min-w-0 gap-1 rounded-2xl bg-app-elevated p-3.5">
+          <dt class="eyebrow">{{ $t('history.completed') }}</dt>
+          <dd class="m-0 grid gap-0.5">
+            <strong class="text-2xl font-semibold tracking-tight tabular-nums">{{
+              formatNumber(runs.length)
+            }}</strong>
+            <span class="text-xs text-app-muted">{{
+              $t('history.totalRuntime', { duration: formatDuration(seconds) })
+            }}</span>
           </dd>
         </div>
-        <div>
-          <dt>{{ $t('session.acceptedShares') }}</dt>
-          <dd>
-            <strong :class="{ 'history-summary-positive': accepted > 0 }">{{
-              formatNumber(accepted)
-            }}</strong>
-            <span>{{
+        <div class="grid min-w-0 gap-1 rounded-2xl bg-app-elevated p-3.5">
+          <dt class="eyebrow">{{ $t('session.acceptedShares') }}</dt>
+          <dd class="m-0 grid gap-0.5">
+            <strong
+              class="text-2xl font-semibold tracking-tight tabular-nums"
+              :class="{ 'text-app-green-ink': accepted > 0 }"
+              >{{ formatNumber(accepted) }}</strong
+            >
+            <span class="text-xs text-app-muted">{{
               shares
                 ? $t('history.acceptance', { percent: ((accepted / shares) * 100).toFixed(1) })
                 : $t('history.noSharesYet')
@@ -229,54 +263,74 @@ useDialogFocus(
         </div>
       </dl>
     </section>
-    <section v-if="trend.bars.length" class="st-chart md:col-span-2">
-      <div class="st-chart-head">
+
+    <section
+      v-if="trend.bars.length"
+      class="grid min-w-0 content-start gap-4 rounded-[28px] border border-app-line bg-app-card p-5"
+    >
+      <div class="flex items-center justify-between gap-3">
         <span class="eyebrow">{{ $t('history.trend') }}</span>
-        <span class="supporting-label">{{ trend.peak }}</span>
+        <span class="text-xs font-semibold text-app-muted tabular-nums">{{ trend.peak }}</span>
       </div>
-      <div class="st-bars" role="img" :aria-label="$t('history.trend')">
+      <div
+        class="flex h-32 items-end gap-1.5 border-b border-app-line bg-[linear-gradient(rgb(var(--color-app-line)),transparent_1px)] bg-[length:100%_25%]"
+        role="img"
+        :aria-label="$t('history.trend')"
+      >
         <span
           v-for="bar in trend.bars"
           :key="bar.id"
-          :style="{ '--h': bar.height }"
+          class="bar-rise max-w-7 min-w-0 flex-1 origin-bottom rounded-t-lg rounded-b-[3px] bg-gradient-to-t from-app-green/35 to-app-green opacity-60 last:opacity-100"
+          :style="{ height: `${bar.height * 100}%` }"
           :title="bar.label"
         />
       </div>
     </section>
-    <LeaderboardCard class="md:col-span-2" />
-    <section class="surface">
-      <div class="section-heading">
-        <h3>{{ $t('history.shareQuality') }}</h3>
-        <span class="supporting-label">{{ $t('history.totalBadge', { count: shares }) }}</span>
+
+    <section
+      class="grid min-w-0 content-start gap-3 rounded-[28px] border border-app-line bg-app-card p-5"
+      :class="trend.bars.length ? '' : 'md:col-span-2'"
+    >
+      <div class="flex items-center justify-between gap-3">
+        <h3 class="m-0 text-base font-semibold">{{ $t('history.shareQuality') }}</h3>
+        <span class="eyebrow">{{ $t('history.totalBadge', { count: shares }) }}</span>
       </div>
       <template v-if="shares">
+        <p class="m-0 text-4xl leading-none font-light tracking-tighter tabular-nums">
+          {{ ((accepted / shares) * 100).toFixed(1) }}<span class="text-xl text-app-muted">%</span>
+        </p>
         <div
-          class="share-meter"
+          class="flex h-3 gap-0.5 overflow-hidden rounded-full bg-app-elevated"
           role="img"
           :aria-label="$t('history.shareMeter', { accepted, rejected })"
         >
-          <span :style="{ width: `${(accepted / shares) * 100}%` }" /><span
+          <span class="bg-app-green" :style="{ width: `${(accepted / shares) * 100}%` }" /><span
+            class="bg-[var(--danger)]"
             :style="{ width: `${(rejected / shares) * 100}%` }"
           />
         </div>
-        <div class="share-legend">
+        <div class="flex flex-wrap justify-between gap-x-3 text-xs text-app-muted">
           <span>{{ $t('run.acceptedCount', { count: accepted }) }}</span
           ><span>{{ $t('run.rejectedCount', { count: rejected }) }}</span>
         </div>
       </template>
-      <p v-else class="section-copy">
-        {{ $t('history.noShares') }}
-      </p>
+      <p v-else class="section-copy">{{ $t('history.noShares') }}</p>
     </section>
-    <section class="st-history md:col-span-2">
-      <div class="section-heading">
+
+    <LeaderboardCard class="md:col-span-2" />
+
+    <section class="grid min-w-0 gap-3 md:col-span-2">
+      <div class="flex items-start justify-between gap-3">
         <div>
-          <h3>{{ $t('history.sessionHistory') }}</h3>
-          <span class="supporting-label">{{
-            $t('history.runsBadge', { count: runs.length })
-          }}</span>
+          <h3 class="m-0 text-base font-semibold">{{ $t('history.sessionHistory') }}</h3>
+          <span class="eyebrow mt-1">{{ $t('history.runsBadge', { count: runs.length }) }}</span>
         </div>
-        <button v-if="sessionHistory.length" class="text-button danger-text" @click="clearAll">
+        <button
+          v-if="sessionHistory.length"
+          class="inline-flex min-h-10 shrink-0 items-center gap-1.5 text-sm font-semibold text-[var(--danger)]"
+          type="button"
+          @click="clearAll"
+        >
           <MaterialIcon name="delete_sweep" :size="18" />{{ $t('dashboard.clearHistory') }}
         </button>
       </div>
@@ -287,24 +341,42 @@ useDialogFocus(
           {{ $t('history.reset') }}
         </button>
       </div>
-      <ul class="st-runs">
-        <li v-for="run in runs" :key="run.id" class="st-run">
-          <button class="history-row" @click="selected = run">
-            <CoinIcon :symbol="run.coinSymbol" :size="40" />
-            <span
-              ><strong>{{ run.coinSymbol }} · {{ formatDuration(run.durationSeconds) }}</strong
-              ><small>{{ dateTime(run.endedAt) }}</small
-              ><small>{{
+      <ul class="m-0 grid list-none gap-2 p-0 lg:grid-cols-2">
+        <li
+          v-for="run in runs"
+          :key="run.id"
+          class="flex min-w-0 items-stretch rounded-[20px] border border-app-line bg-app-card"
+        >
+          <button
+            type="button"
+            class="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1 p-3.5 text-left min-[360px]:grid-cols-[auto_minmax(0,1fr)_auto]"
+            @click="selected = run"
+          >
+            <CoinIcon
+              :symbol="run.coinSymbol"
+              :size="40"
+              class="row-span-2 min-[360px]:row-span-1"
+            />
+            <span class="grid min-w-0 gap-0.5">
+              <strong class="text-[0.8125rem] font-semibold"
+                >{{ run.coinSymbol }} · {{ formatDuration(run.durationSeconds) }}</strong
+              >
+              <small class="text-xs text-app-muted">{{ dateTime(run.endedAt) }}</small>
+              <small class="text-xs text-app-muted">{{
                 $t('history.runLine', {
                   accepted: run.acceptedShares,
                   rejected: run.rejectedShares
                 })
-              }}</small></span
-            ><b>{{ formatHashrate(run.averageHashrate) }}</b>
+              }}</small>
+            </span>
+            <b
+              class="col-start-2 text-sm font-semibold tabular-nums min-[360px]:col-start-auto min-[360px]:text-right"
+              >{{ formatHashrate(run.averageHashrate) }}</b
+            >
           </button>
           <button
-            class="st-remove"
             type="button"
+            class="grid w-11 shrink-0 place-items-center rounded-r-[20px] text-app-muted hover:text-[var(--danger)] focus-visible:text-[var(--danger)]"
             :aria-label="$t('dashboard.deleteSession')"
             @click="removeRun(run)"
           >
@@ -313,7 +385,10 @@ useDialogFocus(
         </li>
       </ul>
     </section>
-    <details class="surface">
+
+    <details
+      class="stat-note rounded-[28px] border border-app-line bg-app-card px-5 py-3 md:col-span-2"
+    >
       <summary>{{ $t('history.compare') }}</summary>
       <p class="section-copy">{{ $t('history.compareBody') }}</p>
     </details>

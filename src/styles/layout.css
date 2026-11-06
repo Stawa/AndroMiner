@@ -334,13 +334,6 @@
 .session-column .share-strip small {
   font-size: 0.75rem;
 }
-.history-row > .coin-icon {
-  flex: 0 0 auto;
-}
-.history-row > .coin-mark {
-  width: 34px;
-  height: 34px;
-}
 .segment button {
   min-height: 44px;
 }

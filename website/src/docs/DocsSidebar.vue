@@ -1,18 +1,11 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue';
-import { searchDocs } from './search';
+import { nextTick, ref, watch } from 'vue';
 import { sectionOf, sections } from './nav';
 
 const props = defineProps<{ slug: string }>();
-const emit = defineEmits<{ go: [path: string] }>();
+const emit = defineEmits<{ go: [path: string]; search: [] }>();
 
-const query = ref('');
-const active = ref(0);
-const input = ref<HTMLInputElement | null>(null);
 const root = ref<HTMLElement | null>(null);
-
-const hits = computed(() => searchDocs(query.value));
-watch(hits, () => (active.value = 0));
 
 // Only the current section starts open; the reader can open others.
 const opened = ref<Record<string, boolean>>({});
@@ -26,78 +19,43 @@ watch(
   async () => {
     const id = sectionOf(props.slug)?.id;
     if (id) opened.value = { ...opened.value, [id]: true };
-    query.value = '';
     await nextTick();
     root.value?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest' });
   },
   { immediate: true }
 );
-
-const onKey = (event: KeyboardEvent): void => {
-  if (!hits.value.length) return;
-  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-    event.preventDefault();
-    const step = event.key === 'ArrowDown' ? 1 : -1;
-    active.value = (active.value + step + hits.value.length) % hits.value.length;
-  } else if (event.key === 'Enter') {
-    event.preventDefault();
-    emit('go', `/docs/${hits.value[active.value]!.page.slug}`);
-  } else if (event.key === 'Escape') query.value = '';
-};
-
-defineExpose({ focus: () => input.value?.focus() });
 </script>
 
 <template>
   <div ref="root">
-    <label class="sr-only" for="doc-search">Search documentation</label>
-    <div class="relative mb-4">
-      <input
-        id="doc-search"
-        ref="input"
-        v-model="query"
-        type="search"
-        placeholder="Search docs"
-        autocomplete="off"
-        role="combobox"
-        aria-controls="doc-results"
-        :aria-expanded="query.length > 0"
-        class="w-full rounded-control border border-line bg-surface py-2.5 pr-12 pl-3 text-base text-ink placeholder:text-muted lg:text-[.9375rem]"
-        @keydown="onKey"
-      />
+    <button
+      type="button"
+      class="mb-4 flex w-full cursor-pointer items-center gap-2.5 rounded-control border border-line bg-surface px-3 py-2.5 text-left text-[.9375rem] text-muted hover:border-muted hover:text-ink"
+      aria-haspopup="dialog"
+      @click="emit('search')"
+    >
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        aria-hidden="true"
+      >
+        <circle cx="11" cy="11" r="7" />
+        <path d="M20 20l-3.5-3.5" />
+      </svg>
+      <span class="flex-1">Search docs</span>
       <kbd
-        class="pointer-events-none absolute top-1/2 right-3 hidden -translate-y-1/2 rounded border border-line px-1.5 font-mono text-xs text-muted lg:block"
+        class="hidden rounded border border-line px-1.5 font-mono text-xs lg:block"
         aria-hidden="true"
         >/</kbd
       >
-    </div>
+    </button>
 
-    <ul
-      v-if="query"
-      id="doc-results"
-      class="m-0 grid list-none gap-1 p-0"
-      role="listbox"
-      aria-label="Search results"
-    >
-      <li v-for="(hit, i) in hits" :key="hit.page.slug" role="option" :aria-selected="i === active">
-        <a
-          :href="`/docs/${hit.page.slug}`"
-          class="block rounded-control px-3 py-2.5 no-underline hover:bg-surface-2"
-          :class="i === active ? 'bg-surface-2' : ''"
-        >
-          <span class="block text-sm font-bold">{{ hit.page.title }}</span>
-          <span class="block font-mono text-[11px] tracking-wide text-accent-text uppercase">{{
-            sectionOf(hit.page.slug)?.title
-          }}</span>
-          <span class="mt-1 block text-xs text-muted">{{ hit.snippet }}</span>
-        </a>
-      </li>
-      <li v-if="!hits.length" class="px-3 py-2 text-sm text-muted" role="status">
-        No pages match “{{ query }}”.
-      </li>
-    </ul>
-
-    <nav v-else aria-label="Documentation pages">
+    <nav aria-label="Documentation pages">
       <div
         v-for="item in sections"
         :key="item.id"

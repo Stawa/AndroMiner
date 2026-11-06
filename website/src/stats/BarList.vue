@@ -16,68 +16,32 @@ const percent = (share: number): string => `${(share * 100).toFixed(share < 0.1 
 </script>
 
 <template>
-  <ul class="bars">
-    <li v-for="row in rows" :key="row.label">
-      <span class="label">{{ row.label }}</span>
-      <span class="count">{{ number.format(row.count) }}</span>
-      <span class="share">{{ percent(row.share) }}</span>
-      <span class="track" aria-hidden="true">
-        <span class="fill" :style="{ width: `${Math.max(1, row.share * 100)}%` }" />
+  <ul class="m-0 grid list-none gap-3.5 p-0">
+    <li
+      v-for="row in rows"
+      :key="row.label"
+      class="grid grid-cols-[1fr_auto_3.25rem] items-baseline gap-x-3 gap-y-1.5 text-sm"
+    >
+      <span class="min-w-0 [overflow-wrap:anywhere]">{{ row.label }}</span>
+      <span class="text-right font-semibold tabular-nums">{{ number.format(row.count) }}</span>
+      <span class="text-right text-muted tabular-nums">{{ percent(row.share) }}</span>
+      <span
+        class="col-span-full h-1.5 overflow-hidden rounded-[3px] bg-surface-2"
+        aria-hidden="true"
+      >
+        <span
+          class="block h-full rounded-[3px] bg-accent"
+          :style="{ width: `${Math.max(1, row.share * 100)}%` }"
+        />
       </span>
     </li>
-    <li v-for="note in notes" :key="note.label" class="note">
-      <span class="label">{{ note.label }}</span>
-      <span class="count">{{ number.format(note.count) }}</span>
+    <li
+      v-for="note in notes"
+      :key="note.label"
+      class="grid grid-cols-[1fr_auto] items-baseline gap-x-3 text-sm text-muted"
+    >
+      <span class="min-w-0 [overflow-wrap:anywhere]">{{ note.label }}</span>
+      <span class="text-right font-semibold tabular-nums">{{ number.format(note.count) }}</span>
     </li>
   </ul>
 </template>
-
-<style scoped>
-.bars {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 14px;
-}
-li {
-  display: grid;
-  grid-template-columns: 1fr auto 3.25rem;
-  column-gap: 12px;
-  row-gap: 6px;
-  align-items: baseline;
-  font-size: 0.875rem;
-}
-.label {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.count,
-.share {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-.count {
-  font-weight: 650;
-}
-.share {
-  color: rgb(var(--color-app-muted));
-}
-.track {
-  grid-column: 1 / -1;
-  height: 6px;
-  border-radius: 3px;
-  background: rgb(var(--color-app-elevated));
-  overflow: hidden;
-}
-.fill {
-  display: block;
-  height: 100%;
-  border-radius: 3px;
-  background: rgb(var(--color-app-green));
-}
-.note {
-  color: rgb(var(--color-app-muted));
-  grid-template-columns: 1fr auto;
-}
-</style>

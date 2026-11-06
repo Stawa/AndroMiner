@@ -167,65 +167,138 @@ const activeFor = (tag: string): number | null => {
   const wanted = tag.replace(/^v/i, '');
   return stats.value?.appVersions.groups.find((group) => group.key === wanted)?.count ?? null;
 };
+
+// Shared class strings: the page repeats these, and Tailwind reads them as plain text.
+const panel = 'min-w-0 rounded-2xl border border-line bg-surface p-[clamp(16px,2vw,24px)]';
+const head = 'mb-4 flex flex-wrap items-center justify-between gap-3';
+const h2 = 'm-0 text-[.9375rem] font-semibold';
+const note = 'm-0 max-w-[64ch] text-[.8125rem] leading-relaxed text-muted';
+const ghost =
+  'min-h-9 cursor-pointer rounded-control border border-line px-3.5 text-[.8125rem] disabled:cursor-default disabled:opacity-50';
+const textLink =
+  'font-semibold underline decoration-accent decoration-2 underline-offset-[5px] hover:decoration-current';
+const explainer = [
+  {
+    term: 'Installations',
+    text: 'Optional, anonymous check-ins: a random ID, app and Android version, APK type and a country you choose.'
+  },
+  {
+    term: 'Downloads',
+    text: 'From the GitHub Releases API. They count HTTP requests, not people.'
+  },
+  { term: 'Never collected', text: 'Wallets, pools, or anything about what you mine.' }
+];
 </script>
 
 <template>
   <SiteHeader />
-  <div class="page">
-    <main>
-      <div class="title">
+  <div class="mx-auto max-w-[88rem] px-gutter pt-6">
+    <main class="grid gap-4">
+      <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-4 pt-4 pb-1">
         <div>
-          <h1>AndroMiner usage</h1>
-          <p v-if="stats" class="finding">{{ finding }}</p>
-          <p v-else class="finding">
+          <h1 class="mb-1.5 text-[1.75rem] leading-tight font-bold tracking-tight">
+            AndroMiner usage
+          </h1>
+          <p v-if="stats" class="m-0 max-w-[60ch] leading-relaxed text-muted">{{ finding }}</p>
+          <p v-else class="m-0 max-w-[60ch] leading-relaxed text-muted">
             Anonymous check-ins from people who leave reporting on, plus public GitHub download
             counts. Estimates, not a census.
           </p>
         </div>
-        <div v-if="stats" class="stamp">
+        <div v-if="stats" class="flex items-center gap-3 text-[.8125rem] text-muted">
           <span>Updated {{ updated }}</span>
-          <button type="button" class="ghost" :disabled="loading" @click="load">Refresh</button>
+          <button type="button" :class="ghost" :disabled="loading" @click="load">Refresh</button>
         </div>
       </div>
 
-      <details class="panel explainer">
-        <summary>What these numbers are</summary>
-        <p>
-          Installation figures come from optional, anonymous check-ins: a random ID, app and Android
-          version, APK type and an optional country you choose. Nothing about wallets, pools or what
-          you mine is sent. Download counts come from the GitHub Releases API and count HTTP
-          requests, not people.
-          <a :href="`${repoUrl}/blob/main/docs/statistics.md`">Methodology</a> �
-          <a :href="`${repoUrl}/blob/main/docs/privacy.md`">Privacy policy</a>
-        </p>
-      </details>
+      <section
+        class="mt-10 mb-6 grid gap-6 border-t border-line pt-8 md:grid-cols-[5fr_7fr] md:gap-12"
+        aria-labelledby="explainer-title"
+      >
+        <div>
+          <h2
+            id="explainer-title"
+            class="mb-2 text-[clamp(1.375rem,1.1rem+1vw,1.75rem)] font-bold tracking-tight"
+          >
+            What these numbers are
+          </h2>
+          <p class="m-0 text-muted">Counts, not people. Here is where each figure comes from.</p>
+          <p class="mt-4 mb-0 flex flex-wrap gap-x-5 gap-y-1">
+            <a :href="`${repoUrl}/blob/main/docs/statistics.md`" :class="textLink"
+              >Methodology <span aria-hidden="true">→</span></a
+            >
+            <a :href="`${repoUrl}/blob/main/docs/privacy.md`" :class="textLink"
+              >Privacy policy <span aria-hidden="true">→</span></a
+            >
+          </p>
+        </div>
+        <dl class="m-0 grid">
+          <div
+            v-for="item in explainer"
+            :key="item.term"
+            class="grid gap-1.5 border-t border-line py-4 first:border-0 first:pt-0 md:grid-cols-[9rem_minmax(0,1fr)] md:gap-6"
+          >
+            <dt class="font-semibold">{{ item.term }}</dt>
+            <dd class="m-0 max-w-[60ch] leading-relaxed text-muted">{{ item.text }}</dd>
+          </div>
+        </dl>
+      </section>
 
-      <p v-if="loading && !stats" class="state" role="status">Loading statistics…</p>
-      <div v-else-if="failed && !stats" class="state panel" role="alert">
+      <p v-if="loading && !stats" class="text-muted" role="status">Loading statistics…</p>
+      <div v-else-if="failed && !stats" :class="panel" class="text-muted" role="alert">
         <p>The statistics service could not be reached. This does not affect the app.</p>
-        <button type="button" class="ghost" @click="load">Try again</button>
+        <button type="button" :class="ghost" @click="load">Try again</button>
       </div>
 
       <template v-else-if="stats">
-        <section class="figures" aria-label="Headline figures">
-          <dl>
-            <div v-for="(figure, index) in figures" :key="figure.label" :class="{ lead: !index }">
-              <dt>{{ figure.label }}</dt>
-              <dd>{{ figure.value }}</dd>
-              <small>{{ figure.note }}</small>
+        <section
+          class="overflow-hidden rounded-2xl border border-line bg-surface"
+          aria-label="Headline figures"
+        >
+          <dl
+            class="m-0 grid grid-cols-3 gap-px bg-line min-[860px]:grid-cols-[1.6fr_repeat(3,1fr)]"
+          >
+            <div
+              v-for="(figure, index) in figures"
+              :key="figure.label"
+              class="grid content-start gap-1.5 bg-surface p-[clamp(16px,2vw,24px)]"
+              :class="index ? '' : 'col-span-3 min-[860px]:col-span-1'"
+            >
+              <dt class="text-[.8125rem] text-muted">{{ figure.label }}</dt>
+              <dd
+                class="m-0 leading-[1.1] tabular-nums"
+                :class="
+                  index
+                    ? 'text-[1.375rem] font-semibold min-[480px]:text-[1.75rem]'
+                    : 'text-[2.5rem] font-bold tracking-tight'
+                "
+              >
+                {{ figure.value }}
+              </dd>
+              <small class="text-xs font-medium text-muted max-[480px]:hidden">{{
+                figure.note
+              }}</small>
             </div>
           </dl>
         </section>
 
-        <div class="split">
-          <section class="panel" aria-labelledby="trend">
-            <div class="head">
-              <h2 id="trend">Growth</h2>
-              <div class="tabs" role="group" aria-label="Series">
+        <div class="grid items-start gap-4 min-[860px]:grid-cols-[7fr_5fr]">
+          <section :class="panel" aria-labelledby="trend">
+            <div :class="head">
+              <h2 id="trend" :class="h2">Growth</h2>
+              <div
+                class="grid w-full grid-cols-3 gap-1 rounded-[10px] bg-surface-2 p-[3px] sm:inline-flex sm:w-auto"
+                role="group"
+                aria-label="Series"
+              >
                 <button
                   v-for="item in series"
                   :key="item.id"
                   type="button"
+                  class="min-h-8 cursor-pointer rounded-lg px-2 text-xs sm:px-3 sm:text-[.8125rem]"
+                  :class="
+                    current.id === item.id ? 'bg-surface font-semibold text-ink' : 'text-muted'
+                  "
                   :aria-pressed="current.id === item.id"
                   @click="picked = item.id"
                 >
@@ -240,46 +313,53 @@ const activeFor = (tag: string): number | null => {
               :title="current.label"
               :kind="current.bar ? 'bar' : 'line'"
             />
-            <p v-else class="empty">
+            <p v-else :class="note">
               {{ current.label }} will chart here once there is something to count. Check-ins only
               start when someone turns on usage statistics in the app.
             </p>
           </section>
 
-          <div class="stack">
-            <section class="panel" aria-labelledby="board">
-              <div class="head">
-                <h2 id="board">Leaderboard</h2>
-                <span v-if="leaderboard.length" class="muted">Top {{ leaderboard.length }}</span>
+          <div class="grid gap-4">
+            <section :class="panel" aria-labelledby="board">
+              <div :class="head">
+                <h2 id="board" :class="h2">Leaderboard</h2>
+                <span v-if="leaderboard.length" class="text-[.8125rem] text-muted"
+                  >Top {{ leaderboard.length }}</span
+                >
               </div>
-              <ol v-if="leaderboard.length" class="board">
-                <li v-for="entry in boardRows" :key="entry.id">
-                  <span class="rank">{{ entry.rank }}</span>
-                  <span class="flag" aria-hidden="true">{{ countryFlag(entry.country) }}</span>
-                  <span class="who">{{ entry.id }}</span>
-                  <span class="time">{{ hoursAndMinutes(entry.miningSeconds) }}</span>
+              <ol v-if="leaderboard.length" class="m-0 grid list-none p-0">
+                <li
+                  v-for="entry in boardRows"
+                  :key="entry.id"
+                  class="grid min-h-11 grid-cols-[2rem_1.5rem_minmax(0,1fr)_auto] items-center gap-2 text-sm tabular-nums"
+                >
+                  <span class="text-right text-muted">{{ entry.rank }}</span>
+                  <span aria-hidden="true">{{ countryFlag(entry.country) }}</span>
+                  <span class="font-semibold tracking-wide">{{ entry.id }}</span>
+                  <span class="text-muted">{{ hoursAndMinutes(entry.miningSeconds) }}</span>
                 </li>
               </ol>
-              <p v-else class="empty">
+              <p v-else :class="note">
                 Nobody is ranked yet. Turn on Mining activity under Settings → Usage statistics in
                 the app and your ID appears here after your next check-in.
               </p>
               <button
                 v-if="leaderboard.length > PREVIEW_ROWS"
                 type="button"
-                class="ghost more"
+                class="mt-2"
+                :class="ghost"
                 @click="boardOpen = !boardOpen"
               >
                 {{ boardOpen ? 'Show fewer' : `Show all ${leaderboard.length}` }}
               </button>
-              <p class="foot">
+              <p :class="[note, 'mt-4']">
                 Random public IDs that cannot be traced to a person or a device. Each app reports
                 its own figures; they are not verified.
               </p>
             </section>
-            <section v-if="!anyBreakdown" class="panel" aria-labelledby="who">
-              <h2 id="who">Countries, Android versions, APK variants</h2>
-              <p class="empty">
+            <section v-if="!anyBreakdown" :class="panel" aria-labelledby="who">
+              <h2 id="who" :class="[h2, 'mb-4']">Countries, Android versions, APK variants</h2>
+              <p :class="note">
                 These appear once at least {{ stats.minGroupSize }} installations have reported, so
                 no single installation can be picked out. Countries are chosen by users in Settings,
                 never detected from location or IP address.
@@ -288,33 +368,42 @@ const activeFor = (tag: string): number | null => {
           </div>
         </div>
 
-        <section class="panel" aria-labelledby="versions">
-          <h2 id="versions">Releases</h2>
-          <table v-if="downloads?.releases?.length">
-            <thead>
+        <section :class="panel" aria-labelledby="versions">
+          <h2 id="versions" :class="[h2, 'mb-4']">Releases</h2>
+          <table
+            v-if="downloads?.releases?.length"
+            class="w-full border-collapse text-sm [&_td]:border-b [&_td]:border-line [&_td]:px-2 [&_td]:py-3 [&_th]:border-b [&_th]:border-line [&_th]:px-2 [&_th]:py-3 [&_th]:text-left [&_tr:last-child_td]:border-0 [&_tr:last-child_th]:border-0"
+          >
+            <thead class="text-[.8125rem] text-muted [&_th]:pt-0 [&_th]:font-medium">
               <tr>
                 <th scope="col">Release</th>
-                <th scope="col" class="num">Active</th>
-                <th scope="col" class="num">Downloads</th>
-                <th scope="col" class="meter"><span class="sr-only">Share of downloads</span></th>
+                <th scope="col" class="!text-right">Active</th>
+                <th scope="col" class="!text-right">Downloads</th>
+                <th scope="col" class="w-[35%] pl-5 max-[860px]:hidden">
+                  <span class="sr-only">Share of downloads</span>
+                </th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="release in downloads.releases" :key="release.tag">
-                <th scope="row">
+                <th scope="row" class="font-semibold">
                   {{ release.tag }}
-                  <small v-if="release.prerelease">pre-release</small>
+                  <small v-if="release.prerelease" class="ml-1.5 font-medium text-muted"
+                    >pre-release</small
+                  >
                 </th>
-                <td class="num">
+                <td class="text-right whitespace-nowrap tabular-nums">
                   {{
                     activeFor(release.tag) === null ? '—' : number.format(activeFor(release.tag)!)
                   }}
                 </td>
-                <td class="num">{{ number.format(release.total) }}</td>
-                <td class="meter" aria-hidden="true">
-                  <span class="track"
+                <td class="text-right whitespace-nowrap tabular-nums">
+                  {{ number.format(release.total) }}
+                </td>
+                <td class="w-[35%] !pl-5 max-[860px]:hidden" aria-hidden="true">
+                  <span class="block h-1.5 overflow-hidden rounded-[3px] bg-surface-2"
                     ><span
-                      class="fill"
+                      class="block h-full rounded-[3px] bg-accent"
                       :style="{ width: `${(release.total / maxRelease) * 100}%` }"
                   /></span>
                 </td>
@@ -326,8 +415,8 @@ const activeFor = (tag: string): number | null => {
             :rows="rowsOf(stats.appVersions, (key) => key)"
             :notes="notesOf(stats.appVersions, 'Other')"
           />
-          <p v-else class="empty">Version figures appear once enough installations report.</p>
-          <p class="foot">
+          <p v-else :class="note">Version figures appear once enough installations report.</p>
+          <p :class="[note, 'mt-4']">
             <template v-if="downloads">
               From the GitHub Releases API<template v-if="downloads.fetchedAt"
                 >, fetched {{ new Date(downloads.fetchedAt).toLocaleString() }}</template
@@ -337,47 +426,45 @@ const activeFor = (tag: string): number | null => {
           </p>
         </section>
 
-        <div v-if="anyBreakdown" class="trio">
-          <template v-if="stats">
-            <section class="panel" aria-labelledby="geo">
-              <h2 id="geo">Countries</h2>
-              <BarList
-                v-if="published(stats.countries)"
-                :rows="rowsOf(stats.countries, (key) => `${countryName(key)} (${key})`)"
-                :notes="
-                  notesOf(
-                    stats.countries,
-                    `Other countries (fewer than ${stats.minGroupSize} each)`,
-                    'Country not shared'
-                  )
-                "
-              />
-              <p v-else class="empty">Not enough reports to publish yet.</p>
-              <p class="foot">Chosen by users in Settings, never detected.</p>
-            </section>
-            <section class="panel" aria-labelledby="android">
-              <h2 id="android">Android versions</h2>
-              <BarList
-                v-if="published(stats.androidVersions)"
-                :rows="rowsOf(stats.androidVersions, (key) => `Android ${key}`)"
-                :notes="notesOf(stats.androidVersions, 'Other')"
-              />
-              <p v-else class="empty">Not enough reports to publish yet.</p>
-            </section>
-            <section class="panel" aria-labelledby="variants">
-              <h2 id="variants">APK variants</h2>
-              <BarList
-                v-if="published(stats.variants)"
-                :rows="rowsOf(stats.variants, (key) => variantLabels[key] ?? key)"
-                :notes="notesOf(stats.variants, 'Other')"
-              />
-              <p v-else class="empty">Not enough reports to publish yet.</p>
-            </section>
-          </template>
+        <div v-if="anyBreakdown" class="grid items-start gap-4 min-[860px]:grid-cols-3">
+          <section :class="panel" aria-labelledby="geo">
+            <h2 id="geo" :class="[h2, 'mb-4']">Countries</h2>
+            <BarList
+              v-if="published(stats.countries)"
+              :rows="rowsOf(stats.countries, (key) => `${countryName(key)} (${key})`)"
+              :notes="
+                notesOf(
+                  stats.countries,
+                  `Other countries (fewer than ${stats.minGroupSize} each)`,
+                  'Country not shared'
+                )
+              "
+            />
+            <p v-else :class="note">Not enough reports to publish yet.</p>
+            <p :class="[note, 'mt-4']">Chosen by users in Settings, never detected.</p>
+          </section>
+          <section :class="panel" aria-labelledby="android">
+            <h2 id="android" :class="[h2, 'mb-4']">Android versions</h2>
+            <BarList
+              v-if="published(stats.androidVersions)"
+              :rows="rowsOf(stats.androidVersions, (key) => `Android ${key}`)"
+              :notes="notesOf(stats.androidVersions, 'Other')"
+            />
+            <p v-else :class="note">Not enough reports to publish yet.</p>
+          </section>
+          <section :class="panel" aria-labelledby="variants">
+            <h2 id="variants" :class="[h2, 'mb-4']">APK variants</h2>
+            <BarList
+              v-if="published(stats.variants)"
+              :rows="rowsOf(stats.variants, (key) => variantLabels[key] ?? key)"
+              :notes="notesOf(stats.variants, 'Other')"
+            />
+            <p v-else :class="note">Not enough reports to publish yet.</p>
+          </section>
         </div>
 
-        <footer>
-          <p>
+        <footer class="px-1 pt-2">
+          <p :class="note">
             Only installations with reporting turned on are counted, so every installation figure is
             a lower bound. Individual records are removed after
             {{ stats.retentionDays }} days of inactivity.
@@ -388,352 +475,3 @@ const activeFor = (tag: string): number | null => {
   </div>
   <SiteFooter />
 </template>
-
-<style scoped>
-.explainer {
-  margin: 16px 0;
-  padding: 12px 16px;
-}
-.explainer summary {
-  cursor: pointer;
-  font-weight: 650;
-}
-.explainer p {
-  margin: 8px 0 0;
-  max-width: 70ch;
-}
-.page {
-  max-width: 88rem;
-  margin: 0 auto;
-  padding: 24px var(--spacing-page, 16px) 0;
-}
-.bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 16px 0;
-}
-.brand {
-  font-weight: 750;
-  font-size: 1.0625rem;
-  color: inherit;
-  text-decoration: none;
-  white-space: nowrap;
-}
-.brand span {
-  color: rgb(var(--color-app-muted));
-  font-weight: 550;
-  margin-left: 6px;
-}
-nav {
-  display: flex;
-  gap: 20px;
-  font-size: 0.875rem;
-}
-nav a {
-  color: rgb(var(--color-app-muted));
-  text-decoration: none;
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-}
-nav a:hover {
-  color: rgb(var(--color-app-on));
-}
-main {
-  display: grid;
-  gap: 16px;
-}
-.title {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px 24px;
-  flex-wrap: wrap;
-  padding: 16px 0 4px;
-}
-h1 {
-  margin: 0 0 6px;
-  font-size: 1.75rem;
-  font-weight: 700;
-  line-height: 1.2;
-  letter-spacing: -0.01em;
-}
-.finding {
-  margin: 0;
-  max-width: 60ch;
-  color: rgb(var(--color-app-muted));
-  line-height: 1.55;
-}
-.stamp {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: rgb(var(--color-app-muted));
-  font-size: 0.8125rem;
-}
-h2 {
-  margin: 0;
-  font-size: 0.9375rem;
-  font-weight: 650;
-}
-.panel {
-  background: rgb(var(--color-app-card));
-  border: 1px solid rgb(var(--color-app-line));
-  border-radius: var(--radius-panel, 16px);
-  padding: clamp(16px, 2vw, 24px);
-  min-width: 0;
-}
-.panel > h2 {
-  margin-bottom: 16px;
-}
-.head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-}
-.muted {
-  color: rgb(var(--color-app-muted));
-  font-size: 0.8125rem;
-}
-
-/* One container split into four cells; the first figure answers the page's question. */
-.figures {
-  background: rgb(var(--color-app-card));
-  border: 1px solid rgb(var(--color-app-line));
-  border-radius: var(--radius-panel, 16px);
-  overflow: hidden;
-}
-.figures dl {
-  margin: 0;
-  display: grid;
-  grid-template-columns: 1.6fr repeat(3, 1fr);
-  gap: 1px;
-  background: rgb(var(--color-app-line));
-}
-.figures dl > div {
-  display: grid;
-  align-content: start;
-  gap: 6px;
-  padding: clamp(16px, 2vw, 24px);
-  background: rgb(var(--color-app-card));
-}
-.figures dt {
-  color: rgb(var(--color-app-muted));
-  font-size: 0.8125rem;
-}
-.figures dd {
-  margin: 0;
-  font-size: 1.75rem;
-  font-weight: 600;
-  line-height: 1.1;
-  font-variant-numeric: tabular-nums;
-}
-.figures .lead dd {
-  font-size: 2.5rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-.figures small {
-  color: rgb(var(--color-app-muted));
-  font-size: 0.75rem;
-  font-weight: 500;
-}
-
-.split {
-  display: grid;
-  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
-  gap: 16px;
-  align-items: start;
-}
-.stack {
-  display: grid;
-  gap: 16px;
-}
-.trio {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-  align-items: start;
-}
-.tabs {
-  display: inline-flex;
-  gap: 4px;
-  padding: 3px;
-  border-radius: 10px;
-  background: rgb(var(--color-app-elevated));
-}
-.tabs button {
-  min-height: 32px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: rgb(var(--color-app-muted));
-  font: inherit;
-  font-size: 0.8125rem;
-  cursor: pointer;
-}
-.tabs button[aria-pressed='true'] {
-  background: rgb(var(--color-app-card));
-  color: rgb(var(--color-app-on));
-  font-weight: 600;
-}
-.board {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-}
-.board li {
-  display: grid;
-  grid-template-columns: 2rem 1.5rem minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  font-variant-numeric: tabular-nums;
-  font-size: 0.875rem;
-}
-.rank {
-  color: rgb(var(--color-app-muted));
-  text-align: right;
-}
-.who {
-  font-weight: 600;
-  letter-spacing: 0.04em;
-}
-.time {
-  color: rgb(var(--color-app-muted));
-}
-.more {
-  margin-top: 8px;
-}
-.foot,
-.empty,
-footer p {
-  color: rgb(var(--color-app-muted));
-  font-size: 0.8125rem;
-  line-height: 1.6;
-  max-width: 64ch;
-}
-.foot {
-  margin: 16px 0 0;
-}
-.empty {
-  margin: 0;
-}
-footer {
-  padding: 8px 4px 0;
-}
-footer p {
-  margin: 0;
-}
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
-}
-th,
-td {
-  padding: 12px 8px;
-  text-align: left;
-  border-bottom: 1px solid rgb(var(--color-app-line));
-  font-weight: 500;
-}
-thead th {
-  color: rgb(var(--color-app-muted));
-  font-size: 0.8125rem;
-  padding-top: 0;
-}
-tbody th {
-  font-weight: 650;
-}
-tbody tr:last-child th,
-tbody tr:last-child td {
-  border-bottom: 0;
-}
-.num {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.meter {
-  width: 35%;
-  padding-left: 20px;
-}
-.track {
-  display: block;
-  height: 6px;
-  border-radius: 3px;
-  background: rgb(var(--color-app-elevated));
-  overflow: hidden;
-}
-.fill {
-  display: block;
-  height: 100%;
-  background: rgb(var(--color-app-green));
-  border-radius: 3px;
-}
-tbody small {
-  color: rgb(var(--color-app-muted));
-  font-weight: 500;
-  margin-left: 6px;
-}
-.state {
-  color: rgb(var(--color-app-muted));
-}
-.ghost {
-  min-height: 36px;
-  padding: 0 14px;
-  border: 1px solid rgb(var(--color-app-line));
-  border-radius: var(--radius-control, 12px);
-  background: transparent;
-  color: rgb(var(--color-app-on));
-  font: inherit;
-  font-size: 0.8125rem;
-  cursor: pointer;
-}
-.ghost:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-a:focus-visible,
-button:focus-visible {
-  outline: 2px solid rgb(var(--color-app-green));
-  outline-offset: 2px;
-}
-
-@media (max-width: 860px) {
-  .split,
-  .trio {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .figures dl {
-    grid-template-columns: repeat(3, 1fr);
-  }
-  .figures .lead {
-    grid-column: 1 / -1;
-  }
-  .meter {
-    display: none;
-  }
-}
-@media (max-width: 480px) {
-  .brand span {
-    display: none;
-  }
-  nav {
-    gap: 12px;
-  }
-  .figures dd {
-    font-size: 1.375rem;
-  }
-  .figures small {
-    display: none;
-  }
-}
-</style>

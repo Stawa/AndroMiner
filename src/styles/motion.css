@@ -51,7 +51,6 @@
 
 @media (hover: hover) {
   .outline-button:hover:not(:disabled),
-  .history-row:hover,
   .drawer-row:hover,
   .session-action:hover:not(:disabled) {
     background: rgb(var(--color-app-elevated));

@@ -520,46 +520,6 @@
   font-size: 0.75rem;
   color: rgb(var(--color-app-muted));
 }
-.history-row {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  text-align: left;
-  padding: 14px 0;
-  border-bottom: 1px solid rgb(var(--color-app-line));
-}
-.history-row:last-child {
-  border-bottom: 0;
-}
-.history-row > span:not(.coin-mark):not(.coin-icon) {
-  flex: 1;
-  min-width: 0;
-}
-.history-row strong,
-.history-row small {
-  display: block;
-  overflow-wrap: anywhere;
-}
-.history-row strong {
-  font-weight: 550;
-  font-size: 0.8125rem;
-}
-.history-row small {
-  color: rgb(var(--color-app-muted));
-  font-size: 0.75rem;
-  margin-top: 3px;
-}
-.history-row b {
-  font-size: 0.75rem;
-  font-weight: 600;
-  max-width: 28%;
-  overflow-wrap: anywhere;
-}
-.history-row > .material-symbols-rounded:last-child {
-  color: rgb(var(--color-app-muted));
-  flex-shrink: 0;
-}
 .config-fields {
   border: 0;
   padding: 0;
@@ -804,27 +764,6 @@
   font-weight: 550;
   letter-spacing: -0.04em;
   margin-bottom: 8px;
-}
-.share-meter {
-  display: flex;
-  height: 6px;
-  border-radius: 4px;
-  overflow: hidden;
-  background: rgb(var(--color-app-elevated));
-  margin: 14px 0 10px;
-}
-.share-meter > span:first-child {
-  background: rgb(var(--color-app-green));
-}
-.share-meter > span:last-child {
-  background: var(--danger);
-}
-.share-legend {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  color: rgb(var(--color-app-muted));
-  font-size: 0.75rem;
 }
 .setting-row {
   display: flex;

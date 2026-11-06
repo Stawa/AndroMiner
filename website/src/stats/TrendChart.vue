@@ -114,16 +114,21 @@ const summary = computed(() =>
 </script>
 
 <template>
-  <figure class="chart">
-    <div class="readout" aria-live="polite">
+  <figure class="m-0">
+    <div class="mb-2 flex min-h-8 items-baseline gap-2.5" aria-live="polite">
       <template v-if="readout">
-        <strong>{{ full.format(readout.value) }}</strong>
-        <span>{{ caption }} · {{ formatLabel(readout.label) }}</span>
+        <strong class="text-2xl font-extrabold tabular-nums">{{
+          full.format(readout.value)
+        }}</strong>
+        <span class="text-[.8125rem] text-muted"
+          >{{ caption }} · {{ formatLabel(readout.label) }}</span
+        >
       </template>
-      <span v-else>No data yet</span>
+      <span v-else class="text-[.8125rem] text-muted">No data yet</span>
     </div>
     <svg
       :viewBox="`0 0 ${width} ${height}`"
+      class="block h-auto w-full touch-pan-y rounded-lg"
       role="img"
       tabindex="0"
       :aria-label="summary"
@@ -132,7 +137,7 @@ const summary = computed(() =>
       @keydown="onKey"
       @blur="hovered = null"
     >
-      <g class="grid">
+      <g class="fill-muted text-[11px] tabular-nums [&_line]:stroke-line [&_line]:opacity-70">
         <template v-for="tick in ticks" :key="tick">
           <line :x1="pad.left" :x2="width - pad.right" :y1="yFor(tick)" :y2="yFor(tick)" />
           <text :x="pad.left - 8" :y="yFor(tick) + 4" text-anchor="end">
@@ -145,8 +150,8 @@ const summary = computed(() =>
           <rect
             v-for="(point, i) in points"
             :key="point.label"
-            class="bar"
-            :class="{ dim: active !== i }"
+            class="fill-accent transition-opacity duration-100 motion-reduce:transition-none"
+            :class="active !== i ? 'opacity-45' : ''"
             :x="xFor(i) - barWidth / 2"
             :y="yFor(point.value)"
             :width="barWidth"
@@ -155,10 +160,14 @@ const summary = computed(() =>
           />
         </template>
         <template v-else>
-          <path v-if="points.length > 1" :d="path" class="series" />
+          <path
+            v-if="points.length > 1"
+            :d="path"
+            class="fill-none stroke-accent stroke-[2.25] [stroke-linecap:round] [stroke-linejoin:round] [vector-effect:non-scaling-stroke]"
+          />
           <line
             v-if="hovered !== null"
-            class="cursor"
+            class="stroke-muted [stroke-dasharray:3_3]"
             :x1="xFor(hovered)"
             :x2="xFor(hovered)"
             :y1="pad.top"
@@ -169,95 +178,30 @@ const summary = computed(() =>
             :cx="xFor(active)"
             :cy="yFor(points[active].value)"
             r="4.5"
-            class="dot"
+            class="fill-accent stroke-surface stroke-2"
           />
         </template>
       </template>
       <text
         v-for="edge in edgeLabels"
         :key="edge.text"
-        class="axis"
+        class="fill-muted text-[11px] tabular-nums"
         :x="edge.x"
         :y="height - 6"
         :text-anchor="edge.anchor"
       >
         {{ edge.text }}
       </text>
-      <text v-if="!points.length" class="axis" :x="width / 2" :y="height / 2" text-anchor="middle">
+      <text
+        v-if="!points.length"
+        class="fill-muted text-[11px]"
+        :x="width / 2"
+        :y="height / 2"
+        text-anchor="middle"
+      >
         Not enough data yet
       </text>
     </svg>
     <figcaption class="sr-only">{{ summary }}</figcaption>
   </figure>
 </template>
-
-<style scoped>
-.chart {
-  margin: 0;
-}
-.readout {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  min-height: 2rem;
-  margin-bottom: 8px;
-}
-.readout strong {
-  font-size: 1.5rem;
-  font-weight: 750;
-  font-variant-numeric: tabular-nums;
-}
-.readout span {
-  color: rgb(var(--color-app-muted));
-  font-size: 0.8125rem;
-}
-svg {
-  display: block;
-  width: 100%;
-  height: auto;
-  touch-action: pan-y;
-  border-radius: 8px;
-}
-.grid line {
-  stroke: rgb(var(--color-app-line));
-  stroke-width: 1;
-  opacity: 0.7;
-}
-text {
-  fill: rgb(var(--color-app-muted));
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-}
-.series {
-  fill: none;
-  stroke: rgb(var(--color-app-green));
-  stroke-width: 2.25;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-  vector-effect: non-scaling-stroke;
-}
-.cursor {
-  stroke: rgb(var(--color-app-muted));
-  stroke-width: 1;
-  stroke-dasharray: 3 3;
-}
-.bar,
-.dot {
-  fill: rgb(var(--color-app-green));
-}
-.dot {
-  stroke: rgb(var(--color-app-card));
-  stroke-width: 2;
-}
-.bar {
-  transition: opacity 120ms ease;
-}
-.bar.dim {
-  opacity: 0.45;
-}
-@media (prefers-reduced-motion: reduce) {
-  .bar {
-    transition: none;
-  }
-}
-</style>

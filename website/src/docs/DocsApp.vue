@@ -6,6 +6,7 @@ import generated from './components.generated.json';
 import ComponentDocs from './ComponentDocs.vue';
 import { categories, notes, type ComponentCategory } from './componentNotes';
 import { markdownFor } from './content';
+import DocsSearch from './DocsSearch.vue';
 import DocsSidebar from './DocsSidebar.vue';
 import DocsToc from './DocsToc.vue';
 import { renderMarkdown, slugify, type Heading } from './markdown';
@@ -56,7 +57,7 @@ const tocOpen = ref(false);
 const drawer = ref<HTMLElement | null>(null);
 const menuButton = ref<HTMLButtonElement | null>(null);
 const closeButton = ref<HTMLButtonElement | null>(null);
-const sidebar = ref<InstanceType<typeof DocsSidebar> | null>(null);
+const searchOpen = ref(false);
 const desktop = window.matchMedia('(min-width: 1024px)');
 
 const openMenu = async (): Promise<void> => {
@@ -81,11 +82,12 @@ const go = (path: string): void => {
   slug.value = target || first;
   menuOpen.value = false;
   tocOpen.value = false;
+  searchOpen.value = false;
   void scrollToHash();
 };
 
 // New pages jump instantly; in-page links glide.
-const scrollToHash = async (behavior: ScrollBehavior = 'instant'): Promise<void> => {
+const scrollToHash = async (behavior: 'instant' | 'smooth' | 'auto' = 'instant'): Promise<void> => {
   await nextTick();
   const id = decodeURIComponent(location.hash.slice(1));
   const el = id ? document.getElementById(id) : null;
@@ -167,17 +169,17 @@ const setMeta = (): void => {
 };
 watch(title, setMeta);
 
-const focusSearch = async (): Promise<void> => {
-  if (!desktop.matches) await openMenu();
-  await nextTick();
-  sidebar.value?.focus();
+const openSearch = (): void => {
+  menuOpen.value = false;
+  tocOpen.value = false;
+  searchOpen.value = true;
 };
 
 const onKey = (event: KeyboardEvent): void => {
   const typing = (event.target as HTMLElement).matches('input, textarea, select');
   if ((event.key === '/' && !typing) || ((event.ctrlKey || event.metaKey) && event.key === 'k')) {
     event.preventDefault();
-    void focusSearch();
+    openSearch();
   } else if (event.key === 'Escape') {
     if (menuOpen.value) closeMenu();
     tocOpen.value = false;
@@ -242,6 +244,7 @@ onBeforeUnmount(() => {
         ref="menuButton"
         type="button"
         class="btn-ghost !px-3.5 !py-2 text-sm"
+        aria-label="Menu"
         :aria-expanded="menuOpen"
         aria-controls="doc-nav"
         @click="openMenu"
@@ -254,12 +257,33 @@ onBeforeUnmount(() => {
             stroke-linecap="round"
           />
         </svg>
-        Menu
+        <span class="max-sm:sr-only">Menu</span>
       </button>
       <p class="m-0 min-w-0 flex-1 truncate font-mono text-xs text-muted">
         {{ section?.title ?? 'Docs' }} /
         <span class="text-ink">{{ page?.title }}</span>
       </p>
+      <button
+        type="button"
+        class="btn-ghost grid !size-10 shrink-0 place-items-center !p-0"
+        aria-label="Search docs"
+        aria-haspopup="dialog"
+        @click="openSearch"
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          aria-hidden="true"
+        >
+          <circle cx="11" cy="11" r="7" />
+          <path d="M20 20l-3.5-3.5" />
+        </svg>
+      </button>
       <button
         v-if="headings.length > 1"
         id="doc-toc-button"
@@ -269,7 +293,7 @@ onBeforeUnmount(() => {
         aria-controls="doc-toc-mobile"
         @click="tocOpen = !tocOpen"
       >
-        On this page
+        <span class="whitespace-nowrap">On this page</span>
         <svg
           class="transition-transform motion-reduce:transition-none"
           :class="tocOpen ? 'rotate-180' : ''"
@@ -331,7 +355,7 @@ onBeforeUnmount(() => {
           </svg>
         </button>
       </div>
-      <DocsSidebar ref="sidebar" :slug="slug" @go="go" />
+      <DocsSidebar :slug="slug" @go="go" @search="openSearch" />
     </aside>
 
     <main id="doc-main" class="min-w-0 py-8 lg:py-12">
@@ -400,4 +424,5 @@ onBeforeUnmount(() => {
     </aside>
   </div>
   <SiteFooter />
+  <DocsSearch :open="searchOpen" @close="searchOpen = false" @go="go" />
 </template>

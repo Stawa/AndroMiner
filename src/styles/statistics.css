@@ -1,117 +1,6 @@
-/* History page: filter chips and statistics. */
-.chip-row {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.chip-row::-webkit-scrollbar {
-  display: none;
-}
-.chip {
-  flex: none;
-  min-height: 40px;
-  padding: 0 16px;
-  border-radius: 999px;
-  background: rgb(var(--color-app-elevated));
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: rgb(var(--color-app-on));
-  white-space: nowrap;
-  transition:
-    background-color 180ms,
-    color 180ms;
-}
-.chip[aria-pressed='true'] {
-  background: rgb(var(--color-app-on));
-  color: rgb(var(--color-app-bg));
-}
-
-/* ---- Statistics ---- */
-.st-hero {
-  display: grid;
-  gap: 10px;
-  min-width: 0;
-}
-.st-number {
-  font-size: clamp(2.5rem, 13vw, 3.75rem);
-  font-weight: 300;
-  line-height: 1.05;
-  letter-spacing: -0.04em;
-  font-variant-numeric: tabular-nums;
-}
-.st-kpis {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin: 6px 0 0;
-  border-block: 1px solid rgb(var(--color-app-line));
-}
-.st-kpis > div {
-  display: grid;
-  gap: 6px;
-  padding: 16px 0;
-}
-.st-kpis > div + div {
-  padding-left: 16px;
-  border-left: 1px solid rgb(var(--color-app-line));
-}
-.st-kpis dt {
-  font-size: 0.6875rem;
-  font-weight: 650;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: rgb(var(--color-app-muted));
-}
-.st-kpis dd {
-  display: grid;
-  gap: 2px;
-  margin: 0;
-}
-.st-kpis strong {
-  font-size: 1.75rem;
-  font-weight: 600;
-  letter-spacing: -0.03em;
-  font-variant-numeric: tabular-nums;
-}
-.st-kpis dd > span {
-  font-size: 0.75rem;
-  color: rgb(var(--color-app-muted));
-}
-.st-chart {
-  display: grid;
-  gap: 14px;
-  min-width: 0;
-}
-.st-chart-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.st-bars {
-  display: flex;
-  align-items: flex-end;
-  gap: 6px;
-  height: 7rem;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgb(var(--color-app-line));
-  background-image: radial-gradient(rgb(var(--color-app-line)) 1px, transparent 1.4px);
-  background-size: 12px 12px;
-}
-.st-bars > span {
-  flex: 1 1 0;
-  max-width: 28px;
-  height: calc(var(--h) * 100%);
-  border-radius: 6px 6px 3px 3px;
-  background: rgb(var(--color-app-green));
-  transform-origin: bottom;
+/* Statistics: only what utilities cannot express. */
+.bar-rise {
   animation: bar-rise 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-.st-bars > span:last-child {
-  opacity: 1;
-}
-.st-bars > span:not(:last-child) {
-  opacity: 0.55;
 }
 @keyframes bar-rise {
   from {
@@ -119,5 +8,10 @@
   }
   to {
     transform: scaleY(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bar-rise {
+    animation: none;
   }
 }
