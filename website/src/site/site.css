@@ -1,0 +1,171 @@
+/* AndroMiner public site. Built separately from the Android app (vite.stats.config.ts). */
+@import 'tailwindcss' source('..');
+
+@font-face {
+  font-family: 'Manrope';
+  src: url('../../../src/assets/fonts/Manrope-Variable.ttf') format('truetype');
+  font-weight: 200 800;
+  font-display: swap;
+}
+
+/* Tokens switch with the system colour scheme; Tailwind utilities read them through `@theme inline`. */
+:root {
+  --ground: #0a0c0a;
+  --surface: #111411;
+  --surface-2: #191d19;
+  --line: #262b26;
+  --ink: #eef1ea;
+  --muted: #9ba296;
+  --accent: #b8f36b;
+  --on-accent: #0d1802;
+  --accent-text: #b8f36b;
+  --header-h: 4.25rem;
+  /* Side padding that keeps content on one 88rem column while backgrounds may bleed full width. */
+  --page-pad: max(clamp(16px, 4vw, 48px), calc((100vw - 88rem) / 2 + clamp(16px, 4vw, 48px)));
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --ground: #f6f8f2;
+    --surface: #ffffff;
+    --surface-2: #eceee6;
+    --line: #d9ddd0;
+    --ink: #161a14;
+    --muted: #5d665a;
+    --accent: #b8f36b;
+    --on-accent: #0d1802;
+    --accent-text: #3f6b0e;
+  }
+}
+
+@theme inline {
+  --font-sans: 'Manrope', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
+
+  --color-ground: var(--ground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-accent-text: var(--accent-text);
+
+  --radius-card: 12px;
+  --radius-control: 10px;
+
+  --spacing-gutter: clamp(16px, 4vw, 48px);
+  --spacing-section: clamp(64px, 9vw, 144px);
+
+  --text-hero: clamp(2.5rem, 1rem + 6vw, 5.5rem);
+  --text-hero--line-height: 0.98;
+  --text-hero--letter-spacing: -0.04em;
+  --text-cta: clamp(2.5rem, 1rem + 6vw, 6rem);
+  --text-cta--line-height: 0.98;
+  --text-cta--letter-spacing: -0.04em;
+  --text-h2: clamp(1.75rem, 1.2rem + 2.4vw, 3rem);
+  --text-h2--line-height: 1.06;
+  --text-h2--letter-spacing: -0.03em;
+  --text-h3: clamp(1.125rem, 1.05rem + 0.4vw, 1.375rem);
+  --text-h3--line-height: 1.25;
+  --text-h3--letter-spacing: -0.01em;
+  --text-lead: clamp(1.0625rem, 1rem + 0.4vw, 1.3125rem);
+  --text-lead--line-height: 1.45;
+
+  --animate-rise: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 88px;
+    color-scheme: dark light;
+  }
+  body {
+    @apply bg-ground font-sans text-[clamp(.9375rem,.9rem+.2vw,1.0625rem)] leading-relaxed text-ink antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-bold text-balance;
+  }
+  p {
+    @apply mb-[1em] max-w-[62ch];
+  }
+  img {
+    @apply block h-auto max-w-full;
+  }
+  :focus-visible {
+    @apply outline-[3px] outline-offset-[3px] outline-accent;
+  }
+  ::selection {
+    @apply bg-accent text-on-accent;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-accent px-5 py-2.5 font-bold text-on-accent no-underline transition-transform hover:-translate-y-px active:translate-y-0 active:scale-[0.98] motion-reduce:transition-none;
+  }
+  .btn-lg {
+    @apply px-7 py-3.5 text-base;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-line bg-transparent px-5 py-2.5 font-bold text-ink no-underline transition-colors hover:border-muted;
+  }
+  .btn-ghost.btn-lg {
+    @apply px-7 py-3.5 text-base;
+  }
+  .eyebrow {
+    @apply mb-4 font-mono text-xs tracking-[0.14em] text-accent-text uppercase;
+  }
+  .card {
+    @apply rounded-card border border-line bg-surface;
+  }
+  .data-table {
+    @apply w-full border-collapse tabular-nums;
+  }
+  .data-table th,
+  .data-table td {
+    @apply border-b border-line px-2.5 py-3 text-left align-top sm:px-4 sm:py-3.5;
+  }
+  .data-table thead th {
+    @apply font-mono text-xs font-medium tracking-[0.08em] text-muted uppercase sm:whitespace-nowrap;
+  }
+  .data-table .num {
+    @apply text-right whitespace-nowrap;
+  }
+}
+
+/* Motion: transform and opacity only. Content stays visible without script. */
+.js .reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition:
+    opacity 0.6s ease,
+    transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.js .reveal.in {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .js .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}

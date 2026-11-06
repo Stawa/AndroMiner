@@ -1,0 +1,1579 @@
+[
+  {
+    "name": "AppDrawer",
+    "source": "src/components/AppDrawer.vue",
+    "props": [
+      {
+        "name": "open",
+        "type": "boolean",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "activeTab",
+        "type": "AppTab",
+        "required": true,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {},
+    "emits": [
+      {
+        "name": "close",
+        "payload": ""
+      },
+      {
+        "name": "navigate",
+        "payload": "value: AppTab"
+      },
+      {
+        "name": "exportConfig",
+        "payload": ""
+      },
+      {
+        "name": "importConfig",
+        "payload": ""
+      }
+    ],
+    "slots": [],
+    "imports": [
+      "vue",
+      "../composables/useAppVersion",
+      "./BrandLogo.vue",
+      "./MaterialIcon.vue",
+      "./BottomNav.vue",
+      "../composables/useDialogFocus",
+      "../i18n"
+    ],
+    "scopedStyle": false,
+    "rootClass": "drawer-backdrop",
+    "styleFile": "src/styles/components.css",
+    "usesI18n": true
+  },
+  {
+    "name": "AppHeader",
+    "source": "src/components/AppHeader.vue",
+    "props": [
+      {
+        "name": "connected",
+        "type": "boolean",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "sessionState",
+        "type": "string",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "activeTab",
+        "type": "AppTab",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "backendState",
+        "type": "MinerBackendState",
+        "required": true,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {},
+    "emits": [
+      {
+        "name": "openDrawer",
+        "payload": ""
+      },
+      {
+        "name": "back",
+        "payload": ""
+      },
+      {
+        "name": "notifications",
+        "payload": ""
+      }
+    ],
+    "slots": [],
+    "imports": [
+      "vue",
+      "./MaterialIcon.vue",
+      "./BottomNav.vue",
+      "../composables/useMiningController",
+      "../i18n"
+    ],
+    "scopedStyle": false,
+    "rootClass": "app-header",
+    "styleFile": "src/styles/layout.css",
+    "usesI18n": true
+  },
+  {
+    "name": "AppUpdatesCard",
+    "source": "src/components/AppUpdatesCard.vue",
+    "props": [],
+    "propsResolved": true,
+    "defaults": {},
+    "emits": [],
+    "slots": [],
+    "imports": [
+      "vue",
+      "./MaterialIcon.vue",
+      "./ToggleRow.vue",
+      "../stores/settings",
+      "../composables/useNativeMinerInfo",
+      "../composables/useGitHubReleaseUpdater",
+      "../i18n"
+    ],
+    "scopedStyle": true,
+    "rootClass": "surface",
+    "styleFile": "src/styles/components.css",
+    "usesI18n": true
+  },
+  {
+    "name": "BottomNav",
+    "source": "src/components/BottomNav.vue",
+    "props": [
+      {
+        "name": "modelValue",
+        "type": "AppTab",
+        "required": true,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {},
+    "emits": [
+      {
+        "name": "update:modelValue",
+        "payload": "value: AppTab"
+      }
+    ],
+    "slots": [],
+    "imports": ["./MaterialIcon.vue"],
+    "scopedStyle": false,
+    "rootClass": "app-bottom-nav",
+    "styleFile": "src/styles/components.css",
+    "usesI18n": false
+  },
+  {
+    "name": "BrandLogo",
+    "source": "src/components/BrandLogo.vue",
+    "props": [],
+    "propsResolved": true,
+    "defaults": {},
+    "emits": [],
+    "slots": [],
+    "imports": ["../../assets/brand/androminer-logo.png"],
+    "scopedStyle": false,
+    "rootClass": "block",
+    "styleFile": null,
+    "usesI18n": false
+  },
+  {
+    "name": "CoinIcon",
+    "source": "src/components/CoinIcon.vue",
+    "props": [
+      {
+        "name": "symbol",
+        "type": "string",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "size",
+        "type": "number",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "decorative",
+        "type": "boolean",
+        "required": false,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {
+      "size": "36",
+      "decorative": "true"
+    },
+    "emits": [],
+    "slots": [],
+    "imports": ["vue", "./MaterialIcon.vue"],
+    "scopedStyle": false,
+    "rootClass": "coin-icon",
+    "styleFile": "src/styles/components.css",
+    "usesI18n": false
+  },
+  {
+    "name": "ConfigCard",
+    "source": "src/components/ConfigCard.vue",
+    "props": [
+      {
+        "name": "icon",
+        "type": "string",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "title",
+        "type": "string",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "subtitle",
+        "type": "string",
+        "required": false,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {},
+    "emits": [],
+    "slots": ["aside", "default"],
+    "imports": ["./MaterialIcon.vue"],
+    "scopedStyle": false,
+    "rootClass": "cfg-card",
+    "styleFile": "src/styles/mining-setup.css",
+    "usesI18n": false
+  },
+  {
+    "name": "ConfigInput",
+    "source": "src/components/ConfigInput.vue",
+    "props": [
+      {
+        "name": "modelValue",
+        "type": "string | number",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "label",
+        "type": "string",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "type",
+        "type": "'text' | 'number' | 'password'",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "inputmode",
+        "type": "'text' | 'numeric' | 'decimal' | 'url'",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "supportingText",
+        "type": "string",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "suffix",
+        "type": "string",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "revealable",
+        "type": "boolean",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "error",
+        "type": "string",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "min",
+        "type": "number",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "max",
+        "type": "number",
+        "required": false,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {
+      "type": "'text'",
+      "inputmode": "'text'",
+      "supportingText": "''",
+      "suffix": "''",
+      "revealable": "false"
+    },
+    "emits": [
+      {
+        "name": "update:modelValue",
+        "payload": "value: string | number"
+      }
+    ],
+    "slots": [],
+    "imports": ["vue", "./MaterialIcon.vue"],
+    "scopedStyle": false,
+    "rootClass": "config-field",
+    "styleFile": "src/styles/components.css",
+    "usesI18n": false
+  },
+  {
+    "name": "ConfigSelect",
+    "source": "src/components/ConfigSelect.vue",
+    "props": [
+      {
+        "name": "modelValue",
+        "type": "string",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "label",
+        "type": "string",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "options",
+        "type": "ConfigSelectOption[]",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "supportingText",
+        "type": "string",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "searchable",
+        "type": "boolean",
+        "required": false,
+        "description": "Shows the search box. Defaults to on when the options are coins."
+      },
+      {
+        "name": "searchLabel",
+        "type": "string",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "searchPlaceholder",
+        "type": "string",
+        "required": false,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {
+      "supportingText": "''",
+      "searchable": "undefined",
+      "searchLabel": "''",
+      "searchPlaceholder": "''"
+    },
+    "emits": [
+      {
+        "name": "update:modelValue",
+        "payload": "value: string"
+      }
+    ],
+    "slots": [],
+    "imports": ["vue", "./MaterialIcon.vue", "./CoinIcon.vue", "../composables/useDialogFocus"],
+    "scopedStyle": false,
+    "rootClass": "config-field",
+    "styleFile": "src/styles/components.css",
+    "usesI18n": false
+  },
+  {
+    "name": "CrashRestartPrompt",
+    "source": "src/components/CrashRestartPrompt.vue",
+    "props": [
+      {
+        "name": "crash",
+        "type": "CrashRestart",
+        "required": true,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {},
+    "emits": [
+      {
+        "name": "restart",
+        "payload": ""
+      },
+      {
+        "name": "cancel",
+        "payload": ""
+      }
+    ],
+    "slots": [],
+    "imports": ["vue", "../types/mining", "./MaterialIcon.vue"],
+    "scopedStyle": true,
+    "rootClass": "app-page",
+    "styleFile": "src/styles/components.css",
+    "usesI18n": false
+  },
+  {
+    "name": "DeviceBenchmark",
+    "source": "src/components/DeviceBenchmark.vue",
+    "props": [
+      {
+        "name": "engine",
+        "type": "MiningEngineId | undefined",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "mining",
+        "type": "boolean",
+        "required": true,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {},
+    "emits": [],
+    "slots": [],
+    "imports": [
+      "vue",
+      "./MaterialIcon.vue",
+      "../composables/useAppVersion",
+      "../composables/useBenchmark",
+      "../i18n",
+      "../types/mining",
+      "../utils/benchmarkClient"
+    ],
+    "scopedStyle": false,
+    "rootClass": "dv-group",
+    "styleFile": "src/styles/device.css",
+    "usesI18n": true
+  },
+  {
+    "name": "DotMeter",
+    "source": "src/components/DotMeter.vue",
+    "props": [
+      {
+        "name": "value",
+        "type": "number | null",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "count",
+        "type": "number",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "label",
+        "type": "string",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "tone",
+        "type": "'accent' | 'warn' | 'danger' | 'muted'",
+        "required": false,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {
+      "count": "20",
+      "label": "''",
+      "tone": "'accent'"
+    },
+    "emits": [],
+    "slots": [],
+    "imports": ["vue"],
+    "scopedStyle": false,
+    "rootClass": "dot-meter",
+    "styleFile": "src/styles/primitives.css",
+    "usesI18n": false
+  },
+  {
+    "name": "EngineCard",
+    "source": "src/components/EngineCard.vue",
+    "props": [
+      {
+        "name": "modelValue",
+        "type": "MiningEngineId | undefined",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "coin",
+        "type": "Pick<Cryptocurrency, 'name' | 'xmrigAlgo' | 'requiredEngine'>",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "error",
+        "type": "string",
+        "required": false,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {},
+    "emits": [
+      {
+        "name": "update:modelValue",
+        "payload": "value: MiningEngineId"
+      },
+      {
+        "name": "download",
+        "payload": ""
+      }
+    ],
+    "slots": [],
+    "imports": [
+      "vue",
+      "../composables/useNativeMinerInfo",
+      "../i18n",
+      "../types/mining",
+      "../utils/engineDownloads",
+      "../utils/engines",
+      "./ConfigCard.vue",
+      "./ConfigSelect.vue"
+    ],
+    "scopedStyle": true,
+    "rootClass": null,
+    "styleFile": null,
+    "usesI18n": true
+  },
+  {
+    "name": "ExpandableCard",
+    "source": "src/components/ExpandableCard.vue",
+    "props": [
+      {
+        "name": "title",
+        "type": "string",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "supportingText",
+        "type": "string",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "modelValue",
+        "type": "boolean",
+        "required": true,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {
+      "supportingText": "''"
+    },
+    "emits": [
+      {
+        "name": "update:modelValue",
+        "payload": "value: boolean"
+      }
+    ],
+    "slots": ["default"],
+    "imports": ["./MaterialIcon.vue"],
+    "scopedStyle": false,
+    "rootClass": "app-card",
+    "styleFile": "src/styles/components.css",
+    "usesI18n": false
+  },
+  {
+    "name": "HashrateRing",
+    "source": "src/components/HashrateRing.vue",
+    "props": [
+      {
+        "name": "value",
+        "type": "number | null",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "peak",
+        "type": "number | null",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "active",
+        "type": "boolean",
+        "required": true,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {},
+    "emits": [],
+    "slots": [],
+    "imports": ["vue", "../composables/useTweenedNumber"],
+    "scopedStyle": false,
+    "rootClass": "relative",
+    "styleFile": null,
+    "usesI18n": false
+  },
+  {
+    "name": "LeaderboardCard",
+    "source": "src/components/LeaderboardCard.vue",
+    "props": [],
+    "propsResolved": true,
+    "defaults": {},
+    "emits": [],
+    "slots": [],
+    "imports": [
+      "vue",
+      "@capacitor/clipboard",
+      "./MaterialIcon.vue",
+      "../composables/useTelemetry",
+      "../i18n",
+      "../utils/telemetryClient",
+      "../utils/countryFlag"
+    ],
+    "scopedStyle": true,
+    "rootClass": "surface",
+    "styleFile": "src/styles/components.css",
+    "usesI18n": true
+  },
+  {
+    "name": "MaterialIcon",
+    "source": "src/components/MaterialIcon.vue",
+    "props": [
+      {
+        "name": "name",
+        "type": "string",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "size",
+        "type": "number",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "filled",
+        "type": "boolean",
+        "required": false,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {
+      "size": "24",
+      "filled": "false"
+    },
+    "emits": [],
+    "slots": [],
+    "imports": [],
+    "scopedStyle": false,
+    "rootClass": "material-symbols-rounded",
+    "styleFile": "src/styles/about.css",
+    "usesI18n": false
+  },
+  {
+    "name": "MetricChart",
+    "source": "src/components/MetricChart.vue",
+    "props": [
+      {
+        "name": "title",
+        "type": "string",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "subtitle",
+        "type": "string",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "points",
+        "type": "HistoryPoint[]",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "accent",
+        "type": "string",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "unit",
+        "type": "string",
+        "required": true,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {},
+    "emits": [],
+    "slots": [],
+    "imports": ["chart.js", "vue", "vue-chartjs", "../types/mining"],
+    "scopedStyle": false,
+    "rootClass": "app-card",
+    "styleFile": "src/styles/components.css",
+    "usesI18n": false
+  },
+  {
+    "name": "MinerDownloadWarningSheet",
+    "source": "src/components/MinerDownloadWarningSheet.vue",
+    "props": [
+      {
+        "name": "open",
+        "type": "boolean",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "downloading",
+        "type": "boolean",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "progress",
+        "type": "MinerDownloadProgress",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "error",
+        "type": "string",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "engines",
+        "type": "readonly NativeEngineInfo[]",
+        "required": true,
+        "description": "What this device reports for every engine; empty until the native layer has answered."
+      },
+      {
+        "name": "selectedId",
+        "type": "string",
+        "required": true,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {},
+    "emits": [
+      {
+        "name": "confirm",
+        "payload": "variant: MinerBinaryVariant, scope: 'selected' | 'all'"
+      },
+      {
+        "name": "cancel",
+        "payload": ""
+      }
+    ],
+    "slots": [],
+    "imports": [
+      "vue",
+      "./MaterialIcon.vue",
+      "../composables/useDialogFocus",
+      "../composables/useMiningController",
+      "../utils/engineDownloads",
+      "../utils/engines"
+    ],
+    "scopedStyle": false,
+    "rootClass": "modal-backdrop",
+    "styleFile": "src/styles/components.css",
+    "usesI18n": false
+  },
+  {
+    "name": "MiningMetric",
+    "source": "src/components/MiningMetric.vue",
+    "props": [
+      {
+        "name": "label",
+        "type": "string",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "value",
+        "type": "string",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "tone",
+        "type": "'normal' | 'good' | 'warning' | 'danger'",
+        "required": false,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {
+      "tone": "'normal'"
+    },
+    "emits": [],
+    "slots": [],
+    "imports": [],
+    "scopedStyle": false,
+    "rootClass": "min-w-0",
+    "styleFile": null,
+    "usesI18n": false
+  },
+  {
+    "name": "PhoneMiningRiskView",
+    "source": "src/components/PhoneMiningRiskView.vue",
+    "props": [],
+    "propsResolved": true,
+    "defaults": {},
+    "emits": [
+      {
+        "name": "continue",
+        "payload": ""
+      }
+    ],
+    "slots": [],
+    "imports": ["./MaterialIcon.vue"],
+    "scopedStyle": false,
+    "rootClass": "onboarding-page",
+    "styleFile": "src/styles/components.css",
+    "usesI18n": false
+  },
+  {
+    "name": "PoolConnectionTest",
+    "source": "src/components/PoolConnectionTest.vue",
+    "props": [
+      {
+        "name": "config",
+        "type": "MiningConfig",
+        "required": true,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {},
+    "emits": [],
+    "slots": [],
+    "imports": [
+      "vue",
+      "@capacitor/core",
+      "@capacitor/clipboard",
+      "./MaterialIcon.vue",
+      "../types/mining",
+      "../i18n"
+    ],
+    "scopedStyle": false,
+    "rootClass": "pool-test",
+    "styleFile": "src/styles/mining-setup.css",
+    "usesI18n": true
+  },
+  {
+    "name": "ProfileChip",
+    "source": "src/components/ProfileChip.vue",
+    "props": [
+      {
+        "name": "value",
+        "type": "MiningProfile",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "label",
+        "type": "string",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "supportingText",
+        "type": "string",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "selected",
+        "type": "boolean",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "icon",
+        "type": "string",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "threadLabel",
+        "type": "string",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "coreLabel",
+        "type": "string",
+        "required": false,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {},
+    "emits": [
+      {
+        "name": "select",
+        "payload": "value: MiningProfile"
+      }
+    ],
+    "slots": [],
+    "imports": ["./MaterialIcon.vue", "../types/mining"],
+    "scopedStyle": false,
+    "rootClass": "profile-option",
+    "styleFile": "src/styles/components.css",
+    "usesI18n": false
+  },
+  {
+    "name": "ProtectionEventList",
+    "source": "src/components/ProtectionEventList.vue",
+    "props": [
+      {
+        "name": "events",
+        "type": "ProtectionEvent[]",
+        "required": true,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {},
+    "emits": [],
+    "slots": [],
+    "imports": ["vue", "../i18n", "../types/mining", "../utils/protection"],
+    "scopedStyle": false,
+    "rootClass": "pe-list",
+    "styleFile": "src/styles/device.css",
+    "usesI18n": true
+  },
+  {
+    "name": "ProtectionPanel",
+    "source": "src/components/ProtectionPanel.vue",
+    "props": [
+      {
+        "name": "device",
+        "type": "DeviceTelemetry",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "protection",
+        "type": "ProtectionSnapshot | null",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "events",
+        "type": "ProtectionEvent[]",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "temperatureLimitC",
+        "type": "number",
+        "required": true,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {},
+    "emits": [],
+    "slots": [],
+    "imports": [
+      "vue",
+      "../i18n",
+      "../types/mining",
+      "../utils/protection",
+      "./ProtectionEventList.vue"
+    ],
+    "scopedStyle": false,
+    "rootClass": "dv-group",
+    "styleFile": "src/styles/device.css",
+    "usesI18n": true
+  },
+  {
+    "name": "RangeSlider",
+    "source": "src/components/RangeSlider.vue",
+    "props": [
+      {
+        "name": "modelValue",
+        "type": "number",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "label",
+        "type": "string",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "min",
+        "type": "number",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "max",
+        "type": "number",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "step",
+        "type": "number",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "unit",
+        "type": "string",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "disabled",
+        "type": "boolean",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "offLabel",
+        "type": "string",
+        "required": false,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {
+      "step": "1",
+      "unit": "''",
+      "disabled": "false",
+      "offLabel": "''"
+    },
+    "emits": [
+      {
+        "name": "update:modelValue",
+        "payload": "value: number"
+      }
+    ],
+    "slots": [],
+    "imports": ["vue"],
+    "scopedStyle": false,
+    "rootClass": "range-slider",
+    "styleFile": "src/styles/components.css",
+    "usesI18n": false
+  },
+  {
+    "name": "RecentRunCard",
+    "source": "src/components/RecentRunCard.vue",
+    "props": [
+      {
+        "name": "run",
+        "type": "MiningSessionHistoryItem",
+        "required": true,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {},
+    "emits": [
+      {
+        "name": "select",
+        "payload": "run: MiningSessionHistoryItem"
+      }
+    ],
+    "slots": [],
+    "imports": [
+      "vue",
+      "./MaterialIcon.vue",
+      "./CoinIcon.vue",
+      "../utils/miningTelemetry",
+      "../i18n",
+      "../types/mining"
+    ],
+    "scopedStyle": false,
+    "rootClass": "recent-run-card",
+    "styleFile": "src/styles/components.css",
+    "usesI18n": true
+  },
+  {
+    "name": "SavedSetupPicker",
+    "source": "src/components/SavedSetupPicker.vue",
+    "props": [
+      {
+        "name": "profiles",
+        "type": "SavedMiningProfile[]",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "activeId",
+        "type": "string | null",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "required": true,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {},
+    "emits": [
+      {
+        "name": "apply",
+        "payload": "profile: SavedMiningProfile"
+      },
+      {
+        "name": "create",
+        "payload": ""
+      },
+      {
+        "name": "rename",
+        "payload": ""
+      },
+      {
+        "name": "duplicate",
+        "payload": ""
+      },
+      {
+        "name": "delete",
+        "payload": ""
+      },
+      {
+        "name": "update:name",
+        "payload": "name: string"
+      }
+    ],
+    "slots": [],
+    "imports": ["./MaterialIcon.vue", "./CoinIcon.vue", "./ConfigInput.vue", "../types/mining"],
+    "scopedStyle": false,
+    "rootClass": "surface",
+    "styleFile": "src/styles/components.css",
+    "usesI18n": false
+  },
+  {
+    "name": "SessionControls",
+    "source": "src/components/SessionControls.vue",
+    "props": [
+      {
+        "name": "state",
+        "type": "MiningState",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "profileLabel",
+        "type": "string",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "pendingAction",
+        "type": "PendingSessionAction",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "animationsEnabled",
+        "type": "boolean",
+        "required": false,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {},
+    "emits": [
+      {
+        "name": "pause",
+        "payload": ""
+      },
+      {
+        "name": "stop",
+        "payload": ""
+      },
+      {
+        "name": "profile",
+        "payload": ""
+      }
+    ],
+    "slots": [],
+    "imports": ["./MaterialIcon.vue", "../types/mining"],
+    "scopedStyle": false,
+    "rootClass": "session-controls",
+    "styleFile": "src/styles/live-session.css",
+    "usesI18n": false
+  },
+  {
+    "name": "SettingGroup",
+    "source": "src/components/SettingGroup.vue",
+    "props": [
+      {
+        "name": "title",
+        "type": "string",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "icon",
+        "type": "string",
+        "required": false,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {
+      "title": "''",
+      "icon": "''"
+    },
+    "emits": [],
+    "slots": ["default"],
+    "imports": ["./MaterialIcon.vue"],
+    "scopedStyle": false,
+    "rootClass": "app-card",
+    "styleFile": "src/styles/components.css",
+    "usesI18n": false
+  },
+  {
+    "name": "StartMiningWarningSheet",
+    "source": "src/components/StartMiningWarningSheet.vue",
+    "props": [
+      {
+        "name": "open",
+        "type": "boolean",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "config",
+        "type": "MiningConfig",
+        "required": true,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {},
+    "emits": [
+      {
+        "name": "confirm",
+        "payload": ""
+      },
+      {
+        "name": "cancel",
+        "payload": ""
+      }
+    ],
+    "slots": [],
+    "imports": [
+      "vue",
+      "./MaterialIcon.vue",
+      "../composables/useDialogFocus",
+      "../types/mining",
+      "../i18n"
+    ],
+    "scopedStyle": false,
+    "rootClass": "modal-backdrop",
+    "styleFile": "src/styles/components.css",
+    "usesI18n": true
+  },
+  {
+    "name": "StatCard",
+    "source": "src/components/StatCard.vue",
+    "props": [
+      {
+        "name": "label",
+        "type": "string",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "value",
+        "type": "string",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "supportingText",
+        "type": "string",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "icon",
+        "type": "string",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "tone",
+        "type": "'normal' | 'warning' | 'good'",
+        "required": false,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {
+      "supportingText": "''",
+      "icon": "''",
+      "tone": "'normal'"
+    },
+    "emits": [],
+    "slots": [],
+    "imports": ["./MaterialIcon.vue"],
+    "scopedStyle": false,
+    "rootClass": "stat-card",
+    "styleFile": null,
+    "usesI18n": false
+  },
+  {
+    "name": "StatusIndicator",
+    "source": "src/components/StatusIndicator.vue",
+    "props": [
+      {
+        "name": "connected",
+        "type": "boolean",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "label",
+        "type": "string",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "tone",
+        "type": "'good' | 'warning' | 'danger' | 'muted'",
+        "required": false,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {
+      "label": "''",
+      "tone": "undefined"
+    },
+    "emits": [],
+    "slots": [],
+    "imports": ["vue"],
+    "scopedStyle": false,
+    "rootClass": "inline-flex",
+    "styleFile": null,
+    "usesI18n": false
+  },
+  {
+    "name": "TelemetrySparkline",
+    "source": "src/components/TelemetrySparkline.vue",
+    "props": [
+      {
+        "name": "points",
+        "type": "HistoryPoint[]",
+        "required": true,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {},
+    "emits": [],
+    "slots": [],
+    "imports": ["vue", "../types/mining"],
+    "scopedStyle": false,
+    "rootClass": null,
+    "styleFile": null,
+    "usesI18n": false
+  },
+  {
+    "name": "ToggleRow",
+    "source": "src/components/ToggleRow.vue",
+    "props": [
+      {
+        "name": "modelValue",
+        "type": "boolean",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "label",
+        "type": "string",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "supportingText",
+        "type": "string",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "icon",
+        "type": "string",
+        "required": false,
+        "description": ""
+      },
+      {
+        "name": "disabled",
+        "type": "boolean",
+        "required": false,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {
+      "supportingText": "''",
+      "icon": "''",
+      "disabled": "false"
+    },
+    "emits": [
+      {
+        "name": "update:modelValue",
+        "payload": "value: boolean"
+      }
+    ],
+    "slots": [],
+    "imports": ["./MaterialIcon.vue"],
+    "scopedStyle": false,
+    "rootClass": "setting-row",
+    "styleFile": "src/styles/components.css",
+    "usesI18n": false
+  },
+  {
+    "name": "UpdateBanner",
+    "source": "src/components/UpdateBanner.vue",
+    "props": [
+      {
+        "name": "title",
+        "type": "string",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "message",
+        "type": "string",
+        "required": true,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {},
+    "emits": [
+      {
+        "name": "view",
+        "payload": ""
+      },
+      {
+        "name": "dismiss",
+        "payload": ""
+      }
+    ],
+    "slots": [],
+    "imports": ["./MaterialIcon.vue"],
+    "scopedStyle": false,
+    "rootClass": "app-banner-wrap",
+    "styleFile": "src/styles/layout.css",
+    "usesI18n": false
+  },
+  {
+    "name": "UsageStatisticsCard",
+    "source": "src/components/UsageStatisticsCard.vue",
+    "props": [],
+    "propsResolved": true,
+    "defaults": {},
+    "emits": [],
+    "slots": [],
+    "imports": [
+      "vue",
+      "@capacitor/browser",
+      "./MaterialIcon.vue",
+      "./ConfigSelect.vue",
+      "./ToggleRow.vue",
+      "../utils/telemetryClient",
+      "../../server/data/countries.json",
+      "../utils/countryFlag",
+      "../composables/useTelemetry",
+      "../i18n"
+    ],
+    "scopedStyle": true,
+    "rootClass": "surface",
+    "styleFile": "src/styles/components.css",
+    "usesI18n": true
+  },
+  {
+    "name": "WarningBottomSheet",
+    "source": "src/components/WarningBottomSheet.vue",
+    "props": [
+      {
+        "name": "open",
+        "type": "boolean",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "type",
+        "type": "WarningType",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "threshold",
+        "type": "number",
+        "required": true,
+        "description": ""
+      },
+      {
+        "name": "message",
+        "type": "string",
+        "required": false,
+        "description": ""
+      }
+    ],
+    "propsResolved": true,
+    "defaults": {},
+    "emits": [
+      {
+        "name": "resume",
+        "payload": ""
+      },
+      {
+        "name": "lowerPerformance",
+        "payload": ""
+      },
+      {
+        "name": "ignore",
+        "payload": ""
+      },
+      {
+        "name": "dismiss",
+        "payload": ""
+      }
+    ],
+    "slots": [],
+    "imports": ["vue", "./MaterialIcon.vue", "../composables/useDialogFocus"],
+    "scopedStyle": false,
+    "rootClass": "modal-backdrop",
+    "styleFile": "src/styles/components.css",
+    "usesI18n": false
+  }
+]

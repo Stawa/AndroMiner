@@ -6,5 +6,10 @@
     "allowSyntheticDefaultImports": true,
     "noEmit": true
   },
-  "include": ["vite.config.ts", "tailwind.config.ts", "postcss.config.cjs"]
+  "include": [
+    "vite.config.ts",
+    "website/vite.config.ts",
+    "tailwind.config.ts",
+    "postcss.config.cjs"
+  ]
 }

@@ -24,12 +24,12 @@ Then:
 1. Terminate TLS at the proxy and forward to the service. Disable access logs, or at least do not log client addresses or request paths (deletion requests carry the installation ID in the path).
 2. If the proxy sets a trusted client-address header, set `CLIENT_IP_HEADER` so rate limiting does not see only the proxy. Otherwise leave it empty.
 3. Set `CORS_ORIGIN` to the origin of your statistics page if you want to restrict browsers (the Android app is unaffected).
-4. Build the app with `VITE_TELEMETRY_ENDPOINT=https://stats.example.org`. Build the public page with the same value: `npm run build:stats`, then host `dist-stats/` on any static host.
+4. Build the app with `VITE_TELEMETRY_ENDPOINT=https://stats.example.org`. Build the public page with the same value: `npm run build:site`, then host `website/dist/` on any static host.
 5. Back up `stats.sqlite` if you want to keep history; it contains no wallet or mining data.
 
 ## Deploy on Vercel with Firestore (free tier)
 
-The repository root is a Vercel project: `vercel.json` builds the public page (`npm run build:stats` → `dist-stats/`), serves the landing page at `/` and the statistics dashboard at `/stats`, and routes `/v1/*` and `/healthz` to `api/index.mjs`, which runs this service on Firestore instead of SQLite. Everything below fits the free plans (Vercel Hobby, Firebase Spark).
+The repository root is a Vercel project: `vercel.json` builds the public page (`npm run build:site` → `website/dist/`), serves the landing page at `/` and the statistics dashboard at `/stats`, and routes `/v1/*` and `/healthz` to `api/index.mjs`, which runs this service on Firestore instead of SQLite. Everything below fits the free plans (Vercel Hobby, Firebase Spark).
 
 1. In the [Firebase console](https://console.firebase.google.com) create a project and add **Firestore Database** (production mode). Publish `firestore.rules` (it denies all client access; the server uses a service account).
 2. Project settings → Service accounts → **Generate new private key**. Keep the JSON file private.

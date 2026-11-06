@@ -1,11 +1,13 @@
 {
-  "buildCommand": "npm run build:stats",
-  "outputDirectory": "dist-stats",
+  "buildCommand": "npm run build:site",
+  "outputDirectory": "website/dist",
   "rewrites": [
     { "source": "/v1/:path*", "destination": "/api" },
     { "source": "/healthz", "destination": "/api" },
     { "source": "/", "destination": "/landing.html" },
-    { "source": "/stats", "destination": "/stats.html" }
+    { "source": "/stats", "destination": "/stats.html" },
+    { "source": "/docs", "destination": "/docs.html" },
+    { "source": "/docs/:path*", "destination": "/docs.html" }
   ],
   "functions": { "api/index.mjs": { "includeFiles": "server/data/**" } },
   "crons": [{ "path": "/v1/maintenance/prune", "schedule": "17 3 * * *" }]

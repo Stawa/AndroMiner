@@ -2,7 +2,7 @@
 
 How the optional anonymous statistics work: what the numbers mean, the service API, design choices and contributor rules. What users are told is in the [privacy policy](privacy.md).
 
-The app sends a small check-in. `server/` validates it, rate-limits it, keeps one row per installation and serves public totals to `stats.html`. It is a dependency-free Node service on `node:sqlite`; the public instance runs on Vercel with Firestore (`server/src/firestoreStore.mjs`) because Vercel has no persistent disk. Both stores share one interface and one publishing path.
+The app sends a small check-in. `server/` validates it, rate-limits it, keeps one row per installation and serves public totals to `website/stats.html`. It is a dependency-free Node service on `node:sqlite`; the public instance runs on Vercel with Firestore (`server/src/firestoreStore.mjs`) because Vercel has no persistent disk. Both stores share one interface and one publishing path.
 
 ## What the numbers mean
 
@@ -122,7 +122,7 @@ AndroMiner must stay fully usable without telemetry.
 
 ```bash
 npm test && npm run lint     # app and server tests
-npm run build:stats          # public page → dist-stats/
+npm run build:site           # public site → website/dist/
 cd server && node src/index.mjs   # Node 22.13+; set VITE_TELEMETRY_ENDPOINT=http://localhost:8787 for a dev app
 ```
 

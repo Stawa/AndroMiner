@@ -1,0 +1,207 @@
+/* Documentation typography and code blocks. Colours come from the shared site tokens. */
+.prose {
+  max-width: 48rem;
+}
+.prose h1 {
+  font-size: clamp(2rem, 1.4rem + 2vw, 2.75rem);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  margin: 0 0 1rem;
+}
+.prose h2 {
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+  margin: 2.5rem 0 0.75rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--line);
+}
+.prose h3 {
+  font-size: 1.125rem;
+  margin: 1.75rem 0 0.5rem;
+}
+.prose h2,
+.prose h3 {
+  scroll-margin-top: calc(var(--header-h) + 4.75rem);
+}
+.prose h2 .anchor,
+.prose h3 .anchor {
+  margin-left: 0.5rem;
+  font-weight: 400;
+  text-decoration: none;
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.prose h2:hover .anchor,
+.prose h3:hover .anchor,
+.prose .anchor:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .prose h2 .anchor,
+  .prose h3 .anchor {
+    display: none;
+  }
+}
+.prose p,
+.prose li {
+  max-width: 68ch;
+  color: var(--ink);
+}
+.prose .lead {
+  color: var(--muted);
+  font-size: 1.0625rem;
+}
+.prose ul,
+.prose ol {
+  padding-left: 1.4rem;
+  margin: 0 0 1em;
+}
+.prose li {
+  margin-bottom: 0.35rem;
+}
+.prose a {
+  color: var(--accent-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.prose :not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.1em 0.35em;
+  overflow-wrap: anywhere;
+}
+.prose .table-wrap {
+  overflow-x: auto;
+  margin: 0 0 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.prose th,
+.prose td {
+  padding: 0.6rem 0.85rem;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--line);
+}
+.prose tbody tr:last-child td {
+  border-bottom: 0;
+}
+.prose th {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--surface);
+  white-space: nowrap;
+}
+.prose td code {
+  white-space: nowrap;
+}
+.prose .req {
+  font-size: 0.75rem;
+  color: var(--accent-text);
+}
+.prose .meta {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 1.25rem;
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+}
+.prose .meta dt {
+  color: var(--muted);
+}
+.prose .meta dd {
+  margin: 0;
+  min-width: 0;
+}
+
+.code-block {
+  position: relative;
+  margin: 0 0 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #0d100d;
+}
+.code-block::before {
+  content: attr(data-lang);
+  position: absolute;
+  top: 0.45rem;
+  left: 0.9rem;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8b9487;
+}
+.code-block pre {
+  margin: 0;
+  padding: 2rem 1rem 1rem;
+  overflow-x: auto;
+  tab-size: 2;
+}
+.code-block code {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: #e6eadf;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+.copy-code {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.5rem;
+  cursor: pointer;
+  border: 1px solid #2b312b;
+  border-radius: 6px;
+  background: #151915;
+  color: #c9d1c4;
+  font: inherit;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+}
+.copy-code:hover {
+  border-color: #b8f36b;
+  color: #b8f36b;
+}
+.hljs-comment,
+.hljs-quote {
+  color: #7e8a79;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in {
+  color: #b8f36b;
+}
+.hljs-string,
+.hljs-attr,
+.hljs-attribute {
+  color: #8fd3ff;
+}
+.hljs-number,
+.hljs-literal,
+.hljs-variable,
+.hljs-title {
+  color: #f0c674;
+}
+.component-doc + .component-doc {
+  margin-top: 1rem;
+}
+
+/* Headings carry their own scroll-margin (header + mobile bar); drop the landing page offset. */
+html {
+  scroll-padding-top: 0;
+}

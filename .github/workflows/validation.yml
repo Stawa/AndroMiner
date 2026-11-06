@@ -21,7 +21,7 @@ jobs:
       - run: npm run i18n:check
       - run: npm test
       - run: npm run build
-      - run: npm run build:stats
+      - run: npm run build:site
   android:
     needs: frontend
     runs-on: ubuntu-24.04

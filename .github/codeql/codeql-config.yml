@@ -3,5 +3,5 @@ paths-ignore:
   - '**/node_modules/**'
   - android/**/build/**
   - dist/**
-  - dist-stats/**
+  - website/dist/**
   - miner-builder/work/**

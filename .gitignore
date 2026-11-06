@@ -3,7 +3,7 @@ node_modules/
 
 # Build and generated output
 dist/
-dist-stats/
+website/dist/
 build/
 /types/
 coverage/
