@@ -1,0 +1,108 @@
+name: Android ARMv7 Test Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: Miner network variant
+        type: choice
+        options: [tls, notls]
+        default: tls
+
+run-name: Android ARMv7 Test Build (${{ inputs.variant }})
+
+permissions:
+  contents: read
+
+jobs:
+  armv7:
+    name: ARMv7 debug APK
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+    env:
+      NDK_VERSION: 27.2.12479018
+      ABI: armeabi-v7a
+      ANDROID_PLATFORM: android-24
+      XMRIG_REF: v6.26.0
+      LIBUV_REF: v1.48.0
+      OPENSSL_REF: openssl-4.0.0
+      WITH_TLS: ${{ inputs.variant == 'tls' && 'ON' || 'OFF' }}
+      QUIET: 'ON'
+      VITE_TELEMETRY_ENDPOINT: https://andro-miner.vercel.app
+      VITE_STATS_PAGE_URL: https://andro-miner.vercel.app
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install native build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake make ninja-build perl pkg-config
+
+      - name: Install Android SDK packages
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          (yes || true) | "$SDKMANAGER" --licenses
+          "$SDKMANAGER" "platforms;android-36" "build-tools;35.0.0" "ndk;$NDK_VERSION"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+
+      - name: Build web app and sync Android project
+        run: npm run android:sync
+
+      - name: Build XMRig ARMv7 miner
+        run: bash miner-builder/build-xmrig-android.sh
+
+      - name: Build XMRigCC ARMv7 miner
+        env:
+          ENGINE: xmrigcc
+        run: bash miner-builder/build-xmrig-android.sh
+
+      - name: Build XLArig ARMv7 miner
+        env:
+          ENGINE: xlarig
+        run: bash miner-builder/build-xmrig-android.sh
+
+      - name: Build debug APK (ARMv7 only)
+        run: |
+          chmod +x android/gradlew
+          (cd android && ./gradlew assembleDebug -PbundleMiner=true -PminerVariant=${{ inputs.variant }} -PversionNameOverride="armv7-test-${GITHUB_SHA::7}" --stacktrace)
+          apk=android/app/build/outputs/apk/debug/app-debug.apk
+          for lib in libxmrig libxmrigcc libxlarig; do unzip -l "$apk" | grep -q "lib/armeabi-v7a/$lib.so"; done
+          if unzip -l "$apk" | grep -q 'lib/arm64-v8a/libx'; then echo "::error::arm64 miner found in ARMv7 test APK"; exit 1; fi
+          mkdir -p out && cp "$apk" "out/androminer-armv7-${{ inputs.variant }}-debug.apk"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: androminer-armv7-${{ inputs.variant }}-debug
+          path: out/*.apk
+          if-no-files-found: error
+
+      - name: Upload miner build diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: androminer-armv7-miner-build-logs
+          path: |
+            miner-builder/work/logs/
+            miner-builder/work/build/**/CMakeCache.txt
+            miner-builder/work/build/**/CMakeFiles/CMakeConfigureLog.yaml
+          if-no-files-found: warn
