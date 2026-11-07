@@ -37,8 +37,8 @@ export default defineConfig({
       output: {
         codeSplitting: {
           groups: [
-            { name: 'vendor', test: /node_modules[\/](vue|@vue|vue-i18n|@intlify)[\/]/ },
-            { name: 'locales', test: /src[\/]i18n[\/]locales[\/]/ }
+            { name: 'vendor', test: /node_modules[\\/](vue|@vue|vue-i18n|@intlify)[\\/]/ },
+            { name: 'locales', test: /src[\\/]i18n[\\/]locales[\\/]/ }
           ]
         }
       }
