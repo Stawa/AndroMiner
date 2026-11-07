@@ -18,7 +18,6 @@ const escapeHtml = (value: string): string =>
 export const slugify = (text: string): string =>
   text
     .toLowerCase()
-    .replace(/<[^>]+>/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
 
@@ -45,9 +44,9 @@ export const renderMarkdown = (source: string): Rendered => {
     renderer: {
       heading({ tokens, depth }) {
         const text = this.parser.parseInline(tokens);
-        const id = slugify(text);
-        if (depth === 2 || depth === 3)
-          headings.push({ id, text: text.replace(/<[^>]+>/g, ''), depth });
+        const plain = this.parser.parseInline(tokens, this.parser.textRenderer);
+        const id = slugify(plain);
+        if (depth === 2 || depth === 3) headings.push({ id, text: plain, depth });
         const anchor =
           depth === 1
             ? ''
