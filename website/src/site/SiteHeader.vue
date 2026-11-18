@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { images, nav } from './content';
+import { images, links, nav } from './content';
 
 const open = ref(false);
 const here = typeof location === 'undefined' ? '' : location.pathname;
@@ -33,7 +33,18 @@ const current = (href: string): boolean =>
         >
       </nav>
       <div class="flex items-center gap-2">
-        <a class="btn shrink-0 !px-4 text-sm sm:!px-5 sm:text-base" href="/#download">Download</a>
+        <a
+          class="btn-ghost shrink-0 !px-4 text-sm sm:!px-5 sm:text-base"
+          :href="links.repo"
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Star AndroMiner on GitHub"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.44 9.8 8.2 11.39.6.11.82-.26.82-.58v-2.23c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.33-1.76-1.33-1.76-1.09-.75.08-.74.08-.74 1.2.08 1.83 1.23 1.83 1.23 1.07 1.83 2.81 1.3 3.5.99.11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.34-5.47-5.95 0-1.31.47-2.38 1.23-3.22-.12-.3-.53-1.52.12-3.18 0 0 1.01-.32 3.3 1.23.96-.27 1.98-.4 3-.4s2.04.13 3 .4c2.29-1.55 3.3-1.23 3.3-1.23.65 1.66.24 2.88.12 3.18.77.84 1.23 1.91 1.23 3.22 0 4.62-2.8 5.64-5.48 5.94.43.37.81 1.1.81 2.22v3.29c0 .32.22.69.82.57A12 12 0 0 0 24 12C24 5.37 18.63 0 12 0Z" />
+          </svg>
+          Star
+        </a>
         <button
           type="button"
           class="grid size-11 cursor-pointer place-items-center rounded-full text-ink hover:bg-surface-2 md:hidden"
